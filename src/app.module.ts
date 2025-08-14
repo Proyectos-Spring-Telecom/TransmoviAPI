@@ -29,6 +29,7 @@ import Joi from 'joi';
         DB_PASSWORD: Joi.string().allow(''), // Puede estar vacío si no hay pass
         DB_DATABASE: Joi.string().required(),
         JWT_SECRET: Joi.string().required(),
+        JWT_EXPIRES_IN: Joi.string().required(),
       }),
     }),
 
