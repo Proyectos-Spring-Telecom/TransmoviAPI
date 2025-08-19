@@ -41,7 +41,9 @@ export class BitacoraLoggerService {
     Query: string,
     IdUsuario: number,
   ) {
-    const FechaActual = moment().tz('America/Mexico_City').toDate();// fecha en tu zona horaria
+    const FechaActual = moment()
+    .tz('America/Mexico_City')
+    .format('YYYY-MM-DD HH:mm:ss');
 
     const registro = this.bitacoraRepository.create({
       modulo: Modulo,
