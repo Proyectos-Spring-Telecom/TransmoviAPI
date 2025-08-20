@@ -30,6 +30,7 @@ export class DispositivosController {
       createDispositivoDto,
       idUser,
     );
+
   }
 
   @Get()
@@ -54,6 +55,7 @@ export class DispositivosController {
       idUser,
       updateDispositivoEstatusDto,
     );
+
   }
 
   @Put(':id')

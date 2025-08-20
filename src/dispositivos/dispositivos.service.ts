@@ -155,6 +155,7 @@ export class DispositivosService {
         `Se actualizó el dispositivo con ID: ${id}`,
         'UPDATE',
         `UPDATE Clientes SET ... WHERE Id=${id}`,
+
         Number(idUser),
       );
       return await this.dispositivoRepository.findOne({ where: { id } });
@@ -169,6 +170,7 @@ export class DispositivosService {
   }
   //Eliminar Dispositivos
   async removeDispositivo(id: number, idUser: string) {
+
     try {
       const findDispositivo = await this.dispositivoRepository.findOne({
         where: { id },
