@@ -8,8 +8,12 @@ import { UsuarioPermisos } from 'src/entities/UsuarioPermisos';
 
 @Injectable()
 export class PermisosService {
-  constructor(@InjectRepository(Permisos) private readonly permisoRepository: Repository<Permisos>, @InjectRepository(UsuarioPermisos) private readonly usuarioPermiso:Repository<UsuarioPermisos>) { }
-
+  constructor(
+    @InjectRepository(Permisos)
+    private readonly permisoRepository: Repository<Permisos>,
+    @InjectRepository(UsuarioPermisos)
+    private readonly usuarioPermiso: Repository<UsuarioPermisos>,
+  ) {}
 
   async findAll(page: number = 1, limit: number = 10) {
     const [permisos, total] = await this.permisoRepository.findAndCount({
@@ -29,34 +33,31 @@ export class PermisosService {
   async findAllList(page: number = 1, limit: number = 10) {
     const permisos = await this.permisoRepository.find({
       relations: ['modulo'],
-
     });
 
     return permisos;
   }
-
 
   async findOne(id: number) {
     const permiso = await this.permisoRepository.findOne({ where: { id: id } });
     if (!permiso) throw new NotFoundException('Permiso no encontrado');
     return permiso;
   }
-   async createPermiso(createPermiso:CreatePermisoDto, idUsuario){
+  async createPermiso(createPermiso: CreatePermisoDto, idUsuario) {
     try {
       const create = this.permisoRepository.create(createPermiso);
       const savedPermiso = await this.permisoRepository.save(create);
       const asignar = {
         idPermiso: savedPermiso.id,
-        idUsuario: idUsuario
-      }
+        idUsuario: idUsuario,
+      };
       const permiso = await this.usuarioPermiso.create(asignar);
       const asignarRoot = {
         idPermiso: savedPermiso.id,
-        idUsuario: 24
-      }
+        idUsuario: 24,
+      };
       const permisoRoot = await this.usuarioPermiso.create(asignarRoot);
       this.usuarioPermiso.save(permisoRoot);
-
     } catch (error) {
       return error;
     }
@@ -64,79 +65,81 @@ export class PermisosService {
 
   async update(updatePermiso: UpdatePermisoDto) {
     try {
-            const id=updatePermiso.id;
-            const permisoActualizar = {
-              nombre:updatePermiso.nombre,
-              idModulo:updatePermiso.idModulo,
-              descripcion:updatePermiso.descripcion
-            }
-            const permiso = this.permisoRepository.findOne({where:{id}});
-            if(!permiso) throw new NotFoundException('Permiso no encontrado')
-            const result = this.permisoRepository.update(id,permisoActualizar);
-     
-            return result;
-        } catch (error) {
-            return error;
-        }
+      const id = updatePermiso.id;
+      const permisoActualizar = {
+        nombre: updatePermiso.nombre,
+        idModulo: updatePermiso.idModulo,
+        descripcion: updatePermiso.descripcion,
+      };
+      const permiso = this.permisoRepository.findOne({ where: { id } });
+      if (!permiso) throw new NotFoundException('Permiso no encontrado');
+      const result = this.permisoRepository.update(id, permisoActualizar);
+
+      return result;
+    } catch (error) {
+      return error;
+    }
   }
 
   async remove(id: number) {
     return `This action removes a #${id} permiso`;
   }
-
-   async obtenerPermisosAgrupados(idUsuario): Promise<any[]> {
-        try {
-          // Consulta SQL cruda
-          const query = `
+    //ERROR AL CONSUMIR LA API -----------------------********************------
+  async obtenerPermisosAgrupados(idUsuario): Promise<any[]> {
+    try {
+      // Consulta SQL cruda
+      const query = `
             SELECT 
             DISTINCT UsuarioPermisos.IdPermiso,
-              CatModulos.Id AS IdModulo,
-              CatModulos.Nombre AS NombreModulo,
+              Modulos.Id AS IdModulo,
+              Modulos.Nombre AS NombreModulo,
               Permisos.Id AS PermisoId,
               Permisos.Nombre AS PermisoNombre,
               Permisos.Descripcion AS PermisoDescripcion
             FROM 
-           UsuarioPermisos
+           UsuariosPermisos
             INNER JOIN 
               Permisos ON UsuarioPermisos.IdPermiso = Permisos.Id
             INNER JOIN 
-              CatModulos ON Permisos.IdModulo = CatModulos.Id
+              Modulos ON Permisos.IdModulo = Modulos.Id
             WHERE 
-              UsuarioPermisos.IdUsuario ='${idUsuario}'`;
-    
-          // Ejecutar la consulta
-          const results = await this.permisoRepository.query(query);
-    
-          if (!Array.isArray(results)) {
-            throw new Error('El resultado de la consulta no es un array');
-          }
-    
-          // Agrupar resultados
-          const permisosAgrupados = results.reduce((result, item) => {
-            let moduloExistente = result.find(mod => mod.IdModulo === item.IdModulo);
-    
-            if (!moduloExistente) {
-              moduloExistente = {
-                IdModulo: item.IdModulo,
-                NombreModulo: item.NombreModulo,
-                Permisos: []
-              };
-              result.push(moduloExistente);
-            }
-    
-            moduloExistente.Permisos.push({
-              Id: item.PermisoId,
-              Nombre: item.PermisoNombre,
-              Descripcion: item.PermisoDescripcion
-            });
-    
-            return result;
-          }, []);
-    
-          return permisosAgrupados;
-        } catch (error) {
-          console.error('Error al obtener permisos agrupados:', error);
-          throw error; // Lanzar el error para manejarlo en la capa superior si es necesario
-        }
+              UsuariosPermisos.IdUsuario ='${idUsuario}'`;
+
+      // Ejecutar la consulta
+      const results = await this.permisoRepository.query(query);
+
+      if (!Array.isArray(results)) {
+        throw new Error('El resultado de la consulta no es un array');
       }
+
+      // Agrupar resultados
+      const permisosAgrupados = results.reduce((result, item) => {
+        let moduloExistente = result.find(
+          (mod) => mod.IdModulo === item.IdModulo,
+        );
+
+        if (!moduloExistente) {
+          moduloExistente = {
+            IdModulo: item.IdModulo,
+            NombreModulo: item.NombreModulo,
+            Permisos: [],
+          };
+          result.push(moduloExistente);
+        }
+
+        moduloExistente.Permisos.push({
+          Id: item.PermisoId,
+          Nombre: item.PermisoNombre,
+          Descripcion: item.PermisoDescripcion,
+        });
+
+        return result;
+      }, []);
+
+      return permisosAgrupados;
+    } catch (error) {
+      console.error('Error al obtener permisos agrupados:', error);
+      throw error; // Lanzar el error para manejarlo en la capa superior si es necesario
+    }
+  }
 }

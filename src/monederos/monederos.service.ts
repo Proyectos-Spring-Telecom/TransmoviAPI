@@ -69,7 +69,7 @@ export class MonederosService {
       const monederoExpuesto = plainToInstance(ExposeMonederoDto, monederos, {
         excludeExtraneousValues: true,
       });
-      return { message: 'Monederos obtenidos exitosamente', monedero: monederoExpuesto };
+      return { message: 'Monederos obtenidos exitosamente', monederos: monederoExpuesto };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -89,7 +89,7 @@ export class MonederosService {
       const monederoExpuesto = plainToInstance(ExposeMonederoDto, monedero, {
         excludeExtraneousValues: true,
       });
-      return { message: 'Monedero obtenido exitosamente', monedero: monederoExpuesto };
+      return { message: 'Monedero obtenido exitosamente', monederos: monederoExpuesto };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -111,7 +111,7 @@ export class MonederosService {
       const monederoExpuesto = plainToInstance(ExposeMonederoDto, monedero, {
         excludeExtraneousValues: true,
       });
-      return { message: 'Monedero obtenido exitosamente', monedero: monederoExpuesto };
+      return { message: 'Monedero obtenido exitosamente', monederos: monederoExpuesto };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
