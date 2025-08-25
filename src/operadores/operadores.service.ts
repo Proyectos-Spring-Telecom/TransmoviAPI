@@ -12,7 +12,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Operadores } from 'src/entities/Operadores';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-
+import { plainToInstance } from 'class-transformer';
+import { ExposeOperadoresDto } from './dto/expose-operadore.dto';
 @Injectable()
 export class OperadoresService {
   constructor(
@@ -24,7 +25,10 @@ export class OperadoresService {
   async createOperador(createOperadoreDto: CreateOperadoreDto, idUser: string) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: [ {correo: createOperadoreDto.Correo},{numeroLicencia: createOperadoreDto.NumeroLicencia} ],
+        where: [
+          { correo: createOperadoreDto.Correo },
+          { numeroLicencia: createOperadoreDto.NumeroLicencia },
+        ],
       });
       if (operadorExistente) {
         throw new BadRequestException(
@@ -50,12 +54,21 @@ export class OperadoresService {
         `INSERT Operadores SET ... Se creó el operador:${createOperadoreDto.Nombre} ${createOperadoreDto.ApellidoPaterno} CREATE, INSERT INTO Operadores (Nombre, ApellidoPaterno, ApellidoMaterno, NumeroLicencia, FechaNacimiento, Correo, Telefono, Estatus) VALUES (${createOperadoreDto.Nombre}, ${createOperadoreDto.ApellidoPaterno}, ${createOperadoreDto.ApellidoMaterno}, ${createOperadoreDto.NumeroLicencia}, ${createOperadoreDto.FechaNacimiento}, ${createOperadoreDto.Correo}, ${createOperadoreDto.Telefono}, ${createOperadoreDto.Estatus})`,
         Number(idUser),
       );
-      return { message: 'Operador creado exitosamente', operador };
+      const operadorExpuesto = plainToInstance(ExposeOperadoresDto, operador, {
+        excludeExtraneousValues: true,
+      });
+      return {
+        message: 'Operador creado exitosamente',
+        operador: operadorExpuesto,
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException({message: `Error al crear al operador`,error});
+      throw new InternalServerErrorException({
+        message: `Error al crear al operador`,
+        error,
+      });
     }
   }
   //Obtener todos los operadores
@@ -65,8 +78,13 @@ export class OperadoresService {
       if (operadores.length === 0) {
         throw new BadRequestException('Operadores no encontrado o null');
       }
-      //falta el apartado de la bitacora
-      return operadores;
+      const operadorExpuesto = plainToInstance(ExposeOperadoresDto, operadores, {
+        excludeExtraneousValues: true,
+      });
+      return {
+        message: 'Operadores obtenidos exitosamente',
+        operadores: operadorExpuesto,
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -85,8 +103,13 @@ export class OperadoresService {
       if (!operador) {
         throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
-      //falta el apartado de la bitacora
-      return operador;
+      const operadorExpuesto = plainToInstance(ExposeOperadoresDto, operador, {
+        excludeExtraneousValues: true,
+      });
+      return {
+        message: 'Operador obtenido exitosamente',
+        operador: operadorExpuesto,
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -140,7 +163,7 @@ export class OperadoresService {
         where: { id },
       });
       if (!operadorExistente) {
-        console.log(operadorExistente)
+        console.log(operadorExistente);
         throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
       const operadorData = await this.operadoresRepository.create({
@@ -179,15 +202,15 @@ export class OperadoresService {
       if (!operadorExistente) {
         throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
+      await this.operadoresRepository.remove(operadorExistente);
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
-        'Clientes',
+        'Operadores',
         `Se eliminó el operador con ID: ${id}`,
         'DELETE',
-        `DELETE FROM Operadores WHERE Id=${id}`,
+        `DELETE FROM Operadores WHERE Id=${id}  `,
         Number(idUser),
       );
-      await this.operadoresRepository.remove(operadorExistente);
       return `Operador con id: ${id} eliminado exitosamente`;
     } catch (error) {
       if (error instanceof HttpException) {
