@@ -8,12 +8,12 @@ export class CreateModuloDto {
         description: 'Nombre del módulo',
         example: 'Módulos',
     })
-    nombre: string;
+    Nombre: string;
     @IsString()
     @IsNotEmpty()
         @ApiProperty({
         description: 'Descripción del módulo',
         example: 'Módulo',
     })
-    descripcion: string;
+    Descripcion: string;
 }

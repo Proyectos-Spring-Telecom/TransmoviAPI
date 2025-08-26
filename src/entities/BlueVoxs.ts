@@ -11,20 +11,20 @@ import { ConteoPasajeros } from "./ConteoPasajeros";
 @Entity("BlueVoxs", { schema: "TransmoviDev" })
 export class BlueVoxs {
   @PrimaryGeneratedColumn({ type: "int", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "Clave", unique: true, length: 50 })
-  clave: string;
+  Clave: string;
 
   @Column("varchar", { name: "Descripcion", nullable: true, length: 100 })
-  descripcion: string | null;
+  Descripcion: string | null;
 
   @Column("tinyint", { name: "Estatus", nullable: true, default: () => "'1'" })
   estatus: number | null;
 
   @OneToMany(
     () => ConteoPasajeros,
-    (conteoPasajeros) => conteoPasajeros.claveBlueVox2
+    (conteoPasajeros) => conteoPasajeros.ClaveBlueVox2
   )
   conteoPasajeros: ConteoPasajeros[];
 }

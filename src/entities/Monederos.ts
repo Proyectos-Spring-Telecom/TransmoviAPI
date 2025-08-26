@@ -11,13 +11,13 @@ import { Transacciones } from "./Transacciones";
 @Entity("Monederos", { schema: "TransmoviDev" })
 export class Monederos {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "NumeroSerie", unique: true, length: 100 })
-  numeroSerie: string;
+  NumeroSerie: string;
 
   @Column("datetime", { name: "FechaActivacion" })
-  fechaActivacion: Date;
+  FechaActivacion: Date;
 
   @Column("decimal", {
     name: "Saldo",

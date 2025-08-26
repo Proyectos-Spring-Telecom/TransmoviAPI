@@ -19,7 +19,7 @@ export class UsuariosService {
   constructor(
     @InjectRepository(Usuarios)
     private readonly usuarioService: Repository<Usuarios>,
-  ) {}
+  ) { }
   //Obtener todos los usuarios
   async getAllUsuario() {
     try {
@@ -28,7 +28,7 @@ export class UsuariosService {
         throw new NotFoundException('Usuarios no encontrados');
       }
       //Falta el apartado de la bitacora
-      const usuariosSinPassword = Usuarios.map(({ password, ...rest }) => rest);
+      const usuariosSinPassword = Usuarios.map(({ Password, ...rest }) => rest);
       return usuariosSinPassword;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -43,13 +43,13 @@ export class UsuariosService {
     try {
       //Cambiamos el id a number
       const user = await this.usuarioService.findOne({
-        where: { id },
+        where: { Id:id },
       });
       if (!user) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
       //Falta el apartado de la bitacora
-      const { password: _, ...usuarioSinPassword } = user;
+      const { Password: _, ...usuarioSinPassword } = user;
       return usuarioSinPassword;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -63,42 +63,32 @@ export class UsuariosService {
   //Creacion de un usuario
   async createUsuario(createUsuarioDto: CreateUsuarioDto) {
     try {
-      const {
-        userName,
-        password,
-        emailConfirmed,
-        telefono,
-        nombre,
-        apellidoPaterno,
-        apellidoMaterno,
-        estatus,
-        idRol,
-        idCliente,
-      } = createUsuarioDto;
+      /*const {
+        UserName,
+        Password,
+          EmailConfirmed,
+        Telefono,
+        Nombre,
+        ApellidoPaterno,
+        ApellidoMaterno,
+        Estatus,
+        IdRol,
+        IdCliente,
+      } = createUsuarioDto;*/
       const existUsuario = await this.usuarioService.findOne({
-        where: { userName },
+        where: { UserName:createUsuarioDto.UserName },
       });
       if (existUsuario) {
         throw new BadRequestException('El usuario ya existe');
       }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const newUser = this.usuarioService.create({
-        userName,
-        password: hashedPassword,
-        emailConfirmed,
-        telefono,
-        nombre,
-        apellidoPaterno,
-        apellidoMaterno,
-        estatus,
-        idRol,
-        idCliente,
-      });
+      const hashedPassword = await bcrypt.hash(createUsuarioDto.Password, 10);
+      createUsuarioDto.Password = hashedPassword;
+      const newUser = this.usuarioService.create(createUsuarioDto);
 
       await this.usuarioService.save(newUser);
       //Falta el apartado de la bitacora
-      const { password: _, ...usuarioSinPassword } = newUser;
+      const { Password: _, ...usuarioSinPassword } = newUser;
       return {
         message: 'Usuario creado exitosamente',
         User: usuarioSinPassword,
@@ -114,25 +104,25 @@ export class UsuariosService {
   //Actualizar usuario
   async updateUsuario(id: number, updateUsuarioDto: UpdateUsuarioDto) {
     try {
-      const usuario = await this.usuarioService.findOne({ where: { id } });
+      const usuario = await this.usuarioService.findOne({ where: { Id: id } });
 
       if (!usuario) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
 
-      if (updateUsuarioDto.password) {
-        updateUsuarioDto.password = await bcrypt.hash(
-          updateUsuarioDto.password,
+      if (updateUsuarioDto.Password) {
+        updateUsuarioDto.Password = await bcrypt.hash(
+          updateUsuarioDto.Password,
           10,
         );
       }
 
       await this.usuarioService.update(id, updateUsuarioDto);
-      const newUser = await this.usuarioService.findOne({ where: { id } });
+      const newUser = await this.usuarioService.findOne({ where: { Id: id } });
       if (!newUser) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
-      const { password: _, ...usuarioSinPassword } = newUser;
+      const { Password: _, ...usuarioSinPassword } = newUser;
       return usuarioSinPassword;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -150,7 +140,7 @@ export class UsuariosService {
     updateUsuarioEstatusDto: UpdateUsuarioEstatusDto,
   ) {
     try {
-      const usuario = await this.usuarioService.findOne({ where: { id } });
+      const usuario = await this.usuarioService.findOne({ where: { Id: id } });
       if (!usuario) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
@@ -176,7 +166,7 @@ export class UsuariosService {
   //Eliminamos usuario
   async deleteUsuario(id: number) {
     try {
-      const usuario = await this.usuarioService.findOne({ where: { id } });
+      const usuario = await this.usuarioService.findOne({ where: { Id: id } });
       if (!usuario) {
         throw new NotFoundException(`Usuario con ${id} no encontrado`);
       }

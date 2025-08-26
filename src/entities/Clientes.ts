@@ -4,71 +4,71 @@ import { Usuarios } from "./Usuarios";
 @Entity("Clientes", { schema: "TransmoviDev" })
 export class Clientes {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "IdPadre", length: 50 })
-  idPadre: string;
+  IdPadre: string;
 
   @Column("varchar", { name: "RFC", length: 16 })
-  rfc: string;
+  Rfc: string;
 
   @Column("int", { name: "TipoPersona" })
-  tipoPersona: number;
+  TipoPersona: number;
 
   @Column("int", { name: "Estatus" })
-  estatus: number;
+  Estatus: number;
 
   @Column("varchar", { name: "Logotipo", nullable: true, length: 500 })
-  logotipo: string | null;
+  Logotipo: string | null;
 
   @Column("varchar", { name: "Nombre", nullable: true, length: 255 })
-  nombre: string | null;
+  Nombre: string | null;
 
   @Column("varchar", { name: "ApellidoPaterno", nullable: true, length: 100 })
-  apellidoPaterno: string | null;
+  ApellidoPaterno: string | null;
 
   @Column("varchar", { name: "ApellidoMaterno", nullable: true, length: 100 })
-  apellidoMaterno: string | null;
+  ApellidoMaterno: string | null;
 
   @Column("varchar", { name: "Telefono", nullable: true, length: 10 })
-  telefono: string | null;
+  Telefono: string | null;
 
   @Column("varchar", { name: "Correo", nullable: true, length: 100 })
-  correo: string | null;
+  Correo: string | null;
 
   @Column("varchar", { name: "Estado", nullable: true, length: 45 })
-  estado: string | null;
+  Estado: string | null;
 
   @Column("varchar", { name: "Municipio", nullable: true, length: 45 })
-  municipio: string | null;
+  Municipio: string | null;
 
   @Column("varchar", { name: "Colonia", nullable: true, length: 45 })
-  colonia: string | null;
+  Colonia: string | null;
 
   @Column("varchar", { name: "Calle", nullable: true, length: 100 })
-  calle: string | null;
+  Calle: string | null;
 
   @Column("varchar", { name: "EntreCalles", nullable: true, length: 45 })
-  entreCalles: string | null;
+  EntreCalles: string | null;
 
   @Column("varchar", { name: "NumeroExterior", nullable: true, length: 10 })
-  numeroExterior: string | null;
+  NumeroExterior: string | null;
 
   @Column("varchar", { name: "NumeroInterior", nullable: true, length: 10 })
-  numeroInterior: string | null;
+  NumeroInterior: string | null;
 
   @Column("varchar", { name: "CP", nullable: true, length: 5 })
-  cp: string | null;
+  Cp: string | null;
 
   @Column("varchar", { name: "NombreEncargado", nullable: true, length: 100 })
-  nombreEncargado: string | null;
+  NombreEncargado: string | null;
 
   @Column("varchar", { name: "TelefonoEncargado", nullable: true, length: 10 })
-  telefonoEncargado: string | null;
+  TelefonoEncargado: string | null;
 
   @Column("varchar", { name: "EmailEncargado", nullable: true, length: 100 })
-  emailEncargado: string | null;
+  EmailEncargado: string | null;
 
-  @OneToMany(() => Usuarios, (usuarios) => usuarios.idCliente2)
+  @OneToMany(() => Usuarios, (usuarios) => usuarios.IdCliente2)
   usuarios: Usuarios[];
 }

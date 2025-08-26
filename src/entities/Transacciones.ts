@@ -12,16 +12,16 @@ import { Monederos } from "./Monederos";
 @Entity("Transacciones", { schema: "TransmoviDev" })
 export class Transacciones {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  Id: string;
 
   @Column("bigint", { name: "IdMonedero" })
-  idMonedero: number;
+  IdMonedero: number;
 
   @Column("varchar", { name: "TipoTransaccion", length: 10 })
-  tipoTransaccion: string;
+  TipoTransaccion: string;
 
   @Column("decimal", { name: "Monto", precision: 10, scale: 2 })
-  monto: number;
+  Monto: number;
 
   @Column("decimal", {
     name: "Latitud",
@@ -29,7 +29,7 @@ export class Transacciones {
     precision: 10,
     scale: 7,
   })
-  latitud: string | null;
+  Latitud: string | null;
 
   @Column("decimal", {
     name: "Longitud",
@@ -37,10 +37,10 @@ export class Transacciones {
     precision: 10,
     scale: 7,
   })
-  longitud: string | null;
+  Longitud: string | null;
 
   @Column("datetime", { name: "FechaHora" })
-  fechaHora: Date;
+  FechaHora: Date;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
@@ -50,5 +50,5 @@ export class Transacciones {
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdMonedero", referencedColumnName: "id" }])
-  idMonedero2: Monederos;
+  IdMonedero2: Monederos;
 }

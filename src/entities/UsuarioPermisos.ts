@@ -4,11 +4,11 @@ import { Column, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 @Entity("UsuariosPermisos", { schema: "TransmoviDev" })
 export class UsuarioPermisos {
   @Column("bigint", { name: "IdUsuario" })
-  idUsuario: number;
+  IdUsuario: number;
 
   @Column("bigint", { name: "IdPermiso" })
-  idPermiso: number;
+  IdPermiso: number;
 
   @PrimaryGeneratedColumn({ type: "int", name: "id" })
-  id: number;
+  Id: number;
 }

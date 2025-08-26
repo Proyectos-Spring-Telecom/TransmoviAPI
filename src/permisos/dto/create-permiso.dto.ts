@@ -8,7 +8,7 @@ export class CreatePermisoDto {
             description: 'Nombre del permiso',
             example: 'Permiso',
         })
-    nombre:string;
+    Nombre:string;
     
     @IsString()
     @IsNotEmpty()
@@ -16,7 +16,7 @@ export class CreatePermisoDto {
             description: 'Descripcion del permiso',
             example: 'Permiso',
         })
-    descripcion:string;
+    Descripcion:string;
 
     @IsInt({ message: 'Estatus debe ser un numero entero' })
       @IsIn([0, 1], { message: 'Estatus solo puede ser 0 ó 1' })
@@ -25,7 +25,7 @@ export class CreatePermisoDto {
                 description: 'Estatus del dispositivo solo es 1 ó 0',
                 example: '1',
             })
-      estatus?: number = 1;
+      Estatus?: number = 1;
 
     @IsNumber()
     @IsNotEmpty()
@@ -33,5 +33,5 @@ export class CreatePermisoDto {
             description: 'Asignarlo a un módulo',
             example: 'Permiso',
         })
-    idModulo:number
+    IdModulo:number
 }
