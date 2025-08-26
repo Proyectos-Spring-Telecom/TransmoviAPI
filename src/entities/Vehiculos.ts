@@ -16,43 +16,43 @@ import { Dispositivos } from "./Dispositivos";
 @Entity("Vehiculos", { schema: "TransmoviDev" })
 export class Vehiculos {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  Id: string;
 
   @Column("varchar", { name: "Marca", length: 255 })
-  marca: string;
+  Marca: string;
 
   @Column("varchar", { name: "Modelo", length: 100 })
-  modelo: string;
+  Modelo: string;
 
   @Column("int", { name: "Ano" })
-  ano: number;
+  Ano: number;
 
   @Column("varchar", { name: "Placa", unique: true, length: 10 })
-  placa: string;
+  Placa: string;
 
   @Column("varchar", { name: "NumeroEconomico", unique: true, length: 50 })
-  numeroEconomico: string;
+  NumeroEconomico: string;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
   @Column("bigint", { name: "IdOperador", nullable: true })
-  idOperador: string | null;
+  IdOperador: string | null;
 
   @Column("bigint", { name: "IdDispositivo", nullable: true })
-  idDispositivo: string | null;
+  IdDispositivo: string | null;
 
   @ManyToOne(() => Operadores, (operadores) => operadores.vehiculos, {
     onDelete: "SET NULL",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdOperador", referencedColumnName: "id" }])
-  idOperador2: Operadores;
+  IdOperador2: Operadores;
 
   @ManyToOne(() => Dispositivos, (dispositivos) => dispositivos.vehiculos, {
     onDelete: "SET NULL",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdDispositivo", referencedColumnName: "id" }])
-  idDispositivo2: Dispositivos;
+  IdDispositivo2: Dispositivos;
 }

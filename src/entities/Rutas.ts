@@ -5,22 +5,22 @@ import { Tarifas } from "./Tarifas";
 @Entity("Rutas", { schema: "TransmoviDev" })
 export class Rutas {
   @PrimaryGeneratedColumn({ type: "int", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "Nombre", length: 100 })
-  nombre: string;
+  Nombre: string;
 
   @Column("tinyint", { name: "Estatus", nullable: true, default: () => "'1'" })
   estatus: number | null;
 
   @Column("json", { name: "PuntoInicio", nullable: true })
-  puntoInicio: object | null;
+  PuntoInicio: object | null;
 
   @Column("json", { name: "PuntoFin", nullable: true })
-  puntoFin: object | null;
+  PuntoFin: object | null;
 
   @Column("json", { name: "RecorridoDetallado", nullable: true })
-  recorridoDetallado: object | null;
+  RecorridoDetallado: object | null;
 
   @Column("decimal", {
     name: "DistanciaKm",

@@ -15,13 +15,13 @@ import { Clientes } from "./Clientes";
 @Entity("Usuarios", { schema: "TransmoviDev" })
 export class Usuarios {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "UserName", unique: true, length: 100 })
-  userName: string;
+  UserName: string;
 
   @Column("varchar", { name: "Password", length: 255 })
-  password: string;
+  Password: string;
 
   @Column("tinyint", {
     name: "EmailConfirmed",
@@ -31,37 +31,37 @@ export class Usuarios {
   emailConfirmed: number | null;
 
   @Column("varchar", { name: "Telefono", nullable: true, length: 20 })
-  telefono: string | null;
+  Telefono: string | null;
 
   @Column("varchar", { name: "Nombre", nullable: true, length: 100 })
-  nombre: string | null;
+  Nombre: string | null;
 
   @Column("varchar", { name: "ApellidoPaterno", nullable: true, length: 100 })
-  apellidoPaterno: string | null;
+  ApellidoPaterno: string | null;
 
   @Column("varchar", { name: "ApellidoMaterno", nullable: true, length: 100 })
-  apellidoMaterno: string | null;
+  ApellidoMaterno: string | null;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
   @Column("bigint", { name: "IdRol", nullable: true })
-  idRol: number | null;
+  IdRol: number | null;
 
   @Column("bigint", { name: "IdCliente", nullable: true })
-  idCliente: number | null;
+  IdCliente: number | null;
 
   @ManyToOne(() => Roles, (roles) => roles.usuarios, {
     onDelete: "SET NULL",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdRol", referencedColumnName: "id" }])
-  idRol2: Roles;
+  IdRol2: Roles;
 
   @ManyToOne(() => Clientes, (clientes) => clientes.usuarios, {
     onDelete: "SET NULL",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdCliente", referencedColumnName: "id" }])
-  idCliente2: Clientes;
+  IdCliente2: Clientes;
 }

@@ -8,17 +8,20 @@ import {
   Delete,
   Put,
   Request,
+  Query,
+  Res,
 } from '@nestjs/common';
 import { ModulosService } from './modulos.service';
 import { CreateModuloDto } from './dto/create-modulo.dto';
 import { UpdateModuloDto } from './dto/update-modulo.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { UpdateModulosEstatusDto } from './dto/update-modulo-estatus.dto';
+import { Response } from 'src/common/ApiResponse';
 
 @ApiTags('Modulos')
 @Controller('modulos')
 export class ModulosController {
-  constructor(private readonly modulosService: ModulosService) {}
+  constructor(private readonly modulosService: ModulosService) { }
 
   @Post()
   create(@Body() createModuloDto: CreateModuloDto, @Request() req) {
@@ -26,9 +29,15 @@ export class ModulosController {
     return this.modulosService.create(createModuloDto, idUser);
   }
 
+  @Get('list')
+  findAllList(): Promise<Response> {
+    return this.modulosService.findAllList();
+  }
+
   @Get()
-  findAll() {
-    return this.modulosService.findAll();
+  findAll(@Query('page') page:number,
+    @Query('limit') limit :number): Promise<Response> {
+    return this.modulosService.findAll(page,limit);
   }
 
   @Get(':id')

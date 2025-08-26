@@ -4,12 +4,22 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  HttpException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePermisoDto } from './dto/create-permiso.dto';
 import { UpdatePermisoDto } from './dto/update-permiso.dto';
 import { Permisos } from 'src/entities/Permisos';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsuarioPermisos } from 'src/entities/UsuarioPermisos';
+import { plainToInstance } from 'class-transformer';
+import { ExposePermisoDto } from './dto/expose-permiso.dto';
+import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
+import { UpdatePermisoEstatusDto } from './dto/update-permiso-estatus.dto';
 import { plainToInstance } from 'class-transformer';
 import { ExposePermisoDto } from './dto/expose-permiso.dto';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
@@ -24,7 +34,15 @@ export class PermisosService {
     private readonly usuarioPermiso: Repository<UsuarioPermisos>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
+  constructor(
+    @InjectRepository(Permisos)
+    private readonly permisoRepository: Repository<Permisos>,
+    @InjectRepository(UsuarioPermisos)
+    private readonly usuarioPermiso: Repository<UsuarioPermisos>,
+    private readonly bitacoraLogger: BitacoraLoggerService,
+  ) {}
 
+  //Obtener todos los permisos con paginado
   //Obtener todos los permisos con paginado
   async findAll(page: number = 1, limit: number = 10) {
     const [permisos, total] = await this.permisoRepository.findAndCount({
@@ -35,7 +53,11 @@ export class PermisosService {
     const permisoExpuesto = plainToInstance(ExposePermisoDto, permisos, {
       excludeExtraneousValues: true,
     });
+    const permisoExpuesto = plainToInstance(ExposePermisoDto, permisos, {
+      excludeExtraneousValues: true,
+    });
     return {
+      data: permisoExpuesto,
       data: permisoExpuesto,
       total,
       page,
@@ -201,16 +223,61 @@ export class PermisosService {
             DISTINCT UsuariosPermisos.IdPermiso,
               Modulos.Id AS IdModulo,
               Modulos.Nombre AS NombreModulo,
+            DISTINCT UsuariosPermisos.IdPermiso,
+              Modulos.Id AS IdModulo,
+              Modulos.Nombre AS NombreModulo,
               Permisos.Id AS PermisoId,
               Permisos.Nombre AS PermisoNombre,
               Permisos.Descripcion AS PermisoDescripcion
             FROM 
            UsuariosPermisos
+           UsuariosPermisos
             INNER JOIN 
+              Permisos ON UsuariosPermisos.IdPermiso = Permisos.Id
               Permisos ON UsuariosPermisos.IdPermiso = Permisos.Id
             INNER JOIN 
               Modulos ON Permisos.IdModulo = Modulos.Id
+              Modulos ON Permisos.IdModulo = Modulos.Id
             WHERE 
+              UsuariosPermisos.IdUsuario ='${idUsuario}'`;
+
+      // Ejecutar la consulta
+      const results = await this.permisoRepository.query(query);
+
+      if (!Array.isArray(results)) {
+        throw new Error('El resultado de la consulta no es un array');
+      }
+
+      // Agrupar resultados
+      const permisosAgrupados = results.reduce((result, item) => {
+        let moduloExistente = result.find(
+          (mod) => mod.IdModulo === item.IdModulo,
+        );
+
+        if (!moduloExistente) {
+          moduloExistente = {
+            IdModulo: item.IdModulo,
+            NombreModulo: item.NombreModulo,
+            Permisos: [],
+          };
+          result.push(moduloExistente);
+        }
+
+        moduloExistente.Permisos.push({
+          Id: item.PermisoId,
+          Nombre: item.PermisoNombre,
+          Descripcion: item.PermisoDescripcion,
+        });
+
+        return result;
+      }, []);
+
+      return permisosAgrupados;
+    } catch (error) {
+      console.error('Error al obtener permisos agrupados:', error);
+      throw error; // Lanzar el error para manejarlo en la capa superior si es necesario
+    }
+  }
               UsuariosPermisos.IdUsuario ='${idUsuario}'`;
 
       // Ejecutar la consulta

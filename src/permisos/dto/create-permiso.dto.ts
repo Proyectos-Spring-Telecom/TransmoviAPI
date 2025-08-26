@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class CreatePermisoDto {
     @IsString()
@@ -33,5 +34,5 @@ export class CreatePermisoDto {
             description: 'Asignarlo a un módulo',
             example: 'Permiso',
         })
-    idModulo:number
+    IdModulo:number
 }
