@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Dispositivos } from 'src/entities/Dispositivos';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { instanceToPlain, plainToInstance } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { ExposeDispositivoDto } from './dto/expose-dispositivo.dto';
 @Injectable()
 export class DispositivosService {
@@ -101,15 +101,12 @@ export class DispositivosService {
       if (!dispostivoExistente) {
         throw new NotFoundException(`Dispositivo con id: ${id} no encontrado`);
       }
+      const dispositivoExpuesto = plainToInstance(ExposeDispositivoDto, dispostivoExistente, {
+        excludeExtraneousValues: true,
+      });
       return {
         message: 'Dispositivo obtenido exitosamente',
-        dispositivo: plainToInstance(
-          ExposeDispositivoDto,
-          dispostivoExistente,
-          {
-            excludeExtraneousValues: true,
-          },
-        ),
+        dispositivo: dispositivoExpuesto,
       };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -187,15 +184,12 @@ export class DispositivosService {
       const dispositivoActualizado = await this.dispositivoRepository.findOne({
         where: { id },
       });
+      const dispositivoExpuesto = plainToInstance(ExposeDispositivoDto, dispositivoActualizado, {
+        excludeExtraneousValues: true,
+      });
       return {
-        message: 'Dispositivo creado exitosamente',
-        dispositivo: plainToInstance(
-          ExposeDispositivoDto,
-          dispositivoActualizado,
-          {
-            excludeExtraneousValues: true,
-          },
-        ),
+        message: 'Dsipositivo actualizado exitosamente',
+        dispositivo: dispositivoExpuesto,
       };
     } catch (error) {
       if (error instanceof HttpException) {
