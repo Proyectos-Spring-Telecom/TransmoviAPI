@@ -30,7 +30,7 @@ export class AuthService {
       console.log({ data: user });
       if (
         !user ||
-        !(await bcrypt.compare(loginAuthDto.Password, user.Password))
+        !(await bcrypt.compare(loginAuthDto.Password, user.PasswordHash))
       ) {
         console.log({
           user: user,

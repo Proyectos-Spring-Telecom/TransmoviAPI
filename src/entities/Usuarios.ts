@@ -9,7 +9,7 @@ import {
 import { Roles } from "./Roles";
 import { Clientes } from "./Clientes";
 
-@Index("Usuarios_UserName_unique", ["UserName"], { unique: true })
+@Index("UserName_IdCliente", ["IdCliente", "UserName"], { unique: true })
 @Index("IdRol", ["IdRol"], {})
 @Index("IdCliente", ["IdCliente"], {})
 @Entity("Usuarios", { schema: "TransmoviDev" })
@@ -17,21 +17,20 @@ export class Usuarios {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
   Id: number;
 
-  @Column("varchar", { name: "UserName", unique: true, length: 100 })
+  @Column("varchar", { name: "UserName", length: 255 })
   UserName: string;
 
-  @Column("varchar", { name: "Password", length: 255 })
-  Password: string;
+  @Column("varchar", { name: "PasswordHash", length: 255 })
+  PasswordHash: string;
+
+  @Column("varchar", { name: "PinHash", nullable: true, length: 6 })
+  PinHash: string | null;
 
   @Column("tinyint", {
-    name: "EmailConfirmed",
-    nullable: true,
+    name: "EmailConfirmado",
     default: () => "'0'",
   })
-  EmailConfirmed: number | null;
-
-  @Column("varchar", { name: "Telefono", nullable: true, length: 20 })
-  Telefono: string | null;
+  EmailConfirmado: number;
 
   @Column("varchar", { name: "Nombre", nullable: true, length: 100 })
   Nombre: string | null;
@@ -42,24 +41,52 @@ export class Usuarios {
   @Column("varchar", { name: "ApellidoMaterno", nullable: true, length: 100 })
   ApellidoMaterno: string | null;
 
+  @Column("varchar", { name: "Telefono", nullable: true, length: 20 })
+  Telefono: string | null;
+
+  @Column("datetime", { name: "UltimoLogin", nullable: true })
+  UltimoLogin: Date | null;
+
+  @Column("datetime", { name: "ActualizacionPassword", nullable: true })
+  ActualizacionPassword: Date | null;
+
+  @Column("datetime", { name: "ActualizacionPin", nullable: true })
+  ActualizacionPin: Date | null;
+
+  @Column("varchar", { name: "DispositivoId", nullable: true, length: 15 })
+  DispositivoId: string | null;
+
+  @Column("datetime", {
+    name: "FechaCreacion",
+    default: () => "CURRENT_TIMESTAMP",
+  })
+  FechaCreacion: Date;
+
+  @Column("datetime", {
+    name: "FechaActualizacion",
+    default: () => "CURRENT_TIMESTAMP",
+    onUpdate: "CURRENT_TIMESTAMP",
+  })
+  FechaActualizacion: Date;
+
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   Estatus: number;
 
-  @Column("bigint", { name: "IdRol", nullable: true })
-  IdRol: number | null;
+  @Column("bigint", { name: "IdRol" })
+  IdRol: number;
 
-  @Column("bigint", { name: "IdCliente", nullable: true })
-  IdCliente: number | null;
+  @Column("bigint", { name: "IdCliente" })
+  IdCliente: number;
 
   @ManyToOne(() => Roles, (roles) => roles.usuarios, {
-    onDelete: "SET NULL",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdRol", referencedColumnName: "Id" }])
   IdRol2: Roles;
 
   @ManyToOne(() => Clientes, (clientes) => clientes.usuarios, {
-    onDelete: "SET NULL",
+    onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
   @JoinColumn([{ name: "IdCliente", referencedColumnName: "Id" }])

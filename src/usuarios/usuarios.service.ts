@@ -24,41 +24,52 @@ export class UsuariosService {
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly clientesService: ClientesService,
   ) {}
-  //Obtener todos los usuarios con paginacion
-  async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
-    try {
-      const [data, total] = await this.usuarioRepository.findAndCount({
-        relations: ['IdCliente2'],
-        skip: (page - 1) * limit,
-        take: limit,
-      });
-      const dataFiltrada = data.map((u) => ({
-        Id: u.Id,
-        UserName: u.UserName,
-        EmailConfirmed: u.EmailConfirmed,
-        Telefono: u.Telefono,
-        Nombre: u.Nombre,
-        ApellidoPaterno: u.ApellidoPaterno,
-        ApellidoMaterno: u.ApellidoMaterno,
-        Estatus: u.Estatus,
-        IdRol: u.IdRol,
-        IdCliente: u.IdCliente,
-        ClienteNombre: u.IdCliente2?.Nombre || null, // solo nombre del cliente
-      }));
-      const result: ApiResponseCommon = {
-        data: dataFiltrada,
-        paginated: {
-          total: Math.ceil(total / limit),
-          page,
-          limit,
-        },
-        message: 'Usuarios obtenidos correctamente',
-      };
-      return result;
-    } catch (error) {
-      throw new BadRequestException(error.message || 'Error fetching data');
-    }
+// Obtener todos los usuarios con paginación
+async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
+  try {
+    const [data, total] = await this.usuarioRepository.findAndCount({
+      relations: ["IdCliente2", "IdRol2"],
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const dataFiltrada = data.map((u) => ({
+      Id: u.Id,
+      UserName: u.UserName,
+      EmailConfirmado: u.EmailConfirmado,
+      Telefono: u.Telefono,
+      Nombre: u.Nombre,
+      ApellidoPaterno: u.ApellidoPaterno,
+      ApellidoMaterno: u.ApellidoMaterno,
+      Estatus: u.Estatus,
+      IdRol: u.IdRol,
+      RolNombre: u.IdRol2?.Nombre || null, // solo nombre del rol
+      IdCliente: u.IdCliente,
+      ClienteNombre: u.IdCliente2?.Nombre || null, // solo nombre del cliente
+      UltimoLogin: u.UltimoLogin,
+      ActualizacionPassword: u.ActualizacionPassword,
+      ActualizacionPin: u.ActualizacionPin,
+      DispositivoId: u.DispositivoId,
+      FechaCreacion: u.FechaCreacion,
+      FechaActualizacion: u.FechaActualizacion,
+    }));
+
+    const result: ApiResponseCommon = {
+      data: dataFiltrada,
+      paginated: {
+        total: Math.ceil(total / limit),
+        page,
+        limit,
+      },
+      message: "Usuarios obtenidos correctamente",
+    };
+
+    return result;
+  } catch (error) {
+    throw new BadRequestException(error.message || "Error al obtener usuarios");
   }
+}
+
   //Obtener todos los usuarios
   async getAllListUsuarios(): Promise<ApiResponseCommon> {
     try {
@@ -66,7 +77,7 @@ export class UsuariosService {
       if (usuarios.length === 0) {
         throw new NotFoundException('Usuarios no encontrados');
       }
-      const usuariosSinPassword = usuarios.map(({ Password, ...rest }) => rest);
+      const usuariosSinPassword = usuarios.map(({ PasswordHash, ...rest }) => rest);
       const result: ApiResponseCommon = {
         data: usuariosSinPassword,
 
@@ -91,7 +102,7 @@ export class UsuariosService {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
       //Falta el apartado de la bitacora
-      const { Password: _, ...usuarioSinPassword } = user;
+      const { PasswordHash: _, ...usuarioSinPassword } = user;
       return usuarioSinPassword;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -116,8 +127,8 @@ export class UsuariosService {
       );
       if (!cliente) throw new BadRequestException('Cliente Invalido');
 
-      const hashedPassword = await bcrypt.hash(createUsuarioDto.Password, 10); //encriptamos la contraseña
-      createUsuarioDto.Password = hashedPassword;
+      const hashedPassword = await bcrypt.hash(createUsuarioDto.PasswordHash, 10); //encriptamos la contraseña
+      createUsuarioDto.PasswordHash = hashedPassword;
       
       const newUser = this.usuarioRepository.create(createUsuarioDto);
       await this.usuarioRepository.save(newUser);                             //creamos el usuario
@@ -130,7 +141,7 @@ export class UsuariosService {
         `INSERT INTO Usuarios (...) VALUES (...) -> username:  ${createUsuarioDto.UserName} nombre: ${createUsuarioDto.Nombre} apellido paterno: ${createUsuarioDto.ApellidoPaterno} apellido materno: ${createUsuarioDto.ApellidoMaterno}`,
         Number(idUser),
       );
-      const { Password: _, ...usuarioSinPassword } = newUser;
+      const { PasswordHash: _, ...usuarioSinPassword } = newUser;
       return {
         message: 'Usuario creado exitosamente',
         User: usuarioSinPassword,
@@ -160,9 +171,9 @@ export class UsuariosService {
       const cliente = await this.clientesService.getOneCliente(Number(updateUsuarioDto.IdCliente))
       if (!cliente) throw new BadRequestException('Cliente Invalido');
       }
-      if (updateUsuarioDto.Password) {
-        updateUsuarioDto.Password = await bcrypt.hash(
-          updateUsuarioDto.Password,
+      if (updateUsuarioDto.PasswordHash) {
+        updateUsuarioDto.PasswordHash = await bcrypt.hash(
+          updateUsuarioDto.PasswordHash,
           10,
         );
       }
@@ -174,7 +185,7 @@ export class UsuariosService {
       if (!newUser) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
-      const { Password: _, ...usuarioSinPassword } = newUser;
+      const { PasswordHash: _, ...usuarioSinPassword } = newUser;
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Modulos',
