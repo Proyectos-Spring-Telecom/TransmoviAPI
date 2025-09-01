@@ -12,8 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Clientes } from 'src/entities/Clientes';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { plainToInstance } from 'class-transformer';
-import { ExposeClienteDto } from './dto/expose-cliente.dto';
+import { ApiResponseCommon } from 'src/common/ApiResponse';
 
 @Injectable()
 export class ClientesService {
@@ -27,38 +26,15 @@ export class ClientesService {
     try {
       const clienteCreate = await this.clienteRepository.findOne({
         where: {
-          rfc: createClienteDto.RFC,
+          RFC: createClienteDto.RFC,
         },
       });
       if (clienteCreate) {
-        console.log(clienteCreate);
         throw new BadRequestException(
           `Cliente registrado con RFC: ${createClienteDto.RFC}, ingrese otro cliente`,
         );
       }
-      const clienteData = await this.clienteRepository.create({
-        idPadre: createClienteDto.IdPadre,
-        rfc: createClienteDto.RFC,
-        tipoPersona: createClienteDto.TipoPersona,
-        estatus: createClienteDto.Estatus,
-        logotipo: createClienteDto.Logotipo,
-        nombre: createClienteDto.Nombre,
-        apellidoPaterno: createClienteDto.ApellidoPaterno,
-        apellidoMaterno: createClienteDto.ApellidoMaterno,
-        telefono: createClienteDto.Telefono,
-        correo: createClienteDto.Correo,
-        estado: createClienteDto.Estado,
-        municipio: createClienteDto.Municipio,
-        colonia: createClienteDto.Colonia,
-        calle: createClienteDto.Calle,
-        entreCalles: createClienteDto.EntreCalles,
-        numeroExterior: createClienteDto.NumeroExterior,
-        numeroInterior: createClienteDto.NumeroInterior,
-        cp: createClienteDto.CP,
-        nombreEncargado: createClienteDto.NombreEncargado,
-        telefonoEncargado: createClienteDto.TelefonoEncargado,
-        emailEncargado: createClienteDto.EmailEncargado,
-      });
+      const clienteData = await this.clienteRepository.create(createClienteDto);
       const clienteCreado = await this.clienteRepository.save(clienteData);
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
@@ -68,10 +44,7 @@ export class ClientesService {
         `INSERT INTO Clientes (...) VALUES (...) -> RFC: ${createClienteDto.RFC}`,
         Number(idUser),
       );
-      const clienteExpuesto = plainToInstance(ExposeClienteDto, clienteCreado, {
-        excludeExtraneousValues: true,
-      });
-      return { message: 'Cliente creado exitosamente', User: clienteExpuesto };
+      return { message: 'Cliente creado exitosamente', Data: clienteCreado };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -80,16 +53,28 @@ export class ClientesService {
     }
   }
   //Obtener todos los clientes
-  async getClientes() {
+  async getAllClientes(page: number, limit: number): Promise<ApiResponseCommon> {
     try {
       const Clientes = await this.clienteRepository.find();
       if (Clientes.length === 0) {
         throw new NotFoundException('Clientes no encontrados');
       }
-      const clienteExpuesto = plainToInstance(ExposeClienteDto, Clientes, {
-        excludeExtraneousValues: true,
+      const [data, total] = await this.clienteRepository.findAndCount({
+        relations:[],         //Falta la relacion
+        skip: (page - 1) * limit,
+        take: limit,
+        
       });
-      return clienteExpuesto;
+      const result: ApiResponseCommon = {
+        data,
+        paginated: {
+          total: Math.ceil(total/limit),
+          page,
+          limit,
+        },
+        message: 'Clientes obtenidos correctamente',
+      }
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -97,19 +82,38 @@ export class ClientesService {
       throw new BadRequestException({ message: 'Error al obtener Clientes' });
     }
   }
+
+    //Obtener todos los clientes
+  async getAllListClientes(): Promise<ApiResponseCommon> {
+    try {
+      const Clientes = await this.clienteRepository.find();
+      if (Clientes.length === 0) {
+        throw new NotFoundException('Clientes no encontrados');
+      }
+      const result: ApiResponseCommon = {
+        data:Clientes,
+
+        message: 'Clientes obtenidos correctamente',
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException({ message: 'Error al obtener Clientes' });
+    }
+  }
+
   //Obtener el cliente por ID
   async getOneCliente(id: number) {
     try {
-      const oneCliente = await this.clienteRepository.findOne({
-        where: { id },
+      const cliente = await this.clienteRepository.findOne({
+        where: { Id:id },
       });
-      if (!oneCliente) {
+      if (!cliente) {
         throw new NotFoundException(`EL cliente con id:${id} no encontrado`);
       }
-      const clienteExpuesto = plainToInstance(ExposeClienteDto, oneCliente, {
-        excludeExtraneousValues: true,
-      });
-      return clienteExpuesto;
+      return cliente;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -126,35 +130,13 @@ export class ClientesService {
     updateClienteDto: UpdateClienteDto,
   ) {
     try {
-      const Cliente = await this.clienteRepository.findOne({ where: { id } });
+      const Cliente = await this.clienteRepository.findOne({ where: { Id:id } });
       if (!Cliente) {
         throw new NotFoundException(
           `El cliente con id: ${id} no fue encontrado`,
         );
       }
-      const clienteData = await this.clienteRepository.create({
-        idPadre: updateClienteDto.IdPadre,
-        rfc: updateClienteDto.RFC,
-        tipoPersona: updateClienteDto.TipoPersona,
-        estatus: updateClienteDto.Estatus,
-        logotipo: updateClienteDto.Logotipo,
-        nombre: updateClienteDto.Nombre,
-        apellidoPaterno: updateClienteDto.ApellidoPaterno,
-        apellidoMaterno: updateClienteDto.ApellidoMaterno,
-        telefono: updateClienteDto.Telefono,
-        correo: updateClienteDto.Correo,
-        estado: updateClienteDto.Estado,
-        municipio: updateClienteDto.Municipio,
-        colonia: updateClienteDto.Colonia,
-        calle: updateClienteDto.Calle,
-        entreCalles: updateClienteDto.EntreCalles,
-        numeroExterior: updateClienteDto.NumeroExterior,
-        numeroInterior: updateClienteDto.NumeroInterior,
-        cp: updateClienteDto.CP,
-        nombreEncargado: updateClienteDto.NombreEncargado,
-        telefonoEncargado: updateClienteDto.TelefonoEncargado,
-        emailEncargado: updateClienteDto.EmailEncargado,
-      });
+      const clienteData = await this.clienteRepository.create(updateClienteDto);
       await this.clienteRepository.update(id, clienteData);
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
@@ -166,12 +148,9 @@ export class ClientesService {
       );
       //Hacemos un expose que convierta los atributos en PascalCase
       const clientefind = await this.clienteRepository.findOne({
-        where: { id },
+        where: { Id:id },
       });
-      const clienteExpuesto = plainToInstance(ExposeClienteDto, clientefind, {
-        excludeExtraneousValues: true,
-      });
-      return clienteExpuesto;
+      return clientefind;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -188,12 +167,12 @@ export class ClientesService {
     updateClienteEstatusDto: UpdateClienteEstatusDto,
   ) {
     try {
-      const Usuario = await this.clienteRepository.findOne({ where: { id } });
+      const Usuario = await this.clienteRepository.findOne({ where: { Id:id } });
       if (!Usuario) {
         throw new NotFoundException(`Cliente con id: ${id} no encontrado`);
       }
       const Estatus = updateClienteEstatusDto.Estatus;
-      await this.clienteRepository.update(id, { estatus: Estatus });
+      await this.clienteRepository.update(id, { Estatus });
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Clientes',
@@ -219,7 +198,7 @@ export class ClientesService {
   async removeCliente(id: number, idUser: string) {
     try {
       const clienteEliminar = await this.clienteRepository.findOne({
-        where: { id },
+        where: { Id:id },
       });
       if (!clienteEliminar) {
         throw new NotFoundException(

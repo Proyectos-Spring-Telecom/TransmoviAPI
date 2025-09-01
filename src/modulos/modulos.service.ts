@@ -11,10 +11,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Modulos } from 'src/entities/Modulos';
 import { Repository } from 'typeorm';
 import { Permisos } from 'src/entities/Permisos';
-import { ExposeModuloDto } from './dto/expose-modulo.dto';
-import { plainToInstance } from 'class-transformer';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { UpdateModulosEstatusDto } from './dto/update-modulo-estatus.dto';
+import { ApiResponseCommon } from 'src/common/ApiResponse';
 
 @Injectable()
 export class ModulosService {
@@ -33,42 +32,61 @@ export class ModulosService {
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Modulos',
-        `Se creó un modulos con nombre: ${createModuloDto.nombre}`,
+        `Se creó un modulos con nombre: ${createModuloDto.Nombre}`,
         'CREATE',
-        `INSERT INTO Modulos (...) VALUES (...) -> nombre: ${createModuloDto.nombre} descipcion: ${createModuloDto.descripcion}`,
+        `INSERT INTO Modulos (...) VALUES (...) -> nombre: ${createModuloDto.Nombre} descipcion: ${createModuloDto.Descripcion}`,
         Number(idUser),
       );
-      const moduloExpuesto = plainToInstance(ExposeModuloDto, saved, {
-        excludeExtraneousValues: true,
-      });
-      return moduloExpuesto;
+      return saved;
     } catch (error) {
       throw new BadRequestException(error);
     }
   }
 
-  async findAll() {
+  async findAllList(): Promise<ApiResponseCommon> {
     try {
       const modulos = await this.moduloRepository.find({
         relations: ['permisos'],
       });
-      const moduloExpuesto = plainToInstance(ExposeModuloDto, modulos, {
-        excludeExtraneousValues: true,
-      });
-      return moduloExpuesto;
+      const result: ApiResponseCommon = {
+        data: modulos,
+
+        message: 'Módulos obtenidos correctamente',
+      };
+      return result;
     } catch (error) {
       throw new BadRequestException(error);
+    }
+  }
+
+  async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
+    try {
+      const [data, total] = await this.moduloRepository.findAndCount({
+        relations: ['permisos'],
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+
+      const result: ApiResponseCommon = {
+        data,
+        paginated: {
+          total: Math.ceil(total / limit),
+          page,
+          limit,
+        },
+        message: 'Módulos obtenidos correctamente',
+      };
+      return result;
+    } catch (error) {
+      throw new BadRequestException(error.message || 'Error fetching data');
     }
   }
 
   async findOne(id: number) {
     try {
-      const exist = await this.moduloRepository.findOne({ where: { id: id } });
+      const exist = await this.moduloRepository.findOne({ where: { Id: id } });
       if (!exist) throw new NotFoundException('Módulo no encontrado');
-      const moduloExpuesto = plainToInstance(ExposeModuloDto, exist, {
-        excludeExtraneousValues: true,
-      });
-      return moduloExpuesto;
+      
     } catch (error) {
       throw new BadRequestException(error);
     }
@@ -77,25 +95,22 @@ export class ModulosService {
   async update(updateModuloDto: UpdateModuloDto, idUser: string) {
     try {
       const exist = await this.moduloRepository.findOne({
-        where: { id: updateModuloDto.id },
+        where: { Id: updateModuloDto.Id },
       });
       if (!exist) throw new NotFoundException('Módulo no encontrado');
       const update = await this.moduloRepository.update(
-        updateModuloDto.id,
+        updateModuloDto.Id,
         updateModuloDto,
       );
-      const moduloExpuesto = plainToInstance(ExposeModuloDto, exist, {
-        excludeExtraneousValues: true,
-      });
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Modulos',
-        `Se creó un modulos con modulo: ${updateModuloDto.nombre}`,
+        `Se creó un modulos con modulo: ${updateModuloDto.Nombre}`,
         'UPDATE',
-        `UPDATE INTO Modulos (...) VALUES (...) -> nombre: ${updateModuloDto.nombre} descipcion: ${updateModuloDto.descripcion}`,
+        `UPDATE INTO Modulos (...) VALUES (...) -> nombre: ${updateModuloDto.Nombre} descipcion: ${updateModuloDto.Descripcion}`,
         Number(idUser),
       );
-      return moduloExpuesto;
+      return await this.moduloRepository.findOne({where:{Id:updateModuloDto.Id}});
     } catch (error) {
       throw new BadRequestException(error);
     }
@@ -107,16 +122,16 @@ export class ModulosService {
     updateModulosEstatusDto: UpdateModulosEstatusDto,
   ) {
     try {
-      const modulo = await this.moduloRepository.findOne({ where: { id } });
+      const modulo = await this.moduloRepository.findOne({ where: { Id: id } });
       if (!modulo) {
         throw new NotFoundException('Modulo no encontrado');
       }
       const Estatus = updateModulosEstatusDto.Estatus;
-      await this.moduloRepository.update(id, { estatus: Estatus });
+      await this.moduloRepository.update(id, { Estatus: Estatus });
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Modulos',
-        `Se cambio del modulo ${modulo.nombre} con id: ${id} a estatus: ${Estatus}`,
+        `Se cambio del modulo ${modulo.Nombre} con id: ${id} a estatus: ${Estatus}`,
         'UPDATE',
         `UPDATE Modulos SET Estatus = ${Estatus} WHERE id = ${id}`,
         Number(idUser),
@@ -136,46 +151,43 @@ export class ModulosService {
   }
 
   async deleteModulo(id: number, req): Promise<any> {
-    const modulo = await this.moduloRepository.findOne({ where: { id: id } });
+    const modulo = await this.moduloRepository.findOne({ where: { Id: id } });
 
     if (!modulo) throw new NotFoundException('Modulo no encontrado');
-    if (modulo.estatus === 1) {
-      modulo.estatus = 0;
+    if (modulo.Estatus === 1) {
+      modulo.Estatus = 0;
       await this.moduloRepository.update(id, modulo);
 
       const permisos = await this.permisosRepository.find({
-        where: { idModulo: id },
+        where: { IdModulo: id },
       });
       if (permisos.length > 0) {
         for (const permiso of permisos) {
-          permiso.estatus = 0;
-          await this.permisosRepository.update(permiso.id, permiso);
+          permiso.Estatus = 0;
+          await this.permisosRepository.update(permiso.Id, permiso);
         }
       }
     } else {
-      modulo.estatus = 1;
+      modulo.Estatus = 1;
       await this.moduloRepository.update(id, modulo);
       const permisos = await this.permisosRepository.find({
-        where: { idModulo: id },
+        where: { IdModulo: id },
       });
       if (permisos.length > 0) {
         for (const permiso of permisos) {
-          permiso.estatus = 1;
-          await this.permisosRepository.update(permiso.id, permiso);
+          permiso.Estatus = 1;
+          await this.permisosRepository.update(permiso.Id, permiso);
         }
       }
     }
     //-----Registro en la bitacora-----
     await this.bitacoraLogger.logToBitacora(
       'Modulos',
-      `Se eliminó el cliente con ID: ${id}`,
-      'DELETE',
-      `DELETE FROM Clientes WHERE Id=${id}`,
+      `Se eliminó el modulos con ID: ${id}`,
+      'UPDATE',
+      `UPDATE FROM Modulos WHERE Id=${id}`,
       req.user.userId,
     );
-    const moduloExpuesto = plainToInstance(ExposeModuloDto, modulo, {
-      excludeExtraneousValues: true,
-    });
-    return moduloExpuesto;
+    return `Modulo fue eliminado exitosamente`;
   }
 }

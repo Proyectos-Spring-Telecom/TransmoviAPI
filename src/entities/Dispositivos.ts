@@ -7,24 +7,24 @@ import {
 } from "typeorm";
 import { Vehiculos } from "./Vehiculos";
 
-@Index("NumeroSerie", ["numeroSerie"], { unique: true })
+@Index("NumeroSerie", ["NumeroSerie"], { unique: true })
 @Entity("Dispositivos", { schema: "TransmoviDev" })
 export class Dispositivos {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "NumeroSerie", unique: true, length: 255 })
-  numeroSerie: string;
+  NumeroSerie: string;
 
   @Column("varchar", { name: "Marca", length: 100 })
-  marca: string;
+  Marca: string;
 
   @Column("varchar", { name: "Modelo", length: 100 })
-  modelo: string;
+  Modelo: string;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
-  @OneToMany(() => Vehiculos, (vehiculos) => vehiculos.idDispositivo2)
+  @OneToMany(() => Vehiculos, (vehiculos) => vehiculos.IdDispositivo2)
   vehiculos: Vehiculos[];
 }

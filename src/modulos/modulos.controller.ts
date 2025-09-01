@@ -8,14 +8,21 @@ import {
   Delete,
   Put,
   Request,
+  Query,
+  Res,
+  ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { ModulosService } from './modulos.service';
 import { CreateModuloDto } from './dto/create-modulo.dto';
 import { UpdateModuloDto } from './dto/update-modulo.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { UpdateModulosEstatusDto } from './dto/update-modulo-estatus.dto';
+import { ApiResponseCommon } from 'src/common/ApiResponse';
+import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 
 @ApiTags('Modulos')
+@UseGuards(JwtAuthGuard)
 @Controller('modulos')
 export class ModulosController {
   constructor(private readonly modulosService: ModulosService) {}
@@ -26,9 +33,17 @@ export class ModulosController {
     return this.modulosService.create(createModuloDto, idUser);
   }
 
-  @Get()
-  findAll() {
-    return this.modulosService.findAll();
+  @Get('list')
+  findAllList(): Promise<ApiResponseCommon> {
+    return this.modulosService.findAllList();
+  }
+
+  @Get('page/:page/:limit')
+  findAll(
+    @Param('page', ParseIntPipe) page: number,
+    @Param('limit', ParseIntPipe) limit: number,
+  ): Promise<ApiResponseCommon> {
+    return this.modulosService.findAll(page, limit);
   }
 
   @Get(':id')

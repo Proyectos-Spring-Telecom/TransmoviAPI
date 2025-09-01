@@ -12,23 +12,23 @@ import { Usuarios } from "./Usuarios";
 @Entity("Roles", { schema: "TransmoviDev" })
 export class Roles {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  Id: string;
 
   @Column("varchar", { name: "Nombre", length: 100 })
-  nombre: string;
+  Nombre: string;
 
   @Column("varchar", { name: "Descripcion", nullable: true, length: 255 })
-  descripcion: string | null;
+  Descripcion: string | null;
 
   @ManyToMany(() => Permisos, (permisos) => permisos.roles)
   @JoinTable({
     name: "RolePermisos",
-    joinColumns: [{ name: "IdRol", referencedColumnName: "id" }],
-    inverseJoinColumns: [{ name: "IdPermiso", referencedColumnName: "id" }],
-    schema: "Transmovi",
+    joinColumns: [{ name: "IdRol", referencedColumnName: "Id" }],
+    inverseJoinColumns: [{ name: "IdPermiso", referencedColumnName: "Id" }],
+    schema: "TransmoviDev",
   })
-  permisos: Permisos[];
+  Permisos: Permisos[];
 
-  @OneToMany(() => Usuarios, (usuarios) => usuarios.idRol2)
+  @OneToMany(() => Usuarios, (usuarios) => usuarios.IdRol2)
   usuarios: Usuarios[];
 }

@@ -10,32 +10,32 @@ import {
 import { Modulos } from "./Modulos";
 import { Roles } from "./Roles";
 
-@Index("fk_permisos_modulo", ["idModulo"], {})
+@Index("fk_permisos_modulo", ["IdModulo"], {})
 @Entity("Permisos", { schema: "TransmoviDev" })
 export class Permisos {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "Nombre", length: 100 })
-  nombre: string;
+  Nombre: string;
 
   @Column("varchar", { name: "Descripcion", nullable: true, length: 255 })
-  descripcion: string | null;
+  Descripcion: string | null;
 
     @Column("tinyint", { name: "Estatus", nullable: true })
-  estatus: number | null;
+  Estatus: number | null;
 
   @ManyToOne(() => Modulos, (modulos) => modulos.permisos, {
     onDelete: "CASCADE",
     onUpdate: "CASCADE",
   })
-  @JoinColumn([{ name: "idModulo", referencedColumnName: "id" }])
-  idModulo: number;
+  @JoinColumn([{ name: "IdModulo", referencedColumnName: "Id" }])
+  IdModulo: number;
 
-  @ManyToMany(() => Roles, (roles) => roles.permisos)
+  @ManyToMany(() => Roles, (roles) => roles.Permisos)
   roles: Roles[];
 
   @ManyToOne(()=>Modulos, (modulo)=> modulo.permisos)
-    @JoinColumn([{ name: "idModulo", referencedColumnName: "id" }])
-  modulo:Modulos;
+    @JoinColumn([{ name: "IdModulo", referencedColumnName: "Id" }])
+  Modulo:Modulos;
 }

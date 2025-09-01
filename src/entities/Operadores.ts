@@ -7,37 +7,37 @@ import {
 } from "typeorm";
 import { Vehiculos } from "./Vehiculos";
 
-@Index("NumeroLicencia", ["numeroLicencia"], { unique: true })
-@Index("Correo", ["correo"], { unique: true })
+@Index("NumeroLicencia", ["NumeroLicencia"], { unique: true })
+@Index("Correo", ["Correo"], { unique: true })
 @Entity("Operadores", { schema: "TransmoviDev" })
 export class Operadores {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "Nombre", length: 255 })
-  nombre: string;
+  Nombre: string;
 
   @Column("varchar", { name: "ApellidoPaterno", length: 100 })
-  apellidoPaterno: string;
+  ApellidoPaterno: string;
 
   @Column("varchar", { name: "ApellidoMaterno", nullable: true, length: 100 })
-  apellidoMaterno: string | null;
+  ApellidoMaterno: string | null;
 
   @Column("varchar", { name: "NumeroLicencia", unique: true, length: 20 })
-  numeroLicencia: string;
+  NumeroLicencia: string;
 
   @Column("datetime", { name: "FechaNacimiento" })
-  fechaNacimiento: Date;
+  FechaNacimiento: Date;
 
   @Column("varchar", { name: "Correo", unique: true, length: 100 })
-  correo: string;
+  Correo: string;
 
   @Column("varchar", { name: "Telefono", length: 10 })
-  telefono: string;
+  Telefono: string;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
-  @OneToMany(() => Vehiculos, (vehiculos) => vehiculos.idOperador2)
+  @OneToMany(() => Vehiculos, (vehiculos) => vehiculos.IdOperador2)
   vehiculos: Vehiculos[];
 }

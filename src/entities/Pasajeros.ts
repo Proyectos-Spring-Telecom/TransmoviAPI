@@ -3,26 +3,26 @@ import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
 @Entity("Pasajeros", { schema: "TransmoviDev" })
 export class Pasajeros {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("varchar", { name: "Nombre", length: 100 })
-  nombre: string;
+  Nombre: string;
 
   @Column("varchar", { name: "ApellidoPaterno", length: 100 })
-  apellidoPaterno: string;
+  ApellidoPaterno: string;
 
   @Column("varchar", { name: "ApellidoMaterno", nullable: true, length: 100 })
-  apellidoMaterno: string | null;
+  ApellidoMaterno: string | null;
 
   @Column("datetime", { name: "FechaNacimiento" })
-  fechaNacimiento: Date;
+  FechaNacimiento: Date;
 
   @Column("varchar", { name: "Correo", nullable: true, length: 100 })
-  correo: string | null;
+  Correo: string | null;
 
   @Column("varchar", { name: "Telefono", nullable: true, length: 15 })
-  telefono: string | null;
+  Telefono: string | null;
 
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
-  estatus: number;
+  Estatus: number;
 }

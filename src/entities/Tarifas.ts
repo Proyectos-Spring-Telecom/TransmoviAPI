@@ -8,26 +8,26 @@ import {
 } from "typeorm";
 import { Rutas } from "./Rutas";
 
-@Index("IdRuta", ["idRuta"], {})
+@Index("IdRuta", ["IdRuta"], {})
 @Entity("Tarifas", { schema: "TransmoviDev" })
 export class Tarifas {
   @PrimaryGeneratedColumn({ type: "int", name: "Id" })
-  id: number;
+  Id: number;
 
   @Column("int", { name: "IdRuta" })
-  idRuta: number;
+  IdRuta: number;
 
   @Column("decimal", { name: "TarifaBase", precision: 10, scale: 2 })
-  tarifaBase: string;
+  TarifaBase: string;
 
   @Column("decimal", { name: "DistanciaBaseKm", precision: 10, scale: 2 })
-  distanciaBaseKm: string;
+  DistanciaBaseKm: string;
 
   @Column("int", { name: "IncrementoCadaMetros" })
-  incrementoCadaMetros: number;
+  IncrementoCadaMetros: number;
 
   @Column("decimal", { name: "CostoAdicional", precision: 10, scale: 2 })
-  costoAdicional: string;
+  CostoAdicional: string;
 
   @Column("datetime", {
     name: "FechaRegistro",
@@ -43,6 +43,6 @@ export class Tarifas {
     onDelete: "NO ACTION",
     onUpdate: "NO ACTION",
   })
-  @JoinColumn([{ name: "IdRuta", referencedColumnName: "id" }])
-  idRuta2: Rutas;
+  @JoinColumn([{ name: "IdRuta", referencedColumnName: "Id" }])
+  IdRuta2: Rutas;
 }
