@@ -22,10 +22,10 @@ import { Viajes } from "./Viajes";
 @Entity("Clientes", { schema: "TransmoviDev" })
 export class Clientes {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  id: number;
 
   @Column("bigint", { name: "IdPadre", nullable: true })
-  idPadre: string | null;
+  idPadre: number | null;
 
   @Column("varchar", { name: "RFC", unique: true, length: 16 })
   rfc: string;

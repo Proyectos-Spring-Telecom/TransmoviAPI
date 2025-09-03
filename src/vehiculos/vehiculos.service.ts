@@ -40,6 +40,7 @@ export class VehiculosService {
         'CREATE',
         `INSERT INTO Vehiculos (Marca, Modelo, Ano, Placa, NumeroEconomico, Estatus, IdOperador, IdDispositivo) VALUES ('${createVehiculoDto.marca}', '${createVehiculoDto.modelo}', ${createVehiculoDto.ano}, '${createVehiculoDto.placa}', '${createVehiculoDto.numeroEconomico}', ${createVehiculoDto.estatus}, ${createVehiculoDto.idOperador}, ${createVehiculoDto.idDispositivo})`,
         Number(idUser),
+        2,
       );
       return {
         message: 'Operador creado exitosamente',
@@ -133,6 +134,7 @@ export class VehiculosService {
         'UPDATE',
         `UPDATE Operador SET Estatus = ${Estatus} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `El vehiculo con Id: ${Id} su estatus fue actualizado a ${Estatus}`,
@@ -162,6 +164,7 @@ export class VehiculosService {
         'UPDATE',
         `UPDATE Vehiculos SET Marca='${updateVehiculoDto.marca}', Modelo='${updateVehiculoDto.modelo}', Ano=${updateVehiculoDto.ano}, Placa='${updateVehiculoDto.placa}', NumeroEconomico='${updateVehiculoDto.numeroEconomico}', Estatus=${updateVehiculoDto.estatus}, IdOperador=${updateVehiculoDto.idOperador}, IdDispositivo=${updateVehiculoDto.idDispositivo} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return vehiculoData;
     } catch (error) {
@@ -184,6 +187,7 @@ export class VehiculosService {
         'DELETE',
         `DELETE Vehiculos SET Marca='${vehiculo.marca}', Modelo='${vehiculo.modelo}', Ano=${vehiculo.ano}, Placa='${vehiculo.placa}', NumeroEconomico='${vehiculo.numeroEconomico}', Estatus=${vehiculo.estatus}`,  //, IdOperador=${vehiculo.idOperador}, IdDispositivo=${vehiculo.idDispositivo} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
     } catch (error) {
       if (error instanceof HttpException) {

@@ -28,7 +28,7 @@ export class UsuariosService {
 async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
   try {
     const [data, total] = await this.usuarioRepository.findAndCount({
-      relations: ["IdCliente2", "IdRol2"],
+      relations: ["idCliente2", "idRol2"],
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -140,6 +140,7 @@ async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
         'CREATE',
         `INSERT INTO Usuarios (...) VALUES (...) -> username:  ${createUsuarioDto.userName} nombre: ${createUsuarioDto.nombre} apellido paterno: ${createUsuarioDto.apellidoPaterno} apellido materno: ${createUsuarioDto.apellidoMaterno}`,
         Number(idUser),
+        2,
       );
       const { passwordHash: _, ...usuarioSinPassword } = newUser;
       return {
@@ -188,11 +189,12 @@ async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
       const { passwordHash: _, ...usuarioSinPassword } = newUser;
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
-        'Modulos',
+        'Usuarios',
         `Se actualizo el usuario: ${newUser.nombre} con ID; ${newUser.id}`,
         'UPDATE',
         `UPDATE Usuarios SET UserName='${newUser.userName}', Telefono='${newUser.telefono}', Nombre='${newUser.nombre}', ApellidoPaterno='${newUser.apellidoPaterno}', ApellidoMaterno='${newUser.apellidoMaterno}', Estatus=${newUser.estatus}, IdRol=${newUser.idRol}, IdCliente=${newUser.idCliente} WHERE Id=${id}`,
         Number(idUser),
+        2,
       );
       return usuarioSinPassword;
     } catch (error) {
@@ -218,9 +220,9 @@ async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
       if (!usuario) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
-      const { Estatus } = updateUsuarioEstatusDto;
+      const { estatus } = updateUsuarioEstatusDto;
 
-      await this.usuarioRepository.update(id, { estatus: Estatus });
+      await this.usuarioRepository.update(id, { estatus: estatus });
       const usuarioResult = await this.usuarioRepository.findOne({
         where: { id: id },
       });
@@ -229,13 +231,14 @@ async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
       }
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
-        'Modulos',
-        `Se cambio del modulo ${usuarioResult.nombre} con id: ${id} a estatus: ${Estatus}`,
+        'Usuarios',
+        `Se cambio del modulo ${usuarioResult.nombre} con id: ${id} a estatus: ${estatus}`,
         'UPDATE',
-        `UPDATE Modulos SET Estatus = ${Estatus} WHERE id = ${id}`,
+        `UPDATE Usuarios SET Estatus = ${estatus} WHERE id = ${id}`,
         Number(idUser),
+        2,
       );
-      return { message: `Estatus actualizado correctamente a ${Estatus}` };
+      return { message: `Estatus actualizado correctamente a ${estatus}` };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -263,6 +266,7 @@ async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
         'DELETE',
         `DELETE FROM Usuarios WHERE Id=${id}`,
         Number(idUser),
+        2,
       );
       return `Usuario con ${id} eliminado exitosamente`;
     } catch (error) {

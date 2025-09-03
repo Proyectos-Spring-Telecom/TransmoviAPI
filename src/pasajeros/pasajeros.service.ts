@@ -43,6 +43,7 @@ export class PasajerosService {
         'CREATE',
         `INSERT INTO Pasajeros (...) VALUES (...) ->  nombre: ${createPasajeroDto.nombre} apellido paterno: ${createPasajeroDto.apellidoPaterno} apellido materno: ${createPasajeroDto.apellidoMaterno}`,
         Number(idUser),
+        2,
       );
       return { message: 'Usuario creado exitosamente', clienteCreado };
     } catch (error) {
@@ -144,6 +145,7 @@ export class PasajerosService {
         'UPDATE',
         `UPDATE Pasajeros SET Estatus = ${estatus} WHERE id = ${Id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `Cliente con id: ${Id} su estatus fue actualizado a ${estatus}`,
@@ -176,6 +178,7 @@ export class PasajerosService {
         'UPDATE',
         `UPDATE Modulos SET (...) WHERE id = ${Id}`,
         Number(idUser),
+        2,
       );
       return await this.pasajeroRepository.findOne({ where: { id: Id } });
     } catch (error) {
@@ -204,6 +207,7 @@ export class PasajerosService {
         'DELETE',
         `DELETE FROM Pasajeros WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return `Pasajero con id: ${Id} eliminado exitosamente`;
     } catch (error) {

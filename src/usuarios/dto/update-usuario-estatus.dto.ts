@@ -10,5 +10,5 @@ export class UpdateUsuarioEstatusDto {
       description: 'Estatus de activacion del usuario',
       example: '1',
     })
-  Estatus: number = 1;
+  estatus: number = 1;
 }

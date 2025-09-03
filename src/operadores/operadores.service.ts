@@ -25,14 +25,12 @@ export class OperadoresService {
   async createOperador(createOperadoreDto: CreateOperadoreDto, idUser: string) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: [
-          { Correo: createOperadoreDto.Correo },
-          { NumeroLicencia: createOperadoreDto.NumeroLicencia },
-        ],
+        where: 
+          { numeroLicencia: createOperadoreDto.numeroLicencia }
       });
       if (operadorExistente) {
         throw new BadRequestException(
-          `Operador con licencia: ${createOperadoreDto.NumeroLicencia} ú Operador con correo: ${createOperadoreDto.Correo} esta registrado`,
+          `Operador con licencia: ${createOperadoreDto.numeroLicencia} esta registrado`,
         );
       }
       const operadorData = await this.operadoresRepository.create(createOperadoreDto);
@@ -40,10 +38,12 @@ export class OperadoresService {
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Operadores',
-        `Se creó el operador con numero de licencia: ${createOperadoreDto.NumeroLicencia}`,
+        `Se creó el operador con numero de licencia: ${createOperadoreDto.numeroLicencia}`,
         'CREATE',
-        `INSERT Operadores SET ... Se creó el operador:${createOperadoreDto.Nombre} ${createOperadoreDto.ApellidoPaterno} CREATE, INSERT INTO Operadores (Nombre, ApellidoPaterno, ApellidoMaterno, NumeroLicencia, FechaNacimiento, Correo, Telefono, Estatus) VALUES (${createOperadoreDto.Nombre}, ${createOperadoreDto.ApellidoPaterno}, ${createOperadoreDto.ApellidoMaterno}, ${createOperadoreDto.NumeroLicencia}, ${createOperadoreDto.FechaNacimiento}, ${createOperadoreDto.Correo}, ${createOperadoreDto.Telefono}, ${createOperadoreDto.Estatus})`,
+        //`INSERT Operadores SET ... Se creó el operador:${createOperadoreDto.nombre} ${createOperadoreDto.ApellidoPaterno} CREATE, INSERT INTO Operadores (Nombre, ApellidoPaterno, ApellidoMaterno, NumeroLicencia, FechaNacimiento, Correo, Telefono, Estatus) VALUES (${createOperadoreDto.Nombre}, ${createOperadoreDto.ApellidoPaterno}, ${createOperadoreDto.ApellidoMaterno}, ${createOperadoreDto.NumeroLicencia}, ${createOperadoreDto.FechaNacimiento}, ${createOperadoreDto.Correo}, ${createOperadoreDto.Telefono}, ${createOperadoreDto.Estatus})`,
+        `INSERT Operadores set`,
         Number(idUser),
+        2,
       );
       return {
         message: 'Operador creado exitosamente',
@@ -117,7 +117,7 @@ export class OperadoresService {
   async findOneOperador(Id: number) {
     try {
       const operador = await this.operadoresRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!operador) {
         throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
@@ -141,7 +141,7 @@ export class OperadoresService {
   ) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!operadorExistente) {
         throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
@@ -155,6 +155,7 @@ export class OperadoresService {
         'UPDATE',
         `UPDATE Operador SET Estatus = ${Estatus} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `El operador con id: ${Id} su estatus fue actualizado a ${Estatus}`,
@@ -176,7 +177,7 @@ export class OperadoresService {
   ) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!operadorExistente) {
         throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
@@ -190,8 +191,9 @@ export class OperadoresService {
         'UPDATE',
         `UPDATE Operadores SET ... WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
-      return await this.operadoresRepository.findOne({ where: { Id } });
+      return await this.operadoresRepository.findOne({ where: { id:Id } });
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -203,7 +205,7 @@ export class OperadoresService {
   async removeOperador(Id: number, idUser: string) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!operadorExistente) {
         throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
@@ -216,6 +218,7 @@ export class OperadoresService {
         'DELETE',
         `DELETE FROM Operadores WHERE Id=${Id}  `,
         Number(idUser),
+        2,
       );
       return `Operador con id: ${Id} eliminado exitosamente`;
     } catch (error) {

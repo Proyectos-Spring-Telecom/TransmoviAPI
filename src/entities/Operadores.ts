@@ -16,7 +16,7 @@ import { Viajes } from "./Viajes";
 @Entity("Operadores", { schema: "TransmoviDev" })
 export class Operadores {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  id: number;
 
   @Column("varchar", { name: "NumeroLicencia", unique: true, length: 20 })
   numeroLicencia: string;
@@ -60,7 +60,7 @@ export class Operadores {
   estatus: number;
 
   @Column("bigint", { name: "IdUsuario", unique: true })
-  idUsuario: string;
+  idUsuario: number;
 
   @OneToOne(() => Usuarios, (usuarios) => usuarios.operadores, {
     onDelete: "NO ACTION",

@@ -108,6 +108,7 @@ export class PermisosService {
         'CREATE',
         `INSERT INTO Permisos (Nombre, Descripcion) VALUES ('${savedPermiso.nombre}', '${savedPermiso.descripcion}')`,
         Number(idUsuario),
+        2,
       );
       return `Permiso creado exitosamente`;
     } catch (error) {
@@ -138,6 +139,7 @@ export class PermisosService {
         'UPDATE',
         `UPDATE Permiso SET Estatus=${updatePermisoEstatusDto.estatus} WHERE Id=${id}`,
         Number(id),
+        2,
       );
       return `Estatus permiso con ${id} actualizado exitosamente`;
     } catch (error) {
@@ -167,6 +169,7 @@ export class PermisosService {
         'UPDATE',
         `UPDATE Permisos SET... WHERE Id=${id} VALUES ('${permisoActualizar.nombre}', '${permisoActualizar.descripcion}')`,
         Number(id),
+        2,
       );
       return `Permiso con ${id} actualizado exitosamente`;
     } catch (error) {
@@ -189,6 +192,7 @@ export class PermisosService {
         'UPDATE',
         `UPDATE Monederos SET Estatus=${0} WHERE Id=${id}`,
         Number(id),
+        2,
       );
       return `Permiso con #${id} eliminado`;
     } catch (error) {

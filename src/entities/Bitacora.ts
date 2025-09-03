@@ -14,7 +14,7 @@ import { Usuarios } from "./Usuarios";
 @Entity("Bitacora", { schema: "TransmoviDev" })
 export class Bitacora {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
-  id: string;
+  id: number;
 
   @Column("varchar", { name: "Modulo", nullable: true, length: 100 })
   modulo: string | null;
@@ -36,10 +36,10 @@ export class Bitacora {
   fechaCreacion: Date | null;
 
   @Column("bigint", { name: "IdUsuario" })
-  idUsuario: string;
+  idUsuario: number;
 
   @Column("bigint", { name: "IdModulo" })
-  idModulo: string;
+  idModulo: number;
 
   @ManyToOne(() => Modulos, (modulos) => modulos.bitacoras, {
     onDelete: "NO ACTION",

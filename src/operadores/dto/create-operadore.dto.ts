@@ -1,81 +1,54 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ApiProperty } from "@nestjs/swagger";
 import {
-  IsDate,
-  IsEmail,
-  IsIn,
-  IsInt,
+  IsString,
   IsNotEmpty,
   IsOptional,
-  IsString,
-  Length,
+  IsDateString,
+  IsInt,
   MaxLength,
-} from 'class-validator';
+} from "class-validator";
 
 export class CreateOperadoreDto {
-  @IsString({ message: 'Es necesario el nombre' })
-  @ApiProperty({
-    description: 'Nombre del operador',
-    example: 'Juan',
-  })
-  Nombre: string;
-
-  @IsNotEmpty({ message: 'Es obligatorio el apellido paterno' })
   @IsString()
-  @ApiProperty({
-    description: 'Apellido Paterno del operador',
-    example: 'Martinez',
-  })
-  ApellidoPaterno: string;
+  @IsNotEmpty({ message: "El número de licencia es obligatorio" })
+  @MaxLength(20, { message: "El número de licencia no puede exceder 20 caracteres" })
+  @ApiProperty({ description: "Número de licencia único del operador", example: "LIC12345678" })
+  numeroLicencia: string;
 
-  //Apellido Materno es opcional para casos de un solo apellido
+  @IsDateString({}, { message: "La fecha de nacimiento debe tener formato válido (YYYY-MM-DD)" })
+  @ApiProperty({ description: "Fecha de nacimiento del operador", example: "1990-05-15" })
+  fechaNacimiento: string;
+
   @IsOptional()
   @IsString()
-  @ApiProperty({
-    description: 'Apellido Materno del operador',
-    example: 'Castillo',
-  })
-  ApellidoMaterno?: string;
+  @MaxLength(500)
+  @ApiProperty({ description: "Identificación oficial escaneada", example: "identificacion.pdf", required: false })
+  identificacion?: string;
 
-  @IsString()
-  @Length(1, 20)
-  @ApiProperty({
-    description: 'Numero de licencia del operador',
-    example: 'ABC123456',
-  })
-  NumeroLicencia: string;
-
-  @IsDate()
-  @Type(() => Date)
   @IsOptional()
-  @ApiProperty({
-    description: 'Fecha de Nacimiento del operador',
-    example: '1988-08-08 08:00:00',
-  })
-  FechaNacimiento: Date;
-
-  @IsEmail()
-  @ApiProperty({
-    description: 'Correo electronico del operador',
-    example: 'correo@ejemplo.com',
-  })
-  Correo: string;
-
-  @IsNotEmpty({ message: 'Es obligatorio el numero' })
   @IsString()
-  @MaxLength(20, { message: 'El teléfono no puede exceder los 20 caracteres' })
-  @ApiProperty({
-    description: 'Telefono del operador',
-    example: '7776665544',
-  })
-  Telefono: string;
+  @MaxLength(500)
+  @ApiProperty({ description: "Licencia escaneada", example: "licencia.pdf", required: false })
+  licencia?: string;
 
-  @IsInt({ message: 'estatus debe ser un número entero' })
-  @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
-  @ApiProperty({
-    description: 'Estatus del operador solo puede ser 1 ó 0',
-    example: '1',
-  })
   @IsOptional()
-  Estatus?: number = 1;
+  @IsString()
+  @MaxLength(500)
+  @ApiProperty({ description: "Comprobante de domicilio", example: "comprobante.pdf", required: false })
+  comprobanteDomicilio?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @ApiProperty({ description: "Antecedentes no penales", example: "antecedentes.pdf", required: false })
+  antecedentesNoPenales?: string;
+
+  @IsOptional()
+  @IsInt({ message: "Estatus debe ser 0 ó 1" })
+  @ApiProperty({ description: "Estatus del operador (1=Activo, 0=Inactivo)", example: 1, required: false })
+  estatus?: number = 1;
+
+  @IsInt({ message: "El IdUsuario debe ser un número entero" })
+  @ApiProperty({ description: "Id del usuario asociado al operador", example: 10 })
+  idUsuario: number;
 }

@@ -36,6 +36,7 @@ export class ModulosService {
         'CREATE',
         `INSERT INTO Modulos (...) VALUES (...) -> nombre: ${createModuloDto.nombre} descipcion: ${createModuloDto.descripcion}`,
         Number(idUser),
+        2,
       );
       return saved;
     } catch (error) {
@@ -109,6 +110,7 @@ export class ModulosService {
         'UPDATE',
         `UPDATE INTO Modulos (...) VALUES (...) -> nombre: ${updateModuloDto.nombre} descipcion: ${updateModuloDto.descripcion}`,
         Number(idUser),
+        2,
       );
       return await this.moduloRepository.findOne({where:{id:updateModuloDto.id}});
     } catch (error) {
@@ -135,6 +137,7 @@ export class ModulosService {
         'UPDATE',
         `UPDATE Modulos SET Estatus = ${Estatus} WHERE id = ${id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `Modulo con id: ${id} su estatus fue actualizado a ${Estatus}`,
@@ -187,6 +190,7 @@ export class ModulosService {
       'UPDATE',
       `UPDATE FROM Modulos WHERE Id=${id}`,
       req.user.userId,
+      2,
     );
     return `Modulo fue eliminado exitosamente`;
   }
