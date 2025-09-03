@@ -1,37 +1,37 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  MaxLength,
+} from "class-validator";
 
 export class CreateDispositivoDto {
   @IsString()
-  @IsNotEmpty({ message: 'Es necesario el numero de serie' })
-  @ApiProperty({
-    description: 'Numero de serie del dispositivo',
-    example: 'XYZ789000',
-  })
-  NumeroSerie: string;
+  @IsNotEmpty({ message: "El número de serie es obligatorio" })
+  @MaxLength(100, { message: "El número de serie no puede exceder 100 caracteres" })
+  @ApiProperty({ description: "Número de serie único del dispositivo", example: "SN1234567890" })
+  numeroSerie: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Es necesario la marca' })
-  @ApiProperty({
-            description: 'Marca del dispositivo',
-            example: 'ABCDE',
-        })
-  Marca: string;
+  @IsNotEmpty({ message: "La marca es obligatoria" })
+  @MaxLength(100, { message: "La marca no puede exceder 100 caracteres" })
+  @ApiProperty({ description: "Marca del dispositivo", example: "Samsung" })
+  marca: string;
 
   @IsString()
-  @IsNotEmpty({ message: 'Es necesario el modelo' })
-  @ApiProperty({
-            description: 'El modelo del dispositivos',
-            example: 'C2025',
-        })
-  Modelo: string;
+  @IsNotEmpty({ message: "El modelo es obligatorio" })
+  @MaxLength(100, { message: "El modelo no puede exceder 100 caracteres" })
+  @ApiProperty({ description: "Modelo del dispositivo", example: "Galaxy X1" })
+  modelo: string;
 
-  @IsInt({ message: 'Estatus debe ser un numero entero' })
-  @IsIn([0, 1], { message: 'Estatus solo puede ser 0 ó 1' })
   @IsOptional()
-  @ApiProperty({
-            description: 'Estatus del dispositivo solo es 1 ó 0',
-            example: '1',
-        })
-  Estatus?: number = 1;
+  @IsInt({ message: "Estatus debe ser 0 ó 1" })
+  @ApiProperty({ description: "Estatus del dispositivo (1=Activo, 0=Inactivo)", example: 1, required: false })
+  estatus?: number = 1;
+
+  @IsInt({ message: "IdCliente debe ser un número entero" })
+  @ApiProperty({ description: "Id del cliente propietario del dispositivo", example: 5 })
+  idCliente: number;
 }

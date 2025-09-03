@@ -12,7 +12,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Dispositivos } from 'src/entities/Dispositivos';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { plainToInstance } from 'class-transformer';
 import { ApiResponseCommon } from 'src/common/ApiResponse';
 @Injectable()
 export class DispositivosService {
@@ -28,11 +27,11 @@ export class DispositivosService {
   ) {
     try {
       const dispostivoExistente = await this.dispositivoRepository.findOne({
-        where: { NumeroSerie: createDispositivoDto.NumeroSerie },
+        where: { numeroSerie: createDispositivoDto.numeroSerie },
       });
       if (dispostivoExistente) {
         throw new BadRequestException(
-          `Dispositivo con numero de serie ${createDispositivoDto.NumeroSerie} existente`,
+          `Dispositivo con numero de serie ${createDispositivoDto.numeroSerie} existente`,
         );
       }
       const dataDispositivo = await this.dispositivoRepository.create(createDispositivoDto);
@@ -41,10 +40,11 @@ export class DispositivosService {
       // --- Registro en la bitácora ---
       await this.bitacoraLogger.logToBitacora(
         'Dispositivos',
-        `Se creó un dispositivo con numero de serie: ${createDispositivoDto.NumeroSerie}`,
+        `Se creó un dispositivo con numero de serie: ${createDispositivoDto.numeroSerie}`,
         'CREATE',
-        `INSERT INTO Dispositivos (NumeroSerie, Marca, Modelo, Estatus) VALUES (${createDispositivoDto.NumeroSerie}, ${createDispositivoDto.Marca}, '${createDispositivoDto.Modelo}', ${createDispositivoDto.Estatus})`, 
+        `INSERT INTO Dispositivos (NumeroSerie, Marca, Modelo, Estatus) VALUES (${createDispositivoDto.numeroSerie}, ${createDispositivoDto.marca}, '${createDispositivoDto.modelo}', ${createDispositivoDto.estatus})`, 
         Number(idUser),
+        2,
       );
       return {
       message: 'Dispositivo creado exitosamente',
@@ -114,7 +114,7 @@ export class DispositivosService {
   async findOneDispositivo(Id: number) {
     try {
       const dispostivoExistente = await this.dispositivoRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!dispostivoExistente) {
         throw new NotFoundException(`Dispositivo con id: ${Id} no encontrado`);
@@ -140,7 +140,7 @@ export class DispositivosService {
   ) {
     try {
       const dispostivoExistente = await this.dispositivoRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!dispostivoExistente) {
         throw new NotFoundException(`Dispositivo con ${Id} no encontrado`);
@@ -154,6 +154,7 @@ export class DispositivosService {
         'CREATE',
         `UPDATE Dispositivos SET Estatus = ${Estatus} WHERE id = ${Id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `Estatus actualizado exitosamente a ${Estatus}`,
@@ -176,7 +177,7 @@ export class DispositivosService {
   ) {
     try {
       const dispostivoExistente = await this.dispositivoRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!dispostivoExistente) {
         throw new NotFoundException(`Dipositivo con ${Id} no encontrado`);
@@ -188,11 +189,12 @@ export class DispositivosService {
         'Dispositivos',
         `Se actualizó el dispositivo con ID: ${Id}`,
         'UPDATE',
-        `UPDATE Dispositivos SET NumeroSerie='${updateDispositivoDto.NumeroSerie}', Marca='${updateDispositivoDto.Marca}', Modelo='${updateDispositivoDto.Modelo}', Estatus=${updateDispositivoDto.Estatus} WHERE Id=${Id}`,
+        `UPDATE Dispositivos SET NumeroSerie='${updateDispositivoDto.numeroSerie}', Marca='${updateDispositivoDto.marca}', Modelo='${updateDispositivoDto.modelo}', Estatus=${updateDispositivoDto.estatus} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       const dispositivoActualizado = await this.dispositivoRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       return {
         message: 'Dsipositivo actualizado exitosamente',
@@ -211,7 +213,7 @@ export class DispositivosService {
   async removeDispositivo(Id: number, idUser: string) {
     try {
       const findDispositivo = await this.dispositivoRepository.findOne({
-        where: { Id },
+        where: { id:Id },
       });
       if (!findDispositivo) {
         throw new NotFoundException(
@@ -226,6 +228,7 @@ export class DispositivosService {
         'DELETE',
         `DELETE FROM Clientes WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `Dispositivo con id: ${Id} eliminado exitosamente`,

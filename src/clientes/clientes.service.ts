@@ -26,12 +26,12 @@ export class ClientesService {
     try {
       const clienteCreate = await this.clienteRepository.findOne({
         where: {
-          RFC: createClienteDto.RFC,
+          rfc: createClienteDto.rfc,
         },
       });
       if (clienteCreate) {
         throw new BadRequestException(
-          `Cliente registrado con RFC: ${createClienteDto.RFC}, ingrese otro cliente`,
+          `Cliente registrado con RFC: ${createClienteDto.rfc}, ingrese otro cliente`,
         );
       }
       const clienteData = await this.clienteRepository.create(createClienteDto);
@@ -39,10 +39,11 @@ export class ClientesService {
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Clientes',
-        `Se creó un cliente con RFC ${createClienteDto.RFC}`,
+        `Se creó un cliente con RFC ${createClienteDto.rfc}`,
         'CREATE',
-        `INSERT INTO Clientes (...) VALUES (...) -> RFC: ${createClienteDto.RFC}`,
+        `INSERT INTO Clientes (...) VALUES (...) -> RFC: ${createClienteDto.rfc}`,
         Number(idUser),
+        2,
       );
       return { message: 'Cliente creado exitosamente', Data: clienteCreado };
     } catch (error) {
@@ -108,7 +109,7 @@ export class ClientesService {
   async getOneCliente(id: number) {
     try {
       const cliente = await this.clienteRepository.findOne({
-        where: { Id:id },
+        where: { id:id },
       });
       if (!cliente) {
         throw new NotFoundException(`EL cliente con id:${id} no encontrado`);
@@ -130,7 +131,7 @@ export class ClientesService {
     updateClienteDto: UpdateClienteDto,
   ) {
     try {
-      const Cliente = await this.clienteRepository.findOne({ where: { Id:id } });
+      const Cliente = await this.clienteRepository.findOne({ where: { id:id } });
       if (!Cliente) {
         throw new NotFoundException(
           `El cliente con id: ${id} no fue encontrado`,
@@ -145,10 +146,11 @@ export class ClientesService {
         'UPDATE',
         `UPDATE Clientes SET ... WHERE Id=${idUser}`,
         Number(idUser),
+        2,
       );
       //Hacemos un expose que convierta los atributos en PascalCase
       const clientefind = await this.clienteRepository.findOne({
-        where: { Id:id },
+        where: { id:id },
       });
       return clientefind;
     } catch (error) {
@@ -167,23 +169,24 @@ export class ClientesService {
     updateClienteEstatusDto: UpdateClienteEstatusDto,
   ) {
     try {
-      const Usuario = await this.clienteRepository.findOne({ where: { Id:id } });
+      const Usuario = await this.clienteRepository.findOne({ where: { id:id } });
       if (!Usuario) {
         throw new NotFoundException(`Cliente con id: ${id} no encontrado`);
       }
-      const Estatus = updateClienteEstatusDto.Estatus;
-      await this.clienteRepository.update(id, { Estatus });
+      const estatus = updateClienteEstatusDto.Estatus;
+      await this.clienteRepository.update(id, { estatus });
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Clientes',
-        `Se cambio el estatus del cliente: ${id} a estatus: ${Estatus}`,
+        `Se cambio el estatus del cliente: ${id} a estatus: ${estatus}`,
         'UPDATE',
-        `UPDATE CLIENTE SET Estatus = ${Estatus} WHERE id = ${id}`,
+        `UPDATE CLIENTE SET Estatus = ${estatus} WHERE id = ${id}`,
         Number(idUser),
+        2,
       );
       return {
-        message: `Cliente con id:${id} su estatus fue actualizado a ${Estatus}`,
-        Estatus: Number(Estatus),
+        message: `Cliente con id:${id} su estatus fue actualizado a ${estatus}`,
+        Estatus: Number(estatus),
       };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -198,7 +201,7 @@ export class ClientesService {
   async removeCliente(id: number, idUser: string) {
     try {
       const clienteEliminar = await this.clienteRepository.findOne({
-        where: { Id:id },
+        where: { id:id },
       });
       if (!clienteEliminar) {
         throw new NotFoundException(
@@ -213,6 +216,7 @@ export class ClientesService {
         'DELETE',
         `DELETE FROM Clientes WHERE Id=${id}`,
         Number(idUser),
+        2,
       );
       return {
         message: `Cliente con id: ${id} eliminado exitosamente`,

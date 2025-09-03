@@ -42,6 +42,7 @@ export class MonederosService {
         'CREATE',
         `INSERT Monedero -> NumeroSerie: ${createMonederoDto.numeroSerie}`,
         Number(idUser),
+        2,
       );
       return { message: 'Monedero creado exitosamente', monedero: monedero };
     } catch (error) {
@@ -163,6 +164,7 @@ export class MonederosService {
         'UPDATE',
         `UPDATE Monederos SET Estatus=${Estatus} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       const monedero = await this.monederoRepository.findOne({ where: { id: Id } });
       return { message: 'Estatus del monedero actualizado exitosamente', Estatus: Number(Estatus) };
@@ -199,6 +201,7 @@ export class MonederosService {
         'UPDATE',
         `UPDATE Monederos SET Saldo=${Saldo} WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       const monedero = await this.monederoRepository.findOne({ where: { id: Id } });
       return { message: 'Saldo actualizado exitosamente', Saldo: Number(monedero?.saldo) };
@@ -235,6 +238,7 @@ export class MonederosService {
         'UPDATE',
         `UPDATE Monederos SET... WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       const monedero = await this.monederoRepository.findOne({ where: { id: Id } });
       return { message: 'Monederos actualizado exitosamente', monedero: monedero };
@@ -264,6 +268,7 @@ export class MonederosService {
         'DELETE',
         `DELETE From Monederos WHERE Id=${Id}`,
         Number(idUser),
+        2,
       );
       return {message:`El monedero con id: ${Id} ha sido eliminado exitosamente`,Id: Number(Id)};
     } catch (error) {

@@ -66,23 +66,24 @@ export class BitacoraLoggerService {
   }
 
   async logToBitacora(
-    Modulo: string,
-    Descripcion: string,
-    Accion: string,
-    Query: string,
-    IdUsuario: number,
+    modulo: string,
+    descripcion: string,
+    accion: string,
+    query: string,
+    idUsuario: number,
+    idModulo:number,
   ) {
     const FechaActual = moment()
       .tz('America/Mexico_City')
       .format('YYYY-MM-DD HH:mm:ss');
 
     const registro = this.bitacoraRepository.create({
-      Modulo: Modulo,
-      Descripcion: Descripcion,
-      Accion: Accion,
-      Query: Query,
-      Fecha: FechaActual,
-      IdUsuario: IdUsuario,
+      modulo: modulo,
+      descripcion: descripcion,
+      accion: accion,
+      query: query,
+      idUsuario: idUsuario,
+      idModulo:idModulo,
     });
     console.log(FechaActual);
     await this.bitacoraRepository.save(registro);
