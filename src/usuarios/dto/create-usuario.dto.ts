@@ -10,6 +10,9 @@ import {
   IsIn,
   IsArray,
   IsNumber,
+} from "class-validator";
+  IsArray,
+  IsNumber,
   Matches,
 } from 'class-validator';
 
@@ -109,6 +112,11 @@ export class CreateUsuarioDto {
   @IsInt()
   @ApiProperty({ description: 'Cliente asignado', example: 5 })
   idCliente: number;
+  
+  @IsArray()
+  @IsNumber({}, { each: true })
+  permisosIds: number[]; 
+
 
   @IsArray()
   @IsNumber({}, { each: true })

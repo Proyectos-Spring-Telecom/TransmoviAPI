@@ -380,12 +380,12 @@ export class UsuariosService {
         Array.isArray(updateUsuarioDto.permisosIds)
       ) {
         const nuevaLista: number[] = updateUsuarioDto.permisosIds.map(Number); // lista nueva de permisos (ej. [1,2,3])
-
+        
         // Permisos actuales en BD
         const creadaLista = await this.usuariosPermisosRepository.find({
           where: { idUsuario: id },
         });
-
+        
         const nuevaSet = new Set<number>(nuevaLista);
         const creadaMap = new Map<number, any>(
           creadaLista.map((p) => [Number(p.idPermiso), p] as const),
@@ -538,13 +538,16 @@ export class UsuariosService {
       }
       //Se hacer eliminado logico
       //Cambiamos el estatus del usuario a 0
-      await this.usuarioRepository.update(id, { estatus: 0 });
+      await this.usuarioRepository.update(id,{estatus:0})
 
       //buscamos sus permisos
-      const permisos = await this.usuariosPermisosRepository.find({
-        where: { idUsuario: id },
-      });
+      const permisos = await this.usuariosPermisosRepository.find({where:{idUsuario:id}})
 
+      //Cambiamos estatus de los permisos a 0
+      for ( const i of permisos) {
+        await this.usuariosPermisosRepository.update(i.id,{estatus:0})
+        
+      }
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
