@@ -544,7 +544,7 @@ export class UsuariosService {
       const permisos = await this.usuariosPermisosRepository.find({
         where: { idUsuario: id },
       });
-
+      
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
