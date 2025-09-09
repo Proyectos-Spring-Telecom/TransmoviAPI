@@ -26,8 +26,8 @@ export class PermisosService {
 
   //Obtener todos los permisos con paginado
   async findAll(
-    page: number = 1,
-    limit: number = 10,
+    page: number,
+    limit: number,
   ): Promise<ApiResponseCommon> {
     const [data, total] = await this.permisoRepository.findAndCount({
       relations: ['idModulo2'],
@@ -221,7 +221,7 @@ export class PermisosService {
         'Permisos',
         `Se desactivo el permiso: ${permiso.nombre}`,
         'UPDATE',
-        `UPDATE Monederos SET Estatus=${0} WHERE Id=${id}`,
+        `UPDATE Rol SET Estatus=${0} WHERE Id=${id}`,
         Number(idUser),
         4,
       );
@@ -248,8 +248,6 @@ export class PermisosService {
       const query = `
             SELECT 
             DISTINCT UsuariosPermisos.IdPermiso,
-              Modulos.Id AS IdModulo,
-              Modulos.Nombre AS NombreModulo,
               Modulos.Id AS IdModulo,
               Modulos.Nombre AS NombreModulo,
               Permisos.Id AS PermisoId,
