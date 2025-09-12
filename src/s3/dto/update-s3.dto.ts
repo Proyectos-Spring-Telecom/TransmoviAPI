@@ -1,4 +1,13 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateS3Dto } from './create-s3.dto';
+import { IsIn, IsNotEmpty,IsString } from 'class-validator';
 
-export class UpdateS3Dto extends PartialType(CreateS3Dto) {}
+export class UploadDto {
+  @IsNotEmpty()
+  @IsIn(['clientes', 'operadores', 'usuarios'], {
+    message: 'El folder debe ser uno de: clientes, operadores, usuarios',
+  })
+  folder: string;
+
+  @IsNotEmpty()
+  @IsString({ message: 'idModule debe ser un número' })
+  idModule: string;
+}
