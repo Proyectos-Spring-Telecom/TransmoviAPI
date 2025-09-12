@@ -63,7 +63,7 @@ export class UsuariosService {
       const result: ApiResponseCommon = {
         data: dataFiltrada,
         paginated: {
-          total:total,
+          total: total,
           page,
           lastPage: Math.ceil(total / limit),
         },
@@ -100,7 +100,31 @@ export class UsuariosService {
       throw new BadRequestException({ message: 'Error al obtener Usuarios' });
     }
   }
-  
+
+  //Obtener todos los usuarios por rol
+  async getAllListUsuariosRol(): Promise<ApiResponseCommon> {
+    try {
+      const usuarios = await this.usuarioRepository.find({
+        where: { estatus: 1, idRol: 3 },
+      });
+      if (usuarios.length === 0) {
+        throw new NotFoundException('Usuarios no encontrados');
+      }
+      const usuariosSinPassword = usuarios.map(
+        ({ passwordHash, ...rest }) => rest,
+      );
+      const result: ApiResponseCommon = {
+        data: usuariosSinPassword,
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException({ message: 'Error al obtener Usuarios' });
+    }
+  }
+
   //Obtener el usuario por ID
   async getUsuarioByID(id: number) {
     try {
@@ -115,7 +139,7 @@ export class UsuariosService {
       const permiso = await this.usuariosPermisosRepository.find({
         where: { idUsuario: id, estatus: 1 },
       });
-      return { data:{usuario, permiso} };
+      return { data: { usuario, permiso } };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

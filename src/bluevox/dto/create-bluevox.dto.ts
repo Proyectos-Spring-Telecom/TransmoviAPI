@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsNumber } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsInt,
+  IsIn,
+} from 'class-validator';
 
 export class CreateBlueVoxsDto {
   @IsString()
@@ -28,19 +35,16 @@ export class CreateBlueVoxsDto {
   })
   modelo?: string;
 
-  @IsNumber()
-  @IsNotEmpty({ message: 'El estatus es obligatorio' })
-  @ApiProperty({
-    description: 'Estatus del dispositivo (1 = activo, 0 = inactivo)',
-    example: 1,
-  })
-  estatus: number;
+  @IsNotEmpty({ message: 'Confirmar estatus en valor de 0 ó 1' })
+  @IsInt({ message: 'estatus debe ser un número entero' })
+  @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
+  estatus: number = 1;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty({ message: 'El IdCliente es obligatorio' })
   @ApiProperty({
     description: 'Identificador del cliente al que pertenece el dispositivo',
     example: '123',
   })
-  idCliente: string;
+  idCliente: number;
 }

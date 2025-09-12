@@ -38,7 +38,7 @@ export class OperadoresController {
     return this.operadoresService.findAllOperadores(page,limit);
   }
 
-  @Get()
+  @Get('list')
   findAllListOperador(): Promise<ApiResponseCommon> {
     return this.operadoresService.findAllListOperadores();
   }
@@ -48,7 +48,7 @@ export class OperadoresController {
     return this.operadoresService.findOneOperador(+id);
   }
 
-  @Patch(':id/estatus')
+  @Patch('estatus/:id')
   updateOperadorEstatus(
     @Param('id') id: string,
     @Request() req,

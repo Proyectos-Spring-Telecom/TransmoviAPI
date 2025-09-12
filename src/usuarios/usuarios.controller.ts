@@ -82,6 +82,12 @@ export class UsuariosController {
     return await this.usuariosService.getAllListUsuarios();
   }
 
+  //Obtener todos los usuario por roles
+  @Get('list/rol/operador')
+  async findAllListOperador(): Promise<ApiResponseCommon> {
+    return await this.usuariosService.getAllListUsuariosRol();
+  }
+
   //Obtener los usuario por Id
   @Get('/:id')
   findOne(@Param('id') id: string) {

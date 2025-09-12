@@ -5,6 +5,7 @@ import { UpdateVehiculoDto } from './dto/update-vehiculo.dto';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 import { ApiResponseCommon } from 'src/common/ApiResponse';
 import { UpdateVehiculoEstatusDto } from './dto/update-vehiculos-estatus.dto';
+
 @UseGuards(JwtAuthGuard)
 @Controller('vehiculos')
 export class VehiculosController {
@@ -30,17 +31,17 @@ export class VehiculosController {
   }
 
   @Get(':id')
-  findOne(@Param('id') Id: string) {
-    return this.vehiculosService.findOne(+Id);
+  findOne(@Param('id') id: string) {
+    return this.vehiculosService.findOne(+id);
   }
 
   @Put(':id')
-  update(@Param('id') Id: string, @Request() req ,@Body() updateVehiculoDto: UpdateVehiculoDto) {
+  update(@Param('id') id: string, @Request() req ,@Body() updateVehiculoDto: UpdateVehiculoDto) {
     const idUser = req.user.userId;
-    return this.vehiculosService.update(+Id, idUser,updateVehiculoDto);
+    return this.vehiculosService.update(+id, idUser,updateVehiculoDto);
   }
 
-  @Patch(':id/estatus')
+  @Patch('estatus/:id')
   updateEstatus(
     @Param('id')id:string,
     @Body()UpdateVehiculoEstatusDto:UpdateVehiculoEstatusDto,
@@ -51,8 +52,8 @@ export class VehiculosController {
   }
 
   @Delete(':id')
-  remove(@Param('id') Id: string,@Request()req) {
+  remove(@Param('id') id: string,@Request()req) {
     const idUser = req.user.userId;
-    return this.vehiculosService.remove(+Id, idUser);
+    return this.vehiculosService.remove(+id, idUser);
   }
 }

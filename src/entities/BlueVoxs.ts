@@ -44,7 +44,7 @@ export class BlueVoxs {
   estatus: number;
 
   @Column("bigint", { name: "IdCliente" })
-  idCliente: string;
+  idCliente: number;
 
   @ManyToOne(() => Clientes, (clientes) => clientes.blueVoxs, {
     onDelete: "NO ACTION",
