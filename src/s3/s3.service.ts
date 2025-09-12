@@ -18,9 +18,7 @@ export class S3Service {
   private client: S3Client;
   private bucket: string;
 
-  constructor(
-    private readonly bitacoraLogger: BitacoraLoggerService,
-  ) {
+  constructor(private readonly bitacoraLogger: BitacoraLoggerService) {
     this.client = new S3Client({
       region: process.env.AWS_REGION,
       credentials: {
@@ -31,21 +29,29 @@ export class S3Service {
     this.bucket = process.env.AWS_S3_BUCKET!;
   }
 
-  async uploadFile(file: Express.Multer.File,folder: string, idUser:string,idModule: number) {
+  async uploadFile(
+    file: Express.Multer.File,
+    folder: string,
+    idUser: string,
+    idModule: number,
+  ) {
     try {
       if (!file) throw new BadRequestException('Archivo requerido');
 
       // Validar tipo de archivo
-      const allowedMimeTypes = ['image/png', 'image/jpg', 'image/jpeg', 'application/pdf'];
+      const allowedMimeTypes = [
+        'image/png',
+        'image/jpg',
+        'image/jpeg',
+        'application/pdf',
+      ];
       if (!allowedMimeTypes.includes(file.mimetype)) {
         throw new BadRequestException('Solo se permiten PNG, JPG, JPEG o PDF');
       }
-      
 
-      
-      if (file.size >= Number(process.env.UPLOAD_MAX_SIZE)){
+      if (file.size >= Number(process.env.UPLOAD_MAX_SIZE)) {
         throw new BadRequestException('Archivo demasiado grande');
-      };
+      }
 
       // Definir extensión
       let extension = '';
@@ -65,10 +71,9 @@ export class S3Service {
           ACL: 'private', // sigue siendo privado
         }),
       );
-      
 
       const publicUrl = `https://${this.bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-      
+
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         `${folder}`,
@@ -79,7 +84,7 @@ export class S3Service {
         idModule,
       );
 
-      return {url: publicUrl}
+      return { url: publicUrl };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
