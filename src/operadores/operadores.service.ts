@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Operadores } from 'src/entities/Operadores';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
 
 @Injectable()
 export class OperadoresService {
@@ -25,16 +25,19 @@ export class OperadoresService {
   async createOperador(createOperadoreDto: CreateOperadoreDto, idUser: string) {
     try {
       const operadorExistente = await this.operadoresRepository.findOne({
-        where: 
-          { numeroLicencia: createOperadoreDto.numeroLicencia }
+        where: { numeroLicencia: createOperadoreDto.numeroLicencia },
       });
       if (operadorExistente) {
         throw new BadRequestException(
           `Operador con licencia: ${createOperadoreDto.numeroLicencia} esta registrado`,
         );
       }
-      const operadorData = await this.operadoresRepository.create(createOperadoreDto);
+
+      //creamos al operador
+      const operadorData =
+        await this.operadoresRepository.create(createOperadoreDto);
       const operador = await this.operadoresRepository.save(operadorData);
+
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Operadores',
@@ -43,12 +46,20 @@ export class OperadoresService {
         //`INSERT Operadores SET ... Se creó el operador:${createOperadoreDto.nombre} ${createOperadoreDto.ApellidoPaterno} CREATE, INSERT INTO Operadores (Nombre, ApellidoPaterno, ApellidoMaterno, NumeroLicencia, FechaNacimiento, Correo, Telefono, Estatus) VALUES (${createOperadoreDto.Nombre}, ${createOperadoreDto.ApellidoPaterno}, ${createOperadoreDto.ApellidoMaterno}, ${createOperadoreDto.NumeroLicencia}, ${createOperadoreDto.FechaNacimiento}, ${createOperadoreDto.Correo}, ${createOperadoreDto.Telefono}, ${createOperadoreDto.Estatus})`,
         `INSERT Operadores set`,
         Number(idUser),
-        2,
+        9,
       );
-      return {
-        message: 'Operador creado exitosamente',
-        operador: operador,
+      //Api response
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Operador creado correctamente',
+        data: {
+          id: Number(operador.id),
+          nombre:
+            `id usuario:${operador.idUsuario} numero de licencia:${operador.numeroLicencia} ` ||
+            '',
+        },
       };
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -60,25 +71,28 @@ export class OperadoresService {
     }
   }
   //Obtener todos los operadores
-  async findAllOperadores(page: number, limit: number): Promise<ApiResponseCommon> {
+  async findAllOperadores(
+    page: number,
+    limit: number,
+  ): Promise<ApiResponseCommon> {
     try {
       const operadores = await this.operadoresRepository.find();
       if (operadores.length === 0) {
         throw new BadRequestException('Operadores no encontrado o null');
       }
-      const [data,total] = await this.operadoresRepository.findAndCount({
-        relations:[],
-        skip: (page-1)*limit,
-        take:limit,
+      const [data, total] = await this.operadoresRepository.findAndCount({
+        relations: [],
+        skip: (page - 1) * limit,
+        take: limit,
       });
-      const result:ApiResponseCommon = {
+      const result: ApiResponseCommon = {
         data,
         paginated: {
-          total:total,
+          total: total,
           page,
           lastPage: Math.ceil(total / limit),
         },
-      }
+      };
       return result;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -93,13 +107,15 @@ export class OperadoresService {
   //Obtener todos los operadores
   async findAllListOperadores(): Promise<ApiResponseCommon> {
     try {
-      const operadores = await this.operadoresRepository.find({where:{estatus:1}});
+      const operadores = await this.operadoresRepository.find({
+        where: { estatus: 1 },
+      });
       if (operadores.length === 0) {
         throw new BadRequestException('Operadores no encontrado o null');
       }
-      const result:ApiResponseCommon = {
-        data:operadores,
-      }
+      const result: ApiResponseCommon = {
+        data: operadores,
+      };
       return result;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -111,13 +127,13 @@ export class OperadoresService {
     }
   }
   //Obtener operador por ID
-  async findOneOperador(Id: number) {
+  async findOneOperador(id: number) {
     try {
       const operador = await this.operadoresRepository.findOne({
-        where: { id:Id },
+        where: { id: id },
       });
       if (!operador) {
-        throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
+        throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
       return {
         data: operador,
@@ -131,31 +147,42 @@ export class OperadoresService {
   }
   //Actualizar el estatus del operador
   async updateOperadorEstatus(
-    Id: number,
+    id: number,
     idUser: string,
     updateOperadorStatusDto: UpdateOperadorStatusDto,
   ) {
     try {
-      const operadorExistente = await this.operadoresRepository.findOne({
-        where: { id:Id },
+      const operador = await this.operadoresRepository.findOne({
+        where: { id: id },
       });
-      if (!operadorExistente) {
-        throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
+      if (!operador) {
+        throw new NotFoundException(`Usuario id: ${id} con rol no encontrado`);
       }
-      const { Estatus } = updateOperadorStatusDto;
-      await this.operadoresRepository.update(Id, { estatus: Estatus });
+      const { estatus } = updateOperadorStatusDto;
+      await this.operadoresRepository.update(id, { estatus: estatus });
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Operadores',
-        `Se cambio el estatus a: ${Estatus} del operador con ID: ${Id}`,
+        `Se cambio el estatus a: ${estatus} del operador con ID: ${id}`,
         'UPDATE',
-        `UPDATE Operador SET Estatus = ${Estatus} WHERE Id=${Id}`,
+        `UPDATE Operador SET estatus = ${estatus} WHERE id=${id}`,
         Number(idUser),
-        2,
+        9,
       );
-      return {
-        message: `El operador con id: ${Id} su estatus fue actualizado a ${Estatus}`,
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Estatus del operador actualizado correctamente',
+        estatus:{estatus:estatus},
+        data: {
+          id: id,
+          nombre:
+            `id usuario:${operador.idUsuario} con numero de licencia:${operador.numeroLicencia} ` ||
+            '',
+        },
       };
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -167,29 +194,42 @@ export class OperadoresService {
   }
   //Actualizar datos del operador
   async updateOperador(
-    Id: number,
+    id: number,
     idUser: string,
     updateOperadoreDto: UpdateOperadoreDto,
   ) {
     try {
-      const operadorExistente = await this.operadoresRepository.findOne({
-        where: { id:Id },
+      const operador = await this.operadoresRepository.findOne({
+        where: { id: id },
       });
-      if (!operadorExistente) {
-        throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
+      if (!operador) {
+        throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
-      const operadorData = await this.operadoresRepository.create(updateOperadoreDto);
-      await this.operadoresRepository.update(Id, operadorData);
+      const operadorData =
+        await this.operadoresRepository.create(updateOperadoreDto);
+      await this.operadoresRepository.update(id, operadorData);
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Operadores',
-        `Se actualizó el Operador con ID: ${Id}`,
+        `Se actualizó el Operador con ID: ${id}`,
         'UPDATE',
-        `UPDATE Operadores SET ... WHERE Id=${Id}`,
+        `UPDATE Operadores SET ... WHERE id=${id}`,
         Number(idUser),
-        2,
+        9,
       );
-      return await this.operadoresRepository.findOne({ where: { id:Id } });
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Operador actualizado correctamente',
+        data: {
+          id: id,
+          nombre:
+            `id usuario:${operador.idUsuario} con numero de licencia:${operador.numeroLicencia} ` ||
+            '',
+        },
+      };
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -198,25 +238,37 @@ export class OperadoresService {
     }
   }
   //Eliminar Operador
-  async removeOperador(Id: number, idUser: string) {
+  async removeOperador(id: number, idUser: string) {
     try {
-      const operadorExistente = await this.operadoresRepository.findOne({
-        where: { id:Id },
+      const operador = await this.operadoresRepository.findOne({
+        where: { id: id },
       });
-      if (!operadorExistente) {
-        throw new NotFoundException(`Operador con id: ${Id} no encontrado`);
+      if (!operador) {
+        throw new NotFoundException(`Operador con id: ${id} no encontrado`);
       }
-      await this.operadoresRepository.remove(operadorExistente);
+      await this.operadoresRepository.update(id,{estatus: 0});
       //-----Registro en la bitacora-----
       await this.bitacoraLogger.logToBitacora(
         'Operadores',
-        `Se eliminó el operador con ID: ${Id}`,
+        `Se eliminó el operador con ID: ${id}`,
         'DELETE',
-        `DELETE FROM Operadores WHERE Id=${Id}  `,
+        `DELETE FROM Operadores WHERE id=${id}  `,
         Number(idUser),
-        2,
+        9,
       );
-      return `Operador con id: ${Id} eliminado exitosamente`;
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Operador eliminado correctamente',
+        data: {
+          id: id,
+          nombre:
+            `id usuario:${operador.idUsuario} con numero de licencia:${operador.numeroLicencia} ` ||
+            '',
+        },
+      };
+      return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;

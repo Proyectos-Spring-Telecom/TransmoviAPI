@@ -12,6 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { BlueVoxs } from 'src/entities/BlueVoxs';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
+import { UpdateBlueVoxEstatusDto } from './dto/update-bluevox-estatus.dto';
 
 @Injectable()
 export class BluevoxService {
@@ -45,16 +46,16 @@ export class BluevoxService {
         'Bluevoxs',
         `Se creó un bluevoxs con numero de serie ${bluevoxSave.numeroSerie}`,
         'CREATE',
-        `INSERT INTO Bluevoxs (...) VALUES (...) -> Numero Serie: ${bluevoxSave.numeroSerie}, Marca: ${bluevoxSave.marca}, Modelo: ${bluevoxSave.fechaCreacion}, Estatus: ${bluevoxSave.estatus}, IdCliente: ${bluevoxSave.idCliente}`,
+        `INSERT INTO Bluevoxs (...) VALUES (...) -> Numero Serie: ${bluevoxSave.numeroSerie}, Marca: ${bluevoxSave.marca}, Modelo: ${bluevoxSave.modelo}, Estatus: ${bluevoxSave.estatus}, IdCliente: ${bluevoxSave.idCliente}`,
         Number(idUser),
         12,
       );
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Cliente creado correctamente',
+        message: 'BlueVoxs creado correctamente',
         data: {
-          id: bluevoxSave.id,
+          id: Number(bluevoxSave.id),
           nombre: `${bluevoxSave.marca} ${bluevoxSave.numeroSerie} ` || '',
         },
       };
@@ -63,14 +64,13 @@ export class BluevoxService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException('Error al crear un cliente');
+      throw new InternalServerErrorException('Error al crear un bluevoxs');
     }
   }
 
   //Obtner paginado
   async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
     try {
-      
       const [data, total] = await this.bluevoxsRepository.findAndCount({
         skip: (page - 1) * limit,
         take: limit,
@@ -79,7 +79,7 @@ export class BluevoxService {
       const result: ApiResponseCommon = {
         data: data,
         paginated: {
-          total:total,
+          total: total,
           page,
           lastPage: Math.ceil(total / limit),
         },
@@ -101,7 +101,7 @@ export class BluevoxService {
       });
       if (blueVoxs.length === 0) {
         throw new NotFoundException('BlueVoxs no encontrados');
-      };
+      }
       const result: ApiResponseCommon = {
         data: blueVoxs,
       };
@@ -130,6 +130,125 @@ export class BluevoxService {
       throw new InternalServerErrorException({
         message: 'Error al obtener BlueVoxs',
       });
+    }
+  }
+
+  async update(id: number, idUser: string, updateBluevoxDto: UpdateBluevoxDto) {
+    try {
+      const bluevox = await this.bluevoxsRepository.findOne({
+        where: { id: id },
+      });
+      if (!bluevox) throw new NotFoundException('BlueVox no encontrado');
+      await this.bluevoxsRepository.update(id, updateBluevoxDto);
+
+      //-----Registro en la bitacora-----
+      await this.bitacoraLogger.logToBitacora(
+        'BlueVoxs',
+        `Se actualizo el bluevox con ID: ${id}`,
+        'UPDATE',
+        `INSERT INTO Bluevoxs (...) VALUES (...) -> Numero Serie: ${updateBluevoxDto.numeroSerie}, Marca: ${updateBluevoxDto.marca}, Modelo: ${updateBluevoxDto.modelo}, IdCliente: ${updateBluevoxDto.idCliente}`,
+        Number(idUser),
+        12,
+      );
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'BlueVoxs actualizado correctamente',
+        data: {
+          id: id,
+          nombre:
+            `${bluevox.marca || updateBluevoxDto.marca} ${bluevox.numeroSerie || updateBluevoxDto.numeroSerie} ` ||
+            '',
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Error al actualizar bluevox`);
+    }
+  }
+
+  async updateEstatus(
+    id: number,
+    idUser: string,
+    updateBlueVoxEstatusDto: UpdateBlueVoxEstatusDto,
+  ) {
+    try {
+      const bluevoxs = await this.bluevoxsRepository.findOne({
+        where: { id: id },
+      });
+      if (!bluevoxs) throw new NotFoundException('BlueVoxs no encontrado');
+      const estatus = updateBlueVoxEstatusDto.estatus;
+      await this.bluevoxsRepository.update(id, { estatus: estatus });
+
+      //-----Registro en la bitacora-----
+      await this.bitacoraLogger.logToBitacora(
+        'BlueVoxs',
+        `Se actualizo el estatus del bluevoxs con ID: ${id}`,
+        'UPDATE',
+        `UPDATE BlueVoxs SET Estatus = ${estatus} WHERE id=${id}`,
+        Number(idUser),
+        12,
+      );
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Estatus de bluevoxs actualizado correctamente',
+        estatus: { estatus: estatus },
+        data: {
+          id: id,
+          nombre: `${bluevoxs.modelo} ${bluevoxs.numeroSerie} ` || '',
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        `Error al actualizar estatus del bluevoxs`,
+      );
+    }
+  }
+
+  async remove(id: number, idUser: string) {
+    try {
+      const bluevoxs = await this.bluevoxsRepository.findOne({
+        where: { id: id },
+      });
+      if (!bluevoxs) throw new NotFoundException('BlueVox no encontrado');
+
+      await this.bluevoxsRepository.update(id, { estatus: 0 });
+
+      //-----Registro en la bitacora-----
+      await this.bitacoraLogger.logToBitacora(
+        'BlueVoxs',
+        `Se eliminó el bluevoxs con ID: ${id}`,
+        'DELETE',
+        `DELETE Bluevoxs (...) VALUES (...) -> Numero Serie: ${bluevoxs.numeroSerie}, Marca: ${bluevoxs.marca}, Modelo: ${bluevoxs.modelo}, Estatus: ${bluevoxs.estatus}, IdCliente: ${bluevoxs.idCliente}`, //, IdOperador=${bluevoxs.idOperador}, IdDispositivo=${bluevoxs.idDispositivo} WHERE id=${id}`,
+        Number(idUser),
+        12 ,
+      );
+
+      // ----- Api response -----
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'BlueVox eliminado correctamente',
+        data: {
+          id: id,
+          nombre: `${bluevoxs.modelo} ${bluevoxs.numeroSerie} ` || '',
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(`Error al eliminar al bluevoxs`);
     }
   }
 

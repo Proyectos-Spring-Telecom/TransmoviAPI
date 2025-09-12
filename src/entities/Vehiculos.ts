@@ -72,7 +72,7 @@ export class Vehiculos {
   estatus: number;
 
   @Column("bigint", { name: "IdCliente" })
-  idCliente: string;
+  idCliente: number;
 
   @OneToMany(() => Instalaciones, (instalaciones) => instalaciones.vehiculos)
   instalaciones: Instalaciones[];

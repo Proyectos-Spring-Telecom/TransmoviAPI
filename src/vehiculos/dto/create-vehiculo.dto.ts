@@ -1,80 +1,127 @@
-// create-vehiculo.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  IsNotEmpty,
+  IsOptional,
   IsString,
   IsNumber,
-  IsOptional,
-  Length,
-  IsNotEmpty,
+  MaxLength,
+  Min,
+  Max,
   IsInt,
   IsIn,
 } from 'class-validator';
 
 export class CreateVehiculoDto {
-  @IsString()
-  @IsNotEmpty({ message: 'La marca es obligatoria' })
   @ApiProperty({
-    description: 'Marca del vehiculo',
-    example: 'Marcad del vehiculo',
+    description: 'Marca del vehículo',
+    example: 'Toyota',
   })
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(255)
   marca: string;
 
-  @IsString()
-  @IsNotEmpty({ message: 'El modelo es obligatorio' })
   @ApiProperty({
-    description: 'Modelo del vehiculo',
-    example: 'Modelo del vehiculo',
+    description: 'Modelo del vehículo',
+    example: 'Corolla',
   })
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(100)
   modelo: string;
 
-  @IsNumber()
-  @IsNotEmpty({ message: 'El año debe ser mayor a 1900' })
   @ApiProperty({
-    description: 'Año del vehiculo',
-    example: '1990',
+    description: 'Año del vehículo',
+    example: 2022,
   })
+  @IsNotEmpty()
+  @IsNumber()
+  @Min(1900)
+  @Max(new Date().getFullYear() + 1)
   ano: number;
 
-  @IsString()
-  @Length(1, 10)
-  @IsNotEmpty({ message: 'La placa es obligatoria' })
   @ApiProperty({
-    description: 'Placa del vehiculo',
-    example: 'ABC-1234',
+    description: 'Placa del vehículo (única)',
+    example: 'ABC1234',
   })
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(10)
   placa: string;
 
-  @IsString()
-  @Length(1, 50)
-  @IsNotEmpty({ message: 'El número económico es obligatorio' })
   @ApiProperty({
-    description: 'Numero economico del vehiculo',
-    example: 'A20',
+    description: 'Número económico interno de la empresa',
+    example: 'NE-001',
   })
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(50)
   numeroEconomico: string;
 
-  @IsNotEmpty({ message: 'Estaus necesario' })
-  @IsInt({ message: 'Estatus debe ser un numero entero' })
-  @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
   @ApiProperty({
-    description: 'El estatus es solo 0 ó 1',
-    example: '1',
+    description: 'Tarjeta de circulación (opcional)',
+    example: 'tarjeta_123.pdf',
+    required: false,
   })
-  estatus?: number;
-
-  @IsString()
   @IsOptional()
-  @ApiProperty({
-    description: 'ID del operador',
-    example: 'O15ABC',
-  })
-  idOperador?: string;
-
   @IsString()
-  @IsOptional()
+  @MaxLength(500)
+  tarjetaCirculacion?: string;
+
   @ApiProperty({
-    description: 'ID del dispositivo',
-    example: '123ABC',
+    description: 'Póliza de seguro (opcional)',
+    example: 'poliza_123.pdf',
+    required: false,
   })
-  idDispositivo?: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  polizaSeguro?: string;
+
+  @ApiProperty({
+    description: 'Permiso de concesión (opcional)',
+    example: 'permiso_456.pdf',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  permisoConcesion?: string;
+
+  @ApiProperty({
+    description: 'Inspección mecánica (opcional)',
+    example: 'inspeccion_789.pdf',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  inspeccionMecanica?: string;
+
+  @ApiProperty({
+    description: 'Foto del vehículo (opcional)',
+    example: 'vehiculo.jpg',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  foto?: string;
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([0, 1], { message: 'Solo se permite 0 o 1' })
+  @ApiProperty({
+    description: 'Estatus del usuario (1=Activo, 0=Inactivo)',
+    example: 1,
+  })
+  estatus?: number = 1;
+
+  @ApiProperty({
+    description: 'ID del cliente al que pertenece el vehículo',
+    example: 1,
+  })
+  @IsNotEmpty()
+  @IsNumber()
+  idCliente: number;
 }

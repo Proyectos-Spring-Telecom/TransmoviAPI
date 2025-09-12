@@ -14,7 +14,7 @@ export class CreateTransaccioneDto {
   })
   @ApiProperty({
     description: 'Tipo de transaccion',
-    example: 'Recarga/debito',
+    example: 'RECARGA/DEBITO',
   })
   @IsNotEmpty()
   tipoTransaccion: string;
