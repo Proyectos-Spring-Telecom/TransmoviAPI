@@ -51,11 +51,11 @@ export class TransaccionesService {
       }
 
       //actualizamos el saldo del monedero
-      /* await this.monederosService.updateMonederoSaldo(
+      await this.monederosService.updateMonederoSaldo(
         createTransaccioneDto.numeroSerieMonedero,
         idUser,
         montoFinal,
-      ); */
+      );
 
       //Creamos la transaccion en la BD
       const newTransaccion = await this.transaccionesRepository.create(
