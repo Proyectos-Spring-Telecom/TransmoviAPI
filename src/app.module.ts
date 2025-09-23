@@ -23,6 +23,9 @@ import { S3Module } from './s3/s3.module';
 import { ConteopasajerosModule } from './conteopasajeros/conteopasajeros.module';
 import { InstalacionesModule } from './instalaciones/instalaciones.module';
 import { TurnosModule } from './turnos/turnos.module';
+import { RegionesModule } from './regiones/regiones.module';
+import { UsuariosregionesModule } from './usuariosregiones/usuariosregiones.module';
+import { UsuariosinstalacionesModule } from './usuariosinstalaciones/usuariosinstalaciones.module';
 import Joi from 'joi';
 
 @Module({
@@ -57,8 +60,8 @@ import Joi from 'joi';
         database: config.get<string>('DB_DATABASE'),
         autoLoadEntities: false,
         entities: [__dirname + '/entities/*{.ts,.js}'],
-        synchronize: false, 
-        //dateStrings: false, // Mantener como Date objects
+        synchronize: false, //No cambiar nunca
+        //dateStrings: false,
         timezone: 'Z', // Zona horaria de México
       }),
     }),
@@ -102,6 +105,12 @@ import Joi from 'joi';
     InstalacionesModule,
 
     TurnosModule,
+
+    RegionesModule,
+
+    UsuariosregionesModule,
+
+    UsuariosinstalacionesModule,
     
   ], 
  controllers: [AppController],
