@@ -51,8 +51,11 @@ export class TarifasController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.tarifasService.findOne(+id);
+  findOne(@Param('id') id: string, @Request() req,) {
+    const cliente = req.user.cliente;
+    const idUser = req.user.userId;
+    const rol = req.user.rol;
+    return this.tarifasService.findOne(+id, +idUser, +cliente, +rol);
   }
 
   @Patch('estatus/:id')

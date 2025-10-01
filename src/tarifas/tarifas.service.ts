@@ -153,6 +153,9 @@ SELECT
 
   -- Cliente
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
@@ -214,6 +217,9 @@ SELECT
 
   -- Cliente
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
@@ -276,6 +282,9 @@ SELECT
 
   -- Cliente
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
@@ -302,7 +311,7 @@ ORDER BY t.Id DESC;
       }
 
       if (data.length === 0) {
-        throw new NotFoundException('No se encontraron derroteros activos');
+        throw new NotFoundException('No se encontraron Tarifas');
       }
 
       const tarifas = data.map((item) => ({
@@ -348,8 +357,10 @@ ORDER BY t.Id DESC;
       const offset = (page - 1) * limit;
       let data;
       let totalResult;
-      data = await this.usuariosregionesRepository.query(
-        `
+      switch (rol) {
+        case 1:
+          data = await this.usuariosregionesRepository.query(
+            `
 SELECT 
   -- Datos de la tarifa
   t.Id AS id,
@@ -384,6 +395,90 @@ SELECT
 
   -- Cliente
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+
+FROM Tarifas t
+INNER JOIN Derroteros d ON t.IdDerrotero = d.Id
+INNER JOIN Rutas ru ON d.IdRuta = ru.Id
+INNER JOIN Regiones r ON ru.IdRegion = r.Id
+LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+INNER JOIN UsuariosRegiones ur ON ur.IdRegion = r.Id
+
+WHERE ur.IdUsuario = ?
+  AND ur.Estatus = 1
+  AND r.Estatus = 1
+  AND ru.Estatus = 1
+  AND d.Estatus = 1
+
+ORDER BY t.Id DESC
+  LIMIT ? OFFSET ?
+  `,
+            [idUser, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.usuariosregionesRepository.query(
+            `
+SELECT COUNT(*) AS total
+FROM Tarifas t
+INNER JOIN Derroteros d ON t.IdDerrotero = d.Id
+INNER JOIN Rutas ru ON d.IdRuta = ru.Id
+INNER JOIN Regiones r ON ru.IdRegion = r.Id
+INNER JOIN UsuariosRegiones ur ON ur.IdRegion = r.Id
+WHERE ur.IdUsuario = ?
+  AND ur.Estatus = 1         -- Relación usuario-región activa
+  AND r.Estatus = 1          -- Región activa
+  AND ru.Estatus = 1         -- Ruta activa
+  AND d.Estatus = 1          -- Derrotero activo
+  `,
+            [idUser],
+          );
+          break;
+
+        default:
+          data = await this.usuariosregionesRepository.query(
+            `
+SELECT 
+  -- Datos de la tarifa
+  t.Id AS id,
+  t.TarifaBase,
+  t.DistanciaBaseKm,
+  t.IncrementoCadaMetros,
+  t.CostoAdicional,
+  t.FechaCreacion AS fechaCreacionTarifa,
+  t.FechaActualizacion AS fechaActualizacionTarifa,
+  t.Estatus AS estatusTarifa,
+
+  -- Datos del derrotero
+  d.Id AS idDerrotero,
+  d.Nombre AS nombreDerrotero,
+  d.PuntoInicio AS puntoInicio,
+  d.PuntoFin AS puntoFin,
+  d.DistanciaKm AS distanciaKm,
+
+  -- Datos de la ruta
+  ru.Id AS idRuta,
+  ru.Nombre AS nombreRuta,
+  ru.NombreInicio,
+  ru.NombreFin,
+
+  -- Región de inicio (la importante para filtro del usuario)
+  r.Id AS idRegionInicio,
+  r.Nombre AS nombreRegionInicio,
+
+  -- Región de fin
+  rf.Id AS idRegionFin,
+  rf.Nombre AS nombreRegionFin,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
@@ -405,12 +500,12 @@ WHERE ur.IdUsuario = ?
 ORDER BY t.Id DESC
   LIMIT ? OFFSET ?
   `,
-        [idUser, cliente, limit, offset],
-      );
+            [idUser, cliente, limit, offset],
+          );
 
-      // Query para total (sin paginación)
-      totalResult = await this.usuariosregionesRepository.query(
-        `
+          // Query para total (sin paginación)
+          totalResult = await this.usuariosregionesRepository.query(
+            `
 SELECT COUNT(*) AS total
 FROM Tarifas t
 INNER JOIN Derroteros d ON t.IdDerrotero = d.Id
@@ -425,12 +520,35 @@ WHERE ur.IdUsuario = ?
   AND t.Estatus = 1          -- Tarifa activa
   AND r.IdCliente = ?;       -- Cliente específico
   `,
-        [idUser, cliente],
-      );
+            [idUser, cliente],
+          );
+          break;
+      }
+
       const total = Number(totalResult[0]?.total ?? 0);
+
+      if (data.length === 0) {
+        throw new NotFoundException('No se encontraron Tarifas');
+      }
+      const tarifas = data.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        TarifaBase: Number(item.TarifaBase),
+        DistanciaBaseKm: Number(item.DistanciaBaseKm),
+        CostoAdicional: Number(item.CostoAdicional),
+        distanciaKm: Number(item.distanciaKm),
+        idDerrotero: Number(item.idDerrotero),
+        idRuta: Number(item.idRuta),
+        idRegionInicio: item.idRegionInicio
+          ? Number(item.idRegionInicio)
+          : null,
+        idRegionFin: item.idRegionFin ? Number(item.idRegionFin) : null,
+        idCliente: Number(item.idCliente),
+      }));
+
       // Transformación de resultados
       const result: ApiResponseCommon = {
-        data: data,
+        data: tarifas,
         paginated: {
           total,
           page,
@@ -451,8 +569,175 @@ WHERE ur.IdUsuario = ?
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} tarifa`;
+  async findOne(id: number, idUser: number, cliente: number, rol: number) {
+    try {
+      let data;
+      switch (rol) {
+        case 1:
+          data = await this.usuariosregionesRepository.query(
+            `
+SELECT 
+  -- Datos de la tarifa
+  t.Id AS id,
+  t.TarifaBase,
+  t.DistanciaBaseKm,
+  t.IncrementoCadaMetros,
+  t.CostoAdicional,
+  t.FechaCreacion AS fechaCreacionTarifa,
+  t.FechaActualizacion AS fechaActualizacionTarifa,
+  t.Estatus AS estatusTarifa,
+
+  -- Datos del derrotero
+  d.Id AS idDerrotero,
+  d.Nombre AS nombreDerrotero,
+  d.PuntoInicio AS puntoInicio,
+  d.PuntoFin AS puntoFin,
+  d.DistanciaKm AS distanciaKm,
+
+  -- Datos de la ruta
+  ru.Id AS idRuta,
+  ru.Nombre AS nombreRuta,
+  ru.NombreInicio,
+  ru.NombreFin,
+
+  -- Región de inicio (la importante para filtro del usuario)
+  r.Id AS idRegionInicio,
+  r.Nombre AS nombreRegionInicio,
+
+  -- Región de fin
+  rf.Id AS idRegionFin,
+  rf.Nombre AS nombreRegionFin,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+
+FROM Tarifas t
+INNER JOIN Derroteros d ON t.IdDerrotero = d.Id
+INNER JOIN Rutas ru ON d.IdRuta = ru.Id
+INNER JOIN Regiones r ON ru.IdRegion = r.Id
+LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+INNER JOIN UsuariosRegiones ur ON ur.IdRegion = r.Id
+
+WHERE ur.IdUsuario = ?
+  AND ur.Estatus = 1
+  AND r.Estatus = 1
+  AND ru.Estatus = 1
+  AND d.Estatus = 1
+  AND t.Id = ?
+
+ORDER BY t.Id DESC
+  `,
+            [idUser, id],
+          );
+          break;
+
+        default:
+          data = await this.usuariosregionesRepository.query(
+            `
+SELECT 
+  -- Datos de la tarifa
+  t.Id AS id,
+  t.TarifaBase,
+  t.DistanciaBaseKm,
+  t.IncrementoCadaMetros,
+  t.CostoAdicional,
+  t.FechaCreacion AS fechaCreacionTarifa,
+  t.FechaActualizacion AS fechaActualizacionTarifa,
+  t.Estatus AS estatusTarifa,
+
+  -- Datos del derrotero
+  d.Id AS idDerrotero,
+  d.Nombre AS nombreDerrotero,
+  d.PuntoInicio AS puntoInicio,
+  d.PuntoFin AS puntoFin,
+  d.DistanciaKm AS distanciaKm,
+
+  -- Datos de la ruta
+  ru.Id AS idRuta,
+  ru.Nombre AS nombreRuta,
+  ru.NombreInicio,
+  ru.NombreFin,
+
+  -- Región de inicio (la importante para filtro del usuario)
+  r.Id AS idRegionInicio,
+  r.Nombre AS nombreRegionInicio,
+
+  -- Región de fin
+  rf.Id AS idRegionFin,
+  rf.Nombre AS nombreRegionFin,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+
+FROM Tarifas t
+INNER JOIN Derroteros d ON t.IdDerrotero = d.Id
+INNER JOIN Rutas ru ON d.IdRuta = ru.Id
+INNER JOIN Regiones r ON ru.IdRegion = r.Id
+LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+INNER JOIN UsuariosRegiones ur ON ur.IdRegion = r.Id
+
+WHERE ur.IdUsuario = ?
+  AND ur.Estatus = 1
+  AND r.Estatus = 1
+  AND ru.Estatus = 1
+  AND d.Estatus = 1
+  AND t.Id = ?
+  AND c.Id = ?  -- Filtro por cliente específico
+
+ORDER BY t.Id DESC
+  `,
+            [idUser, id, cliente],
+          );
+
+          break;
+      }
+
+      if (data.length === 0) {
+        throw new NotFoundException('No se encontraron tarifas');
+      }
+
+      const tarifas = data.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        TarifaBase: Number(item.TarifaBase),
+        DistanciaBaseKm: Number(item.DistanciaBaseKm),
+        CostoAdicional: Number(item.CostoAdicional),
+        distanciaKm: Number(item.distanciaKm),
+        idDerrotero: Number(item.idDerrotero),
+        idRuta: Number(item.idRuta),
+        idRegionInicio: item.idRegionInicio
+          ? Number(item.idRegionInicio)
+          : null,
+        idRegionFin: item.idRegionFin ? Number(item.idRegionFin) : null,
+        idCliente: Number(item.idCliente),
+      }));
+
+      // Transformación de resultados
+      const result: ApiResponseCommon = {
+        data: tarifas,
+      };
+
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException({
+        message: 'Error al obtner un paginado Tarifas',
+        error: error.message,
+      });
+    }
   }
 
   async updateEstatus(
