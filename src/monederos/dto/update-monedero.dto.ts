@@ -1,14 +1,14 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateMonederoDto } from './create-monedero.dto';
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsIn,
-  IsInt,
-  IsOptional,
-} from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
 
 export class UpdateMonederoDto {
-  
+  @ApiProperty({
+    example: 'MON-0001',
+    description: 'Número de serie único del monedero',
+  })
+  @IsString()
+  numeroSerie: string;
+
   @IsInt({ message: 'estatus debe ser un número entero' })
   @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
   @IsOptional()
