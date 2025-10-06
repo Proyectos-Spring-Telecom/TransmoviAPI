@@ -105,7 +105,6 @@ export class MonederosService {
     }
   }
 
-
   //Obtener todos los monederos paginado
   async findAllMonederos(
     page: number,
@@ -235,12 +234,12 @@ ORDER BY m.Id DESC;
 
       //Cambiamos los datos numericos a number
       const monederoResult = {
-          ...monedero,
-          id: Number(monedero.id),
-          saldo: Number(monedero.saldo),
-          idPasajero: Number(monedero.idPasajero),
-          idCliente: Number(monedero.idCliente),
-       }
+        ...monedero,
+        id: Number(monedero.id),
+        saldo: Number(monedero.saldo),
+        idPasajero: Number(monedero.idPasajero),
+        idCliente: Number(monedero.idCliente),
+      };
       return { data: monederoResult };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -265,12 +264,12 @@ ORDER BY m.Id DESC;
       }
       //Cambiamos los datos numericos a number
       const monederoResult = {
-          ...monedero,
-          id: Number(monedero.id),
-          saldo: Number(monedero.saldo),
-          idPasajero: Number(monedero.idPasajero),
-          idCliente: Number(monedero.idCliente),
-       }
+        ...monedero,
+        id: Number(monedero.id),
+        saldo: Number(monedero.saldo),
+        idPasajero: Number(monedero.idPasajero),
+        idCliente: Number(monedero.idCliente),
+      };
       return { data: monederoResult };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -326,7 +325,6 @@ ORDER BY m.Id DESC;
       };
 
       return result;
-      
     } catch (error) {
       // --- Registro en la bitácora --- ERROR
       const querylogger = { updateMonederoEstatusDto };
@@ -427,28 +425,6 @@ ORDER BY m.Id DESC;
       if (!monedero) {
         throw new NotFoundException(
           `El monedero con ID: ${id} no fue encontrado.`,
-        );
-      }
-
-      //Buscamos pasajero
-      if (
-        !(await this.pasajerosService.findOnePasajero(
-          Number(updateMonederoDto.idPasajero),
-        ))
-      ) {
-        throw new NotFoundException(
-          `El pasajero con ID: ${updateMonederoDto.idPasajero} no fuer encontrado.`,
-        );
-      }
-
-      //Buscamos Cliente
-      if (
-        !(await this.clientesService.getOneCliente(
-          Number(updateMonederoDto.idCliente),
-        ))
-      ) {
-        throw new NotFoundException(
-          `El cliente con ID: ${updateMonederoDto.idCliente}`,
         );
       }
 
