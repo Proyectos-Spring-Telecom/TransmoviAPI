@@ -47,7 +47,8 @@ export class InstalacionesController {
   ): Promise<ApiResponseCommon> {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
-    return await this.instalacionesService.findAll(+cliente,+idUser,page, limit);
+    const rol = req.user.rol;
+    return await this.instalacionesService.findAll(+idUser, +cliente, +rol, page, limit);
   }
 
   @Get('list')

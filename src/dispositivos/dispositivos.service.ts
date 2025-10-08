@@ -126,9 +126,10 @@ export class DispositivosService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Ocurrió un error al recuperar los dispositivos indicados.`,
-      );
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al recuperar los dispositivos indicados.',
+        error: error.message,
+      });
     }
   }
 
