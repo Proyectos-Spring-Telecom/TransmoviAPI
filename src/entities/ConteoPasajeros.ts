@@ -6,48 +6,50 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
-} from "typeorm";
-import { BlueVoxs } from "./BlueVoxs";
-import { Viajes } from "./Viajes";
+} from 'typeorm';
+import { BlueVoxs } from './BlueVoxs';
+import { Viajes } from './Viajes';
+import { ViajesConteos } from './ViajesConteos';
 
 @Index(
-  "IX_ConteoPasajeros_Serie_FechaHora",
-  ["fechaHora", "numeroSerieBlueVox"],
-  {}
+  'IX_ConteoPasajeros_Serie_FechaHora',
+  ['fechaHora', 'numeroSerieBlueVox'],
+  {},
 )
-@Entity("ConteoPasajeros", { schema: "TransmoviDev" })
+@Entity('ConteoPasajeros', { schema: 'TransmoviDev' })
 export class ConteoPasajeros {
-  @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
+  @PrimaryGeneratedColumn({ type: 'bigint', name: 'Id' })
   id: number;
 
-  @Column("int", { name: "Entradas", nullable: true, default: () => "'0'" })
+  @Column('int', { name: 'Entradas', nullable: true, default: () => "'0'" })
   entradas: number | null;
 
-  @Column("int", { name: "Salidas", nullable: true, default: () => "'0'" })
+  @Column('int', { name: 'Salidas', nullable: true, default: () => "'0'" })
   salidas: number | null;
 
-  @Column("int", { name: "Diferencia" })
+  @Column('int', { name: 'Diferencia' })
   diferencia: number;
 
-  @Column("datetime", { name: "FechaHora" })
+  @Column('datetime', { name: 'FechaHora' })
   fechaHora: Date;
 
-  @Column("datetime", {
-    name: "FHRegistro",
-    default: () => "CURRENT_TIMESTAMP",
+  @Column('datetime', {
+    name: 'FHRegistro',
+    default: () => 'CURRENT_TIMESTAMP',
   })
   fhRegistro: Date;
 
-  @Column("varchar", { name: "NumeroSerieBlueVox", length: 100 })
+  @Column('varchar', { name: 'NumeroSerieBlueVox', length: 100 })
   numeroSerieBlueVox: string;
 
   @ManyToOne(() => BlueVoxs, (blueVoxs) => blueVoxs.conteoPasajeros, {
-    onDelete: "NO ACTION",
-    onUpdate: "NO ACTION",
+    onDelete: 'NO ACTION',
+    onUpdate: 'NO ACTION',
   })
   @JoinColumn([
-    { name: "NumeroSerieBlueVox", referencedColumnName: "numeroSerie" },
+    { name: 'NumeroSerieBlueVox', referencedColumnName: 'numeroSerie' },
   ])
   numeroSerieBlueVox2: BlueVoxs;
 
