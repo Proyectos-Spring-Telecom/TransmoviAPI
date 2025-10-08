@@ -13,7 +13,11 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { UpdateUsuarioEstatusDto } from './dto/update-usuario-estatus.dto';
 import * as bcrypt from 'bcrypt';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import {
+  ApiCrudResponse,
+  ApiResponseCommon,
+  EstatusEnumBitcora,
+} from 'src/common/ApiResponse';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { ClientesService } from 'src/clientes/clientes.service';
 import { UsuariosPermisos } from 'src/entities/UsuariosPermisos';
@@ -30,37 +34,134 @@ export class UsuariosService {
     private usuariosPermisosRepository: Repository<UsuariosPermisos>,
   ) {}
   // Obtener todos los usuarios con paginación
-  async getAllUsuario(page: number, limit: number): Promise<ApiResponseCommon> {
+  async getAllUsuario(
+    cliente: number,
+    rol: number,
+    page: number,
+    limit: number,
+  ): Promise<ApiResponseCommon> {
     try {
-      const [data, total] = await this.usuarioRepository.findAndCount({
-        relations: ['idCliente2', 'idRol2'],
-        skip: (page - 1) * limit,
-        take: limit,
-      });
+      let usuarios;
+      const offset = (page - 1) * limit;
+      let totalResult;
 
-      const dataFiltrada = data.map((u) => ({
-        Id: u.id,
-        UserName: u.userName,
-        Telefono: u.telefono,
-        Nombre: u.nombre,
-        ApellidoPaterno: u.apellidoPaterno,
-        ApellidoMaterno: u.apellidoMaterno,
-        Estatus: u.estatus,
-        IdRol: u.idRol,
-        RolNombre: u.idRol2?.nombre || null, // solo nombre del rol
-        IdCliente: u.idCliente,
-        ClienteNombre: u.idCliente2?.nombre || null, // solo nombre del cliente
-        UltimoLogin: u.ultimoLogin,
-        ActualizacionPassword: u.actualizacionPassword,
-        ActualizacionPin: u.actualizacionPin,
-        DispositivoId: u.dispositivoId,
-        FotoPerfil: u.fotoPerfil,
-        FechaCreacion: u.fechaCreacion,
-        FechaActualizacion: u.fechaActualizacion,
+      switch (rol) {
+        case 1:
+          // Consulta de datos paginados Usuario SuperAdministrador
+          usuarios = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS Id,
+  u.UserName AS UserName,
+  u.Nombre AS Nombre,
+  u.ApellidoPaterno AS ApellidoPaterno,
+  u.ApellidoMaterno AS ApellidoMaterno,
+  u.Telefono AS Telefono,
+  u.UltimoLogin AS UltimoLogin,
+  u.DispositivoId AS DispositivoId,
+  u.FotoPerfil AS FotoPerfil,
+  u.FechaCreacion AS FechaCreacion,
+  u.FechaActualizacion AS FechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS IdRol,
+  -- Datos del Rol
+  r.Nombre AS RolNombre,
+  r.Descripcion AS RolDescripcion,
+  u.IdCliente AS IdCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS ApellidoPaternoCliente,
+  c.ApellidoMaterno AS ApellidoMaternoCliente,
+  c.Estatus AS EstatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+
+ORDER BY u.Id DESC
+LIMIT ? OFFSET ?;
+        `,
+            [limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.usuarioRepository.query(
+            `
+  SELECT COUNT(*) AS total
+  FROM Usuarios u
+  INNER JOIN Clientes c ON u.IdCliente = c.Id
+
+  `,
+          );
+          break;
+
+        default:
+          // Consulta de datos paginados resto Usuario
+          usuarios = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS Id,
+  u.UserName AS UserName,
+  u.Nombre AS Nombre,
+  u.ApellidoPaterno AS ApellidoPaterno,
+  u.ApellidoMaterno AS ApellidoMaterno,
+  u.Telefono AS Telefono,
+  u.UltimoLogin AS UltimoLogin,
+  u.DispositivoId AS DispositivoId,
+  u.FotoPerfil AS FotoPerfil,
+  u.FechaCreacion AS FechaCreacion,
+  u.FechaActualizacion AS FechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS IdRol,
+  -- Datos del Rol
+  r.Nombre AS RolNombre,
+  r.Descripcion AS RolDescripcion,
+  u.IdCliente AS IdCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS ApellidoPaternoCliente,
+  c.ApellidoMaterno AS ApellidoMaternoCliente,
+  c.Estatus AS EstatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+WHERE c.Id = ?
+ORDER BY u.Id DESC
+LIMIT ? OFFSET ?;
+        `,
+            [cliente, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.usuarioRepository.query(
+            `
+  SELECT COUNT(*) AS total
+  FROM Usuarios u
+  INNER JOIN Clientes c ON u.IdCliente = c.Id
+	WHERE c.Id = ?
+  `,
+            [cliente],
+          );
+          break;
+      }
+
+      if (usuarios.length === 0) {
+        throw new NotFoundException(`No se encontraron usuarios.`);
+      }
+      const total = Number(totalResult[0]?.total || 0);
+
+      const data = usuarios.map((item) => ({
+        ...item,
+        Id: Number(item.Id),
+        IdRol: Number(item.IdRol),
+        IdCliente: Number(item.IdCliente),
       }));
 
       const result: ApiResponseCommon = {
-        data: dataFiltrada,
+        data: data,
         paginated: {
           total: total,
           page,
@@ -70,33 +171,125 @@ export class UsuariosService {
 
       return result;
     } catch (error) {
-      throw new BadRequestException(
-        error.message || 'Error al obtener usuarios',
-      );
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al obtener la paginación de usuarios.',
+        error: error.message,
+      });
     }
   }
 
   //Obtener todos los usuarios
-  async getAllListUsuarios(): Promise<ApiResponseCommon> {
+  async getAllListUsuarios(
+    cliente: number,
+    rol: number,
+  ): Promise<ApiResponseCommon> {
     try {
-      const usuarios = await this.usuarioRepository.find({
-        where: { estatus: 1 },
-      });
+      let usuarios;
+
+      switch (rol) {
+        case 1:
+          // Consulta de datos listado Usuario SuperAdministrador
+          usuarios = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS Id,
+  u.UserName AS UserName,
+  u.Nombre AS Nombre,
+  u.ApellidoPaterno AS ApellidoPaterno,
+  u.ApellidoMaterno AS ApellidoMaterno,
+  u.Telefono AS Telefono,
+  u.UltimoLogin AS UltimoLogin,
+  u.DispositivoId AS DispositivoId,
+  u.FotoPerfil AS FotoPerfil,
+  u.FechaCreacion AS FechaCreacion,
+  u.FechaActualizacion AS FechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS IdRol,
+  -- Datos del Rol
+  r.Nombre AS RolNombre,
+  r.Descripcion AS RolDescripcion,
+  u.IdCliente AS IdCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS ApellidoPaternoCliente,
+  c.ApellidoMaterno AS ApellidoMaternoCliente,
+  c.Estatus AS EstatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+WHERE u.Estatus = 1
+ORDER BY u.Id DESC;
+        `,
+          );
+          break;
+
+        default:
+          // Consulta de datos listado resto Usuario
+          usuarios = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS Id,
+  u.UserName AS UserName,
+  u.Nombre AS Nombre,
+  u.ApellidoPaterno AS ApellidoPaterno,
+  u.ApellidoMaterno AS ApellidoMaterno,
+  u.Telefono AS Telefono,
+  u.UltimoLogin AS UltimoLogin,
+  u.DispositivoId AS DispositivoId,
+  u.FotoPerfil AS FotoPerfil,
+  u.FechaCreacion AS FechaCreacion,
+  u.FechaActualizacion AS FechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS IdRol,
+  -- Datos del Rol
+  r.Nombre AS RolNombre,
+  r.Descripcion AS RolDescripcion,
+  u.IdCliente AS IdCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS ApellidoPaternoCliente,
+  c.ApellidoMaterno AS ApellidoMaternoCliente,
+  c.Estatus AS EstatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+WHERE c.Id = ?
+AND u.Estatus = 1
+ORDER BY u.Id DESC;
+        `,
+            [cliente],
+          );
+
+          break;
+      }
+
       if (usuarios.length === 0) {
         throw new NotFoundException('Usuarios no encontrados');
       }
-      const usuariosSinPassword = usuarios.map(
-        ({ passwordHash, ...rest }) => rest,
-      );
+
+      const data = usuarios.map((item) => ({
+        ...item,
+        Id: Number(item.Id),
+        IdRol: Number(item.IdRol),
+        IdCliente: Number(item.IdCliente),
+      }));
+
       const result: ApiResponseCommon = {
-        data: usuariosSinPassword,
+        data: data,
       };
       return result;
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException({ message: 'Error al obtener Usuarios' });
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al obtener el listado de usuarios.',
+        error: error.message,
+      });
     }
   }
 
@@ -120,12 +313,15 @@ export class UsuariosService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException({ message: 'Error al obtener Usuarios' });
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al obtener los usuarios por roles.',
+        error: error.message,
+      });
     }
   }
 
-    //Obtener todos los usuarios por cliente
-  async getAllListUsuariosCliente(id:number): Promise<ApiResponseCommon> {
+  //Obtener todos los usuarios por cliente
+  async getAllListUsuariosCliente(id: number): Promise<ApiResponseCommon> {
     try {
       const usuarios = await this.usuarioRepository.find({
         where: { estatus: 1, idCliente: id },
@@ -144,31 +340,128 @@ export class UsuariosService {
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException({ message: 'Error al obtener Usuarios' });
+      throw new InternalServerErrorException({
+        message: 'Error al obtener Usuarios',
+        error: error.message,
+      });
     }
   }
 
   //Obtener el usuario por ID
-  async getUsuarioByID(id: number) {
+  async getUsuarioByID(id: number, cliente: number, rol: number) {
     try {
-      const user = await this.usuarioRepository.findOne({
-        where: { id: id },
-      });
-      if (!user) {
-        throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
+      let usuarioData;
+
+      switch (rol) {
+        case 1:
+          // Consulta de datos listado Usuario SuperAdministrador
+          usuarioData = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS id,
+  u.UserName AS userName,
+  u.Nombre AS nombre,
+  u.ApellidoPaterno AS apellidoPaterno,
+  u.ApellidoMaterno AS apellidoMaterno,
+  u.Telefono AS telefono,
+  u.UltimoLogin AS ultimoLogin,
+  u.DispositivoId AS dispositivoId,
+  u.FotoPerfil AS fotoPerfil,
+  u.FechaCreacion AS fechaCreacion,
+  u.FechaActualizacion AS fechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS idRol,
+  -- Datos del rol
+  r.Nombre AS rolNombre,
+  r.Descripcion AS rolDescripcion,
+  u.IdCliente AS idCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+WHERE u.Id = ?
+ORDER BY u.Id DESC
+        `,
+            [id],
+          );
+          break;
+
+        default:
+          // Consulta de datos paginados resto Usuario
+          usuarioData = await this.usuarioRepository.query(
+            `
+SELECT
+  -- Datos del Usuario
+  u.Id AS id,
+  u.UserName AS userName,
+  u.Nombre AS nombre,
+  u.ApellidoPaterno AS apellidoPaterno,
+  u.ApellidoMaterno AS apellidoMaterno,
+  u.Telefono AS telefono,
+  u.UltimoLogin AS ultimoLogin,
+  u.DispositivoId AS dispositivoId,
+  u.FotoPerfil AS fotoPerfil,
+  u.FechaCreacion AS fechaCreacion,
+  u.FechaActualizacion AS fechaActualizacion,
+  u.Estatus AS estatus,
+  u.IdRol AS idRol,
+  -- Datos del rol
+  r.Nombre AS rolNombre,
+  r.Descripcion AS rolDescripcion,
+  u.IdCliente AS idCliente,
+  -- Datos del Cliente
+  c.Nombre AS clienteNombre,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Usuarios u
+INNER JOIN Roles r ON u.IdRol = r.Id
+INNER JOIN Clientes c ON u.IdCliente = c.Id
+WHERE u.Id = ?
+AND c.Id = ?
+ORDER BY u.Id DESC
+        `,
+            [id, cliente],
+          );
+          break;
       }
-      //Falta el apartado de la bitacora
-      const { passwordHash: _, ...usuario } = user;
-      const permiso = await this.usuariosPermisosRepository.find({
+
+      if (usuarioData.length === 0) {
+        throw new NotFoundException('Usuario no encontrado.');
+      }
+      const usuario = usuarioData.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idRol: Number(item.idRol),
+        idCliente: Number(item.idCliente),
+      }));
+
+      const permisoData = await this.usuariosPermisosRepository.find({
         where: { idUsuario: id, estatus: 1 },
       });
+
+      const permiso = permisoData.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idUsuario: Number(item.idUsuario),
+        idPermiso: Number(item.idPermiso),
+      }));
+
       return { data: { usuario, permiso } };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al obtener Usuario',
+        message: 'Ocurrió un error al obtener al usuario.',
+        error: error.message,
       });
     }
   }
@@ -176,20 +469,24 @@ export class UsuariosService {
   //Creacion de pin operador
   async createPin(
     userName: string,
-    idUser: string,
+    idUser: number,
     updateUsuarioOperadorDto: UpdateUsuarioOperadorDto,
   ): Promise<ApiCrudResponse> {
     try {
       //Buscamos al usuario
       const usuario = await this.usuarioRepository.findOne({
-        where: { userName: userName, id: Number(idUser) },
+        where: { userName: userName, id: idUser },
       });
       if (!usuario) {
-        throw new NotFoundException(`Usuario con ID:${userName} no encontrado`);
+        throw new NotFoundException(
+          `Usuario con nombre de usuario: ${userName} no encontrado.`,
+        );
       }
 
       if (updateUsuarioOperadorDto.userName !== usuario.userName)
-        throw new BadRequestException('Datos invalidas');
+        throw new BadRequestException(
+          'El usuario está intentando ingresar con datos pertenecientes a otro usuario.',
+        );
 
       //encriptamos la contraseña
       const pinPassword = await bcrypt.hash(
@@ -213,14 +510,16 @@ export class UsuariosService {
         updateUsuarioOperadorDto,
       );
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateUsuarioOperadorDto };
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
-        `Se creó el PIN del usuario con nombre: ${usuario.nombre}`,
+        `Se creó el PIN para el usuario con ID: ${usuario.id}.`,
         'UPDATE',
-        `UPDATE INTO Usuarios (...) VALUES (...) -> username:  ${usuario.userName} nombre: ${usuario.nombre} apellido paterno: ${usuario.apellidoPaterno} apellido materno: ${usuario.apellidoMaterno}`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         2,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -234,12 +533,24 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateUsuarioOperadorDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se creó el PIN para el usuario con ID: ${idUser}.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al crear pin del usuario',
-        error,
+        message: 'Error al crear el PIN del usuario.',
+        error: error.message,
       });
     }
   }
@@ -280,15 +591,18 @@ export class UsuariosService {
         await this.usuariosPermisosRepository.save(usuariosPermisos);
       }
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { createUsuarioDto };
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
         `Se creó un usuarios con nombre: ${createUsuarioDto.nombre}`,
         'CREATE',
-        `INSERT INTO Usuarios (...) VALUES (...) -> username:  ${createUsuarioDto.userName} nombre: ${createUsuarioDto.nombre} apellido paterno: ${createUsuarioDto.apellidoPaterno} apellido materno: ${createUsuarioDto.apellidoMaterno}`,
+        `${querylogger}`,
         Number(idUser),
         2,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       const { passwordHash: _, ...usuarioSinPassword } = newUser;
 
       //Api response
@@ -304,10 +618,25 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { createUsuarioDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se creó un usuarios con nombre: ${createUsuarioDto.nombre}`,
+        'CREATE',
+        `${querylogger}`,
+        Number(idUser),
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException(error);
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al intentar crear el usuario.',
+        error: error.message,
+      });
     }
   }
 
@@ -322,7 +651,7 @@ export class UsuariosService {
         where: { id: id },
       });
       if (!usuario) {
-        throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
+        throw new NotFoundException(`Usuario con ID: ${id} no encontrado.`);
       }
       if (
         updateUsuarioContrasena.passwordNueva ===
@@ -337,9 +666,9 @@ export class UsuariosService {
         ) {
           console.log({
             user: usuario,
-            message: 'Entro a verificar los valores y no son iguales',
+            message: 'Entré a verificar los valores y no son iguales.',
           });
-          throw new BadRequestException('Credenciales invalidas');
+          throw new BadRequestException('Credenciales inválidas.');
         }
         const hashedPassword = await bcrypt.hash(
           updateUsuarioContrasena.passwordNueva,
@@ -364,6 +693,18 @@ export class UsuariosService {
         actualizacionPassword: fechaActual,
       });
 
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se actualizó contraseña un usuario con ID: ${id}.`,
+        'UPDATE',
+        `${querylogger}`,
+        Number(idUser),
+        2,
+        EstatusEnumBitcora.SUCCESS,
+      );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -375,12 +716,24 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se actualizó contraseña un usuario con ID: ${id}.`,
+        'UPDATE',
+        `${querylogger}`,
+        Number(idUser),
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al actualizar contraseña',
-        error,
+        message: 'Error al actualizar la contraseña.',
+        error: error.message,
       });
     }
   }
@@ -482,14 +835,16 @@ export class UsuariosService {
         }
       }
 
-      // ----- Registro en la bitácora -----
+      // ----- Registro en la bitácora ----- SUCCESS
+      const querylogger = { updateUsuarioDto };
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
-        `Se actualizó el usuario: ${newUser.nombre} con ID: ${newUser.id}`,
+        `Se actualizó el usuario: ${newUser.nombre} con ID: ${newUser.id}.`,
         'UPDATE',
-        `UPDATE Usuarios SET UserName='${newUser.userName}', Telefono='${newUser.telefono}', Nombre='${newUser.nombre}', ApellidoPaterno='${newUser.apellidoPaterno}', ApellidoMaterno='${newUser.apellidoMaterno}', Estatus=${newUser.estatus}, IdRol=${newUser.idRol}, IdCliente=${newUser.idCliente} WHERE Id=${id}`,
+        `${querylogger}`,
         Number(idUser),
         2,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
@@ -505,12 +860,25 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      // ----- Registro en la bitácora ----- ERROR
+      const querylogger = { updateUsuarioDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se actualizó el usuario con ID: ${id}.`,
+        'UPDATE',
+        `${querylogger}`,
+        Number(idUser),
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al actualizar usuario',
-        error,
+        message: 'Error al actualizar el usuario.',
+        error: error.message,
       });
     }
   }
@@ -519,7 +887,7 @@ export class UsuariosService {
   async updateUsuarioEstatus(
     id: number,
     updateUsuarioEstatusDto: UpdateUsuarioEstatusDto,
-    idUser: string,
+    idUser: number,
   ): Promise<ApiCrudResponse> {
     try {
       const usuario = await this.usuarioRepository.findOne({
@@ -537,15 +905,18 @@ export class UsuariosService {
       if (!usuarioResult) {
         throw new NotFoundException(`Usuario con ID:${id} no encontrado`);
       }
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateUsuarioEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
-        `Se cambio estatus del usuario ${usuarioResult.nombre} con id: ${id} a estatus: ${estatus}`,
+        `Se cambió el estatus del usuario ${usuarioResult.nombre} con ID: ${id} a estatus: ${estatus}.`,
         'UPDATE',
-        `UPDATE Usuarios SET Estatus = ${estatus} WHERE id = ${id}`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         2,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api Response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -561,11 +932,25 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateUsuarioEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se cambió el estatus del usuario con ID: ${id} a estatus: ${updateUsuarioEstatusDto.estatus}.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al actualizar estatus',
+        message: 'No se pudo actualizar el estatus del usuario.',
+        error: error.message,
       });
     }
   }
@@ -577,7 +962,7 @@ export class UsuariosService {
         where: { id: id },
       });
       if (!usuario) {
-        throw new NotFoundException(`Usuario con ${id} no encontrado`);
+        throw new NotFoundException(`No se encontró el usuario con ID: ${id}.`);
       }
       //Se hacer eliminado logico
       //Cambiamos el estatus del usuario a 0
@@ -588,14 +973,16 @@ export class UsuariosService {
         where: { idUsuario: id },
       });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Usuarios',
-        `Se eliminó el usuario con ID: ${id}`,
-        'DELETE',
-        `DELETE FROM Usuarios WHERE Id=${id}`,
+        `Se eliminó el usuario con ID: ${id}.`,
+        'UPDATE',
+        `${querylogger}`,
         Number(idUser),
         2,
+        EstatusEnumBitcora.SUCCESS,
       );
       //Api response
       const result: ApiCrudResponse = {
@@ -608,10 +995,25 @@ export class UsuariosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Usuarios',
+        `Se eliminó el usuario con ID: ${id}.`,
+        'UPDATE',
+        `${querylogger}`,
+        Number(idUser),
+        2,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException('Error al eliminar el usuario');
+      throw new InternalServerErrorException({
+        message: 'Hubo un problema al intentar eliminar el usuario.',
+        error: error.message,
+      });
     }
   }
 }

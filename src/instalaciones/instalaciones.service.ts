@@ -11,15 +11,24 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { UpdateInstalacioneEstatusDto } from './dto/update-instalacione-estatus.dto';
 import { UsuariosInstalaciones } from 'src/entities/UsuariosInstalaciones';
+import { Dispositivos } from 'src/entities/Dispositivos';
+import { BlueVoxs } from 'src/entities/BlueVoxs';
+import { Vehiculos } from 'src/entities/Vehiculos';
 
 @Injectable()
 export class InstalacionesService {
   constructor(
     @InjectRepository(Instalaciones)
     private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(Dispositivos)
+    private readonly dispositivosRepository: Repository<Dispositivos>,
+    @InjectRepository(BlueVoxs)
+    private readonly bluevoxsRepository: Repository<BlueVoxs>,
+    @InjectRepository(Vehiculos)
+    private readonly vehiculosRepository: Repository<Vehiculos>,
     @InjectRepository(UsuariosInstalaciones)
     private readonly usuariosinstalacionesRepository: Repository<UsuariosInstalaciones>,
     private readonly bitacoraLogger: BitacoraLoggerService,
@@ -124,15 +133,32 @@ export class InstalacionesService {
           await this.usuariosinstalacionesRepository.save(permiso);
           break;
       }
+      const body = { estatus: 0 };
 
-      // Registro en la bitácora
+      //actualizamos estatus de los componentes de la instalacion
+      await this.dispositivosRepository.update(
+        createInstalacioneDto.idDispositivo,
+        body,
+      );
+      await this.bluevoxsRepository.update(
+        createInstalacioneDto.idBlueVox,
+        body,
+      );
+      await this.vehiculosRepository.update(
+        createInstalacioneDto.idVehiculo,
+        body,
+      );
+
+      // Registro en la bitácora SUCCESS
+      const querylogger =  {createInstalacioneDto}
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
         `Se creó una Instalación con id: ${instalacionSave.id}`, // ✅ Corregido
         'CREATE',
-        `INSERT INTO Instalaciones (...) VALUES (...) -> id: ${instalacionSave.id}, Estatus: ${instalacionSave.estatus}, IdDispositivo: ${instalacionSave.idDispositivo}, IdBlueVox: ${instalacionSave.idBlueVox}, IdVehiculo: ${instalacionSave.idVehiculo}, IdCliente: ${instalacionSave.idCliente}`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         13,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // API response (con mensajes corregidos)
@@ -146,8 +172,19 @@ export class InstalacionesService {
       };
 
       return result;
-      
     } catch (error) {
+      // Registro en la bitácora ERROR
+      const querylogger =  {createInstalacioneDto}
+      await this.bitacoraLogger.logToBitacora(
+        'Instalaciones',
+        `Se creó una Instalación con `, // ✅ Corregido
+        'CREATE',
+        `${querylogger}`,
+        idUser,
+        13,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -164,21 +201,22 @@ export class InstalacionesService {
 
       throw new InternalServerErrorException({
         message: 'Error al crear Instalación',
-        error: error.message, // ✅ Solo el mensaje, no todo el objeto
+        error: error.message, 
       });
     }
   }
 
   async findAll(
-    cliente: number,
     idUser: number,
+    cliente: number,
+    rol: number,
     page: number,
     limit: number,
   ): Promise<ApiResponseCommon> {
     try {
       let [data, total]: any[] = [];
       const offset = (page - 1) * limit;
-      switch (idUser) {
+      switch (rol) {
         // Usuario administrador - obtiene todas las instalaciones
         case 1:
           data = await this.usuariosinstalacionesRepository.query(

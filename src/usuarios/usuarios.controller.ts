@@ -28,7 +28,6 @@ import { UpdateUsuarioContrasena } from './dto/update-usuario-contrasena.dto';
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
-
   @Post()
   @ApiOperation({ summary: 'Crear nuevo usuario' })
   async createUsuario(
@@ -39,41 +38,55 @@ export class UsuariosController {
     return await this.usuariosService.createUsuario(createUsuarioDto, idUser);
   }
 
-
   @Get(':page/:limit')
   @ApiOperation({ summary: 'Obtener usuarios paginados' })
   @ApiResponse({ status: 200, description: 'Lista de usuarios' })
   async findAll(
     @Param('page', ParseIntPipe) page: number,
     @Param('limit', ParseIntPipe) limit: number,
+    @Request() req,
   ): Promise<ApiResponseCommon> {
-    return await this.usuariosService.getAllUsuario(page, limit);
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return await this.usuariosService.getAllUsuario(
+      +cliente,
+      +rol,
+      page,
+      limit,
+    );
   }
 
   @Get('list')
   @ApiOperation({ summary: 'Obtener todos los usuarios' })
-  async findAllList(): Promise<ApiResponseCommon> {
-    return await this.usuariosService.getAllListUsuarios();
+  async findAllList(@Request() req): Promise<ApiResponseCommon> {
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return await this.usuariosService.getAllListUsuarios(+cliente, +rol);
   }
 
   @Get('list/rol/operador')
   @ApiOperation({ summary: 'Obtener usuarios con rol operador' })
-  async findAllListOperador(): Promise<ApiResponseCommon> {
+  async findAllListOperador(@Request() req): Promise<ApiResponseCommon> {
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
     return await this.usuariosService.getAllListUsuariosRol();
   }
 
   @Get('list/cliente/:id')
   @ApiOperation({ summary: 'Obtener usuarios por cliente' })
-  async findAllListUsuarioCliente(@Param('id', ParseIntPipe) id: number): Promise<ApiResponseCommon> {
+  async findAllListUsuarioCliente(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<ApiResponseCommon> {
     return await this.usuariosService.getAllListUsuariosCliente(id);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener usuario por ID' })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.usuariosService.getUsuarioByID(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return this.usuariosService.getUsuarioByID(+id, +cliente, +rol);
   }
-
 
   @Put(':id')
   @ApiOperation({ summary: 'Actualizar usuario' })
@@ -83,18 +96,26 @@ export class UsuariosController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.usuariosService.updateUsuario(id, updateUsuarioDto, idUser);
+    return await this.usuariosService.updateUsuario(
+      id,
+      updateUsuarioDto,
+      idUser,
+    );
   }
 
   @Put('operador')
   @ApiOperation({ summary: 'Actualizar o crear PIN de operador' })
   async updatePin(
     @Body() updateUsuarioOperadorDto: UpdateUsuarioOperadorDto,
-    @Request() req
+    @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
     const userName = req.user.email;
-    return await this.usuariosService.createPin(userName, idUser, updateUsuarioOperadorDto);
+    return await this.usuariosService.createPin(
+      userName,
+      +idUser,
+      updateUsuarioOperadorDto,
+    );
   }
 
   @Put('actualizar/contrasena/:id')
@@ -102,10 +123,14 @@ export class UsuariosController {
   async updateContrasena(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateUsuarioContrasena: UpdateUsuarioContrasena,
-    @Request() req
+    @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.usuariosService.updateContrasena(id, idUser, updateUsuarioContrasena);
+    return await this.usuariosService.updateContrasena(
+      id,
+      idUser,
+      updateUsuarioContrasena,
+    );
   }
 
   @Patch('estatus/:id')
@@ -116,9 +141,12 @@ export class UsuariosController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.usuariosService.updateUsuarioEstatus(id, updateUsuarioEstatusDto, idUser);
+    return await this.usuariosService.updateUsuarioEstatus(
+      id,
+      updateUsuarioEstatusDto,
+      idUser,
+    );
   }
-
 
   @Delete(':id')
   @ApiOperation({ summary: 'Eliminar usuario' })

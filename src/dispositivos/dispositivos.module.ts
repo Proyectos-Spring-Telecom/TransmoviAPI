@@ -10,5 +10,6 @@ import { ClientesModule } from 'src/clientes/clientes.module';
   imports: [TypeOrmModule.forFeature([Dispositivos]), BitacoraModule,ClientesModule],
   controllers: [DispositivosController],
   providers: [DispositivosService],
+  exports: [DispositivosService]
 })
 export class DispositivosModule {}
