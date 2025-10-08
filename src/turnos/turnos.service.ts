@@ -11,7 +11,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Turnos } from 'src/entities/Turnos';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import {
+  ApiCrudResponse,
+  ApiResponseCommon,
+  EstatusEnumBitcora,
+} from 'src/common/ApiResponse';
 import { UpdateTurnosEstatusDto } from './dto/update-turno-estatus.dto';
 
 @Injectable()
@@ -30,19 +34,23 @@ export class TurnosService {
       //Creamos el turno
       const newTurno = await this.turnosRepository.create(createTurnoDto);
       const turnoSave = await this.turnosRepository.save(newTurno);
-      //-----Registro en la bitacora-----
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { createTurnoDto };
       await this.bitacoraLogger.logToBitacora(
         'Turnos',
-        `Se creó el turno con ID: ${turnoSave.id}`,
+        `El turno con ID: ${turnoSave.id} fue creado correctamente.`,
         'CREATE',
-        `CREATE, INSERT INTO Turnos (Id, Estatus, IdCliente, IdOperador, IdInstalacion) VALUES (${turnoSave.id}, ${turnoSave.estatus}, ${turnoSave.idCliente}, ${turnoSave.idOperador}, ${turnoSave.idInstalacion})`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         14,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Turno creado correctamente',
+        message: 'El turno ha sido creado con éxito.',
         data: {
           id: Number(turnoSave.id),
           nombre:
@@ -52,129 +60,328 @@ export class TurnosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { createTurnoDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Turnos',
+        `El turno con ID fue creado correctamente.`,
+        'CREATE',
+        `${querylogger}`,
+        idUser,
+        14,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: `Error al crear turno`,
-        error,
+        message: `Hubo un problema al crear el turno.`,
+        error: error.message,
       });
     }
   }
 
-  async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
+  async findAll(
+    idUser: number,
+    cliente: number,
+    rol: number,
+    page: number,
+    limit: number,
+  ): Promise<ApiResponseCommon> {
     try {
-      const [data, total] = await this.turnosRepository.findAndCount({
-        skip: (page - 1) * limit,
-        take: limit,
-        relations: [
-        'idCliente2',
-        'idOperador2',
-        'idOperador2.idUsuario2',
-        'idInstalacion2',
-        'idInstalacion2.dispositivos',
-        'idInstalacion2.blueVoxs',
-        'idInstalacion2.vehiculos',
-        'idInstalacion2.idCliente2',
-      ],
-        select: {
-        id: true,
-        inicio: true,
-        fin: true,
-        fechaCreacion: true,
-        fechaActualizacion: true,
-        estatus: true,
-        idCliente2: {
-          id: true,
-          nombre: true,
-          apellidoPaterno: true,
-          apellidoMaterno: true,
-        },
-        idOperador2: {
-          id: true,
-          idUsuario2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-        idInstalacion2: {
-          id: true,
-          dispositivos: { id: true, numeroSerie: true },
-          blueVoxs: { id: true, numeroSerie: true },
-          vehiculos: { id: true, placa: true },
-          idCliente2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-      },
-      });
+      const offset = (page - 1) * limit;
+      let totalResult;
+      let turnos;
+      switch (rol) {
+        case 1:
+          // Usuario SuperAdministrador
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
 
-      if (data.length === 0) {
-      throw new NotFoundException('Turnos no encontrados o null');
-    }
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+
+
+ORDER BY t.Id DESC
+  LIMIT ? OFFSET ?;
+            `,
+            [limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.turnosRepository.query(
+            `
+  SELECT COUNT(*) AS total
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+  `,
+          );
+          break;
+
+        case 2:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+
+WHERE t.IdCliente = ?
+ORDER BY t.Id DESC
+  LIMIT ? OFFSET ?;
+            `,
+            [cliente, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.turnosRepository.query(
+            `
+  SELECT COUNT(*) AS total
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+WHERE t.IdCliente = ?
+  `,
+            [cliente],
+          );
+          break;
+
+        default:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE ui.IdUsuario = ?
+  AND ui.Estatus = 1
+  AND i.Estatus = 1
+ORDER BY t.Id DESC
+  LIMIT ? OFFSET ?;
+            `,
+            [idUser, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.turnosRepository.query(
+            `
+  SELECT COUNT(*) AS total
+FROM UsuariosInstalaciones ui
+INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
+INNER JOIN Turnos t ON t.IdInstalacion = i.Id AND t.IdCliente = i.IdCliente
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE ui.IdUsuario = ?
+  AND ui.Estatus = 1
+  AND i.Estatus = 1
+  `,
+            [idUser],
+          );
+          break;
+      }
+
+      if (turnos.length === 0) {
+        throw new NotFoundException(
+          'No se hallaron turnos o los valores están vacíos.',
+        );
+      }
+
+      const total = Number(totalResult[0]?.total || 0);
 
       // 🔥 Transformación con map
-    const turnos = data.map((t) => ({
-      ...t,
-      id: Number(t.id),
-      idCliente2: {
-        ...t.idCliente2,
-        id: Number(t.idCliente2.id),
-        nombreCompleto: `${t.idCliente2.nombre ?? ''} ${t.idCliente2.apellidoPaterno ?? ''} ${t.idCliente2.apellidoMaterno ?? ''}`.trim(),
-      },
-      idOperador2: t.idOperador2
-        ? {
-            ...t.idOperador2,
-            id: Number(t.idOperador2.id),
-            idUsuario2: t.idOperador2.idUsuario2
-              ? {
-                  ...t.idOperador2.idUsuario2,
-                  id: Number(t.idOperador2.idUsuario2.id),
-                  nombreCompleto: `${t.idOperador2.idUsuario2.nombre ?? ''} ${t.idOperador2.idUsuario2.apellidoPaterno ?? ''} ${t.idOperador2.idUsuario2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-      idInstalacion2: t.idInstalacion2
-        ? {
-            ...t.idInstalacion2,
-            id: Number(t.idInstalacion2.id),
-            dispositivos: t.idInstalacion2.dispositivos
-              ? {
-                  ...t.idInstalacion2.dispositivos,
-                  id: Number(t.idInstalacion2.dispositivos.id),
-                }
-              : null,
-            blueVoxs: t.idInstalacion2.blueVoxs
-              ? {
-                  ...t.idInstalacion2.blueVoxs,
-                  id: Number(t.idInstalacion2.blueVoxs.id),
-                }
-              : null,
-            vehiculos: t.idInstalacion2.vehiculos
-              ? {
-                  ...t.idInstalacion2.vehiculos,
-                  id: Number(t.idInstalacion2.vehiculos.id),
-                }
-              : null,
-            idCliente2: t.idInstalacion2.idCliente2
-              ? {
-                  ...t.idInstalacion2.idCliente2,
-                  id: Number(t.idInstalacion2.idCliente2.id),
-                  nombreCompleto: `${t.idInstalacion2.idCliente2.nombre ?? ''} ${t.idInstalacion2.idCliente2.apellidoPaterno ?? ''} ${t.idInstalacion2.idCliente2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-    }));
+      const data = turnos.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idInstalacion: Number(item.idInstalacion),
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
+        idOperador: Number(item.idOperador),
+      }));
 
       const result: ApiResponseCommon = {
-        data: turnos,
+        data: data,
         paginated: {
           total: total,
           page,
@@ -187,260 +394,512 @@ export class TurnosService {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: `Error al obtener paginado de turnos`,
-        error,
+        message: `No fue posible obtener la paginación de turnos.`,
+        error: error.message,
       });
     }
   }
 
-async findAllList() {
-  try {
-    const turnos = await this.turnosRepository.find({
-      relations: [
-        'idCliente2',
-        'idOperador2',
-        'idOperador2.idUsuario2',
-        'idInstalacion2',
-        'idInstalacion2.dispositivos',
-        'idInstalacion2.blueVoxs',
-        'idInstalacion2.vehiculos',
-        'idInstalacion2.idCliente2',
-      ],
-      where: { estatus: 1 },
-      select: {
-        id: true,
-        inicio: true,
-        fin: true,
-        fechaCreacion: true,
-        fechaActualizacion: true,
-        estatus: true,
-        idCliente2: {
-          id: true,
-          nombre: true,
-          apellidoPaterno: true,
-          apellidoMaterno: true,
-        },
-        idOperador2: {
-          id: true,
-          idUsuario2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-        idInstalacion2: {
-          id: true,
-          dispositivos: { id: true, numeroSerie: true },
-          blueVoxs: { id: true, numeroSerie: true },
-          vehiculos: { id: true, placa: true },
-          idCliente2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-      },
-    });
+  async findAllList(idUser: number, cliente: number, rol: number) {
+    try {
+      let turnos;
+      switch (rol) {
+        case 1:
+          // Usuario SuperAdministrador
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
 
-    if (turnos.length === 0) {
-      throw new NotFoundException('Turnos no encontrados o null');
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE t.Estatus = 1
+
+ORDER BY t.Id DESC;
+            `,
+          );
+          break;
+
+        case 2:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE t.IdCliente = ?
+  AND t.Estatus = 1
+
+ORDER BY t.Id DESC;
+            `,
+            [cliente],
+          );
+          break;
+
+        default:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM UsuariosInstalaciones ui
+INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
+INNER JOIN Turnos t ON t.IdInstalacion = i.Id AND t.IdCliente = i.IdCliente
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE ui.IdUsuario = ?
+  AND ui.Estatus = 1
+  AND i.Estatus = 1
+  AND t.Estatus = 1
+
+ORDER BY t.Id DESC;
+            `,
+            [idUser],
+          );
+          break;
+      }
+
+      if (turnos.length === 0) {
+        throw new NotFoundException(
+          'No fue posible localizar turnos, o los datos son nulos.',
+        );
+      }
+
+      // 🔥 Transformación con map
+      const data = turnos.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idInstalacion: Number(item.idInstalacion),
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
+        idOperador: Number(item.idOperador),
+      }));
+
+      const result: ApiResponseCommon = { data: data };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: `Ocurrió un inconveniente al intentar cargar el listado de turnos.`,
+        error: error.message,
+      });
     }
-
-    // 🔥 Transformación con map
-    const data = turnos.map((t) => ({
-      ...t,
-      id: Number(t.id),
-      idCliente2: {
-        ...t.idCliente2,
-        id: Number(t.idCliente2.id),
-        nombreCompleto: `${t.idCliente2.nombre ?? ''} ${t.idCliente2.apellidoPaterno ?? ''} ${t.idCliente2.apellidoMaterno ?? ''}`.trim(),
-      },
-      idOperador2: t.idOperador2
-        ? {
-            ...t.idOperador2,
-            id: Number(t.idOperador2.id),
-            idUsuario2: t.idOperador2.idUsuario2
-              ? {
-                  ...t.idOperador2.idUsuario2,
-                  id: Number(t.idOperador2.idUsuario2.id),
-                  nombreCompleto: `${t.idOperador2.idUsuario2.nombre ?? ''} ${t.idOperador2.idUsuario2.apellidoPaterno ?? ''} ${t.idOperador2.idUsuario2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-      idInstalacion2: t.idInstalacion2
-        ? {
-            ...t.idInstalacion2,
-            id: Number(t.idInstalacion2.id),
-            dispositivos: t.idInstalacion2.dispositivos
-              ? {
-                  ...t.idInstalacion2.dispositivos,
-                  id: Number(t.idInstalacion2.dispositivos.id),
-                }
-              : null,
-            blueVoxs: t.idInstalacion2.blueVoxs
-              ? {
-                  ...t.idInstalacion2.blueVoxs,
-                  id: Number(t.idInstalacion2.blueVoxs.id),
-                }
-              : null,
-            vehiculos: t.idInstalacion2.vehiculos
-              ? {
-                  ...t.idInstalacion2.vehiculos,
-                  id: Number(t.idInstalacion2.vehiculos.id),
-                }
-              : null,
-            idCliente2: t.idInstalacion2.idCliente2
-              ? {
-                  ...t.idInstalacion2.idCliente2,
-                  id: Number(t.idInstalacion2.idCliente2.id),
-                  nombreCompleto: `${t.idInstalacion2.idCliente2.nombre ?? ''} ${t.idInstalacion2.idCliente2.apellidoPaterno ?? ''} ${t.idInstalacion2.idCliente2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-    }));
-
-    const result: ApiResponseCommon = { data };
-    return result;
-  } catch (error) {
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    throw new InternalServerErrorException({
-      message: `Error al obtener listado del turnos`,
-      error,
-    });
   }
-}
 
+  async findOne(id: number, idUser: number, cliente: number, rol: number) {
+    try {
+      let turnos;
+      switch (rol) {
+        case 1:
+          // Usuario SuperAdministrador
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
 
-async findOne(id: number) {
-  try {
-    const turno = await this.turnosRepository.findOne({
-      where: { id },
-      relations: [
-        'idCliente2',
-        'idOperador2',
-        'idOperador2.idUsuario2',
-        'idInstalacion2',
-        'idInstalacion2.dispositivos',
-        'idInstalacion2.blueVoxs',
-        'idInstalacion2.vehiculos',
-        'idInstalacion2.idCliente2',
-      ],
-      select: {
-        id: true,
-        inicio: true,
-        fin: true,
-        fechaCreacion: true,
-        fechaActualizacion: true,
-        estatus: true,
-        idCliente2: {
-          id: true,
-          nombre: true,
-          apellidoPaterno: true,
-          apellidoMaterno: true,
-        },
-        idOperador2: {
-          id: true,
-          idUsuario2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-        idInstalacion2: {
-          id: true,
-          dispositivos: { id: true, numeroSerie: true },
-          blueVoxs: { id: true, numeroSerie: true },
-          vehiculos: { id: true, placa: true },
-          idCliente2: {
-            id: true,
-            nombre: true,
-            apellidoPaterno: true,
-            apellidoMaterno: true,
-          },
-        },
-      },
-    });
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
 
-    if (!turno) {
-      throw new NotFoundException(`turno con id: ${id} no encontrado`);
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE t.Id = ?
+
+ORDER BY t.Id DESC;
+            `,
+            [id],
+          );
+          break;
+
+        case 2:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE t.IdCliente = ?
+  AND t.Id = 1
+
+ORDER BY t.Id DESC;
+            `,
+            [cliente, id],
+          );
+          break;
+
+        default:
+          turnos = await this.turnosRepository.query(
+            `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+LEFT JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+LEFT JOIN Operadores o ON t.IdOperador = o.Id
+LEFT JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE 
+  t.Id = ?              -- 🔹 filtra por cliente
+ 
+  AND EXISTS (                -- 🔹 asegura que el usuario está asignado a la instalación
+    SELECT 1 
+    FROM UsuariosInstalaciones ui
+    WHERE ui.IdInstalacion = i.Id 
+      AND ui.IdUsuario = ?
+      AND ui.Estatus = 1
+  )
+
+ORDER BY t.Inicio DESC;
+            `,
+            [id, idUser],
+          );
+          break;
+      }
+
+      if (turnos.length === 0) {
+        throw new NotFoundException(
+          'No fue posible localizar turnos, o los datos son nulos.',
+        );
+      }
+
+      // 🔥 Transformación con map
+      const data = turnos.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idInstalacion: Number(item.idInstalacion),
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
+        idOperador: Number(item.idOperador),
+      }));
+
+      return { data };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: `Ocurrió un problema al consultar el turno.`,
+        error: error,
+      });
     }
-
-    // 🔥 Transformamos el objeto antes de devolverlo
-    const data = {
-      ...turno,
-      id: Number(turno.id),
-      idCliente2: turno.idCliente2
-        ? {
-            ...turno.idCliente2,
-            id: Number(turno.idCliente2.id),
-            nombreCompleto: `${turno.idCliente2.nombre ?? ''} ${turno.idCliente2.apellidoPaterno ?? ''} ${turno.idCliente2.apellidoMaterno ?? ''}`.trim(),
-          }
-        : null,
-      idOperador2: turno.idOperador2
-        ? {
-            ...turno.idOperador2,
-            id: Number(turno.idOperador2.id),
-            idUsuario2: turno.idOperador2.idUsuario2
-              ? {
-                  ...turno.idOperador2.idUsuario2,
-                  id: Number(turno.idOperador2.idUsuario2.id),
-                  nombreCompleto: `${turno.idOperador2.idUsuario2.nombre ?? ''} ${turno.idOperador2.idUsuario2.apellidoPaterno ?? ''} ${turno.idOperador2.idUsuario2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-      idInstalacion2: turno.idInstalacion2
-        ? {
-            ...turno.idInstalacion2,
-            id: Number(turno.idInstalacion2.id),
-            dispositivos: turno.idInstalacion2.dispositivos
-              ? {
-                  ...turno.idInstalacion2.dispositivos,
-                  id: Number(turno.idInstalacion2.dispositivos.id),
-                }
-              : null,
-            blueVoxs: turno.idInstalacion2.blueVoxs
-              ? {
-                  ...turno.idInstalacion2.blueVoxs,
-                  id: Number(turno.idInstalacion2.blueVoxs.id),
-                }
-              : null,
-            vehiculos: turno.idInstalacion2.vehiculos
-              ? {
-                  ...turno.idInstalacion2.vehiculos,
-                  id: Number(turno.idInstalacion2.vehiculos.id),
-                }
-              : null,
-            idCliente2: turno.idInstalacion2.idCliente2
-              ? {
-                  ...turno.idInstalacion2.idCliente2,
-                  id: Number(turno.idInstalacion2.idCliente2.id),
-                  nombreCompleto: `${turno.idInstalacion2.idCliente2.nombre ?? ''} ${turno.idInstalacion2.idCliente2.apellidoPaterno ?? ''} ${turno.idInstalacion2.idCliente2.apellidoMaterno ?? ''}`.trim(),
-                }
-              : null,
-          }
-        : null,
-    };
-
-    return { data };
-  } catch (error) {
-    if (error instanceof HttpException) {
-      throw error;
-    }
-    throw new InternalServerErrorException({
-      message: `Error al obtener un turno`,
-      error: error,
-    });
   }
-}
-
 
   async updateEstatus(
     id: number,
@@ -454,20 +913,22 @@ async findOne(id: number) {
       //actualizamos
       await this.turnosRepository.update(id, { estatus: estatus });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateTurnosEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Turnos',
-        `Se cambio el estatus: ${estatus} del turno con ID: ${id}`,
+        `El estatus del turno con ID: ${id} fue actualizado a: ${estatus}.`,
         'UPDATE',
-        `UPDATE Turnos SET estatus = ${estatus} WHERE id=${id}`,
+        `${querylogger}`,
         idUser,
         14,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Estatus del turno actualizado correctamente',
+        message: 'El estatus del turno se actualizó correctamente.',
         estatus: { estatus: estatus },
         data: {
           id: id,
@@ -476,11 +937,23 @@ async findOne(id: number) {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateTurnosEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Turnos',
+        `El estatus del turno con ID: ${id} fue actualizado a: ${updateTurnosEstatusDto.estatus}.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        14,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: `Error al actualizar estatus de un turno`,
+        message: `Hubo un problema al actualizar el estatus del turno.`,
         error,
       });
     }
@@ -491,20 +964,22 @@ async findOne(id: number) {
       //actualizamos
       await this.turnosRepository.update(id, updateTurnoDto);
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateTurnoDto };
       await this.bitacoraLogger.logToBitacora(
         'Turnos',
-        `Se elimino turno con ID: ${id}`,
+        `El turno con ID: ${id} fue actualizado correctamente.`,
         'UPDATE',
-        `UPDATE Turnos Values (inicio: ${updateTurnoDto.inicio}, fin: ${updateTurnoDto.fin}, idCliente: ${updateTurnoDto.idCliente}, idOperador: ${updateTurnoDto.idOperador}, idInstalacion: ${updateTurnoDto.idInstalacion} ) WHERE id=${id}`,
+        `${querylogger}`,
         idUser,
         14,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Se actualizo turno correctamente',
+        message: 'El turno fue actualizado con éxito.',
         data: {
           id: id,
           nombre: `id turno:${id} ` || '',
@@ -512,12 +987,24 @@ async findOne(id: number) {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateTurnoDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Turnos',
+        `El turno con ID: ${id} fue actualizado correctamente.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        14,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: `Error al actualizar turno`,
-        error,
+        message: `Hubo un problema al actualizar el turno.`,
+        error: error.message,
       });
     }
   }
@@ -527,20 +1014,22 @@ async findOne(id: number) {
       //actualizamos
       await this.turnosRepository.update(id, { estatus: 0 });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Turnos',
-        `Se elimino turno con ID: ${id}`,
+        `El turno con ID: ${id} fue eliminado correctamente.`,
         'UPDATE',
-        `UPDATE Turnos WHERE id=${id}`,
+        `${querylogger}`,
         idUser,
         14,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Se elimino turno correctamente',
+        message: 'El turno fue eliminado con éxito.',
         data: {
           id: id,
           nombre: `id turno:${id} ` || '',
@@ -548,12 +1037,24 @@ async findOne(id: number) {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Turnos',
+        `El turno con ID: ${id} fue eliminado correctamente.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        14,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: `Error al eliminar turno`,
-        error,
+        message: `Hubo un problema al eliminar el turno.`,
+        error: error.message,
       });
     }
   }

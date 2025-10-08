@@ -11,7 +11,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
+import {
+  ApiCrudResponse,
+  ApiResponseCommon,
+  EstatusEnumBitcora,
+} from 'src/common/ApiResponse';
 import { UpdateInstalacioneEstatusDto } from './dto/update-instalacione-estatus.dto';
 import { UsuariosInstalaciones } from 'src/entities/UsuariosInstalaciones';
 import { Dispositivos } from 'src/entities/Dispositivos';
@@ -84,8 +88,7 @@ export class InstalacionesService {
       // Si hay conflictos, lanzar error con todos los detalles
       if (errores.length > 0) {
         throw new BadRequestException({
-          message:
-            'No se puede crear la instalación debido a los siguientes conflictos',
+          message: `No se puede crear la instalación debido a los siguientes conflictos`,
           errors: errores,
           conflictsCount: errores.length,
         });
@@ -150,10 +153,10 @@ export class InstalacionesService {
       );
 
       // Registro en la bitácora SUCCESS
-      const querylogger =  {createInstalacioneDto}
+      const querylogger = { createInstalacioneDto };
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
-        `Se creó una Instalación con id: ${instalacionSave.id}`, // ✅ Corregido
+        `La instalación con ID: ${instalacionSave.id} ha sido creada exitosamente.`,
         'CREATE',
         `${querylogger}`,
         idUser,
@@ -164,17 +167,17 @@ export class InstalacionesService {
       // API response (con mensajes corregidos)
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Instalación creada correctamente', // ✅ Corregido
+        message: 'La instalación ha sido creada correctamente.',
         data: {
           id: Number(instalacionSave.id),
-          nombre: `Instalación ${instalacionSave.id} - Dispositivo:${instalacionSave.idDispositivo} BlueVox:${instalacionSave.idBlueVox} Vehículo:${instalacionSave.idVehiculo}`, // ✅ Mejorado
+          nombre: `Instalación ${instalacionSave.id} registrada con los siguientes detalles: Dispositivo: ${instalacionSave.idDispositivo}, BlueVox: ${instalacionSave.idBlueVox}, Vehículo: ${instalacionSave.idVehiculo}.`, // ✅ Mejorado
         },
       };
 
       return result;
     } catch (error) {
       // Registro en la bitácora ERROR
-      const querylogger =  {createInstalacioneDto}
+      const querylogger = { createInstalacioneDto };
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
         `Se creó una Instalación con `, // ✅ Corregido
@@ -201,7 +204,7 @@ export class InstalacionesService {
 
       throw new InternalServerErrorException({
         message: 'Error al crear Instalación',
-        error: error.message, 
+        error: error.message,
       });
     }
   }
@@ -214,15 +217,149 @@ export class InstalacionesService {
     limit: number,
   ): Promise<ApiResponseCommon> {
     try {
-      let [data, total]: any[] = [];
+      let instalaciones;
+      let totalResult;
       const offset = (page - 1) * limit;
       switch (rol) {
-        // Usuario administrador - obtiene todas las instalaciones
         case 1:
-          data = await this.usuariosinstalacionesRepository.query(
+          // Consulta de datos paginados Usuario SuperAdministrador
+          instalaciones = await this.usuariosinstalacionesRepository.query(
             `
 SELECT
   -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+
+  
+
+ORDER BY i.Id DESC
+  LIMIT ? OFFSET ?;
+
+  `,
+            [limit, offset],
+          );
+          // Query para total (sin paginación)
+          totalResult = await this.instalacionesRepository.query(
+            `
+  SELECT COUNT(*) AS total
+  FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+		
+  `,
+          );
+          break;
+
+        case 2:
+          // Consulta de datos paginados Usuario Administrador
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE i.IdCliente = ?
+  
+
+ORDER BY i.Id DESC
+  LIMIT ? OFFSET ?;
+
+  `,
+            [cliente, limit, offset],
+          );
+          // Query para total (sin paginación)
+          totalResult = await this.instalacionesRepository.query(
+            `
+  SELECT COUNT(*) AS total
+  FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+		WHERE i.IdCliente = ?
+  `,
+            [cliente],
+          );
+          break;
+
+        default:
+          // Usuarios normales - solo sus instalaciones asignadas
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación */*/*/* para resto Usuarios
   i.Id AS id,
   i.FechaCreacion AS fechaCreacion,
   i.FechaActualizacion AS fechaActualizacion,
@@ -231,20 +368,28 @@ SELECT
   -- Dispositivo
   i.IdDispositivo AS idDispositivo,
   d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
   
   -- BlueVox
   i.IdBlueVox AS idBlueVox,
   b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
   
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
   
   -- Cliente
   i.IdCliente AS idCliente,
   c.Nombre AS nombreCliente,
   c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
 
 FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
@@ -253,106 +398,49 @@ INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-WHERE ui.IdUsuario = 1
+WHERE ui.IdUsuario = ?
   AND ui.Estatus = 1
-  AND c.Estatus = 1
 
-ORDER BY i.Id DESC;
+ORDER BY i.Id DESC
+  LIMIT ? OFFSET ?;
 
   `,
             [idUser, limit, offset],
           );
-          break;
-
-        default:
-          // Usuarios normales - solo sus instalaciones asignadas
-          [data, total] =
-            await this.usuariosinstalacionesRepository.findAndCount({
-              skip: (page - 1) * limit,
-              take: limit,
-              relations: [
-                'idInstalacion2',
-                'idInstalacion2.dispositivos',
-                'idInstalacion2.blueVoxs',
-                'idInstalacion2.vehiculos',
-                'idInstalacion2.idCliente2',
-              ],
-              where: {
-                idUsuario: idUser,
-                estatus: 1,
-                idInstalacion2: {
-                  idCliente: cliente,
-                },
-              },
-              select: {
-                id: true,
-                idUsuario: true,
-                idInstalacion: true,
-                idInstalacion2: {
-                  id: true,
-                  fechaCreacion: true,
-                  fechaActualizacion: true,
-                  estatus: true,
-                  idCliente: true,
-                  dispositivos: { id: true, numeroSerie: true },
-                  blueVoxs: { id: true, numeroSerie: true },
-                  vehiculos: { id: true, placa: true },
-                  idCliente2: {
-                    id: true,
-                    nombre: true,
-                    apellidoPaterno: true,
-                    apellidoMaterno: true,
-                  },
-                },
-              },
-            });
+          // Query para total (sin paginación)
+          totalResult = await this.instalacionesRepository.query(
+            `
+    SELECT COUNT(*) AS total
+  FROM UsuariosInstalaciones ui
+INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+	WHERE ui.IdUsuario = ?
+	AND ui.Estatus = 1
+  `,
+            [idUser],
+          );
           break;
       }
 
-      if (data.length === 0) {
-        throw new NotFoundException('Instalaciones no encontrado');
+      const total = Number(totalResult[0]?.total || 0);
+
+      if (instalaciones.length === 0) {
+        throw new NotFoundException('No se encontraron instalaciones.');
       }
 
       // 🔥 Transformación de datos (ids → number, nombreCompleto)
-      const instalaciones = data.map((item) => ({
+      const data = instalaciones.map((item) => ({
         ...item,
         id: Number(item.id),
-        idUsuario: Number(item.idUsuario),
-        idInstalacion: Number(item.idInstalacion),
-        idInstalacion2: item.idInstalacion2
-          ? {
-              ...item.idInstalacion2,
-              id: Number(item.idInstalacion2.id),
-              idCliente: Number(item.idInstalacion2.idCliente),
-              dispositivos: item.idInstalacion2.dispositivos
-                ? {
-                    ...item.idInstalacion2.dispositivos,
-                    id: Number(item.idInstalacion2.dispositivos.id),
-                  }
-                : null,
-              blueVoxs: item.idInstalacion2.blueVoxs
-                ? {
-                    ...item.idInstalacion2.blueVoxs,
-                    id: Number(item.idInstalacion2.blueVoxs.id),
-                  }
-                : null,
-              vehiculos: item.idInstalacion2.vehiculos
-                ? {
-                    ...item.idInstalacion2.vehiculos,
-                    id: Number(item.idInstalacion2.vehiculos.id),
-                  }
-                : null,
-              idCliente2: item.idInstalacion2.idCliente2
-                ? {
-                    ...item.idInstalacion2.idCliente2,
-                    id: Number(item.idInstalacion2.idCliente2.id),
-                    nombreCompleto:
-                      `${item.idInstalacion2.idCliente2.nombre ?? ''} ${item.idInstalacion2.idCliente2.apellidoPaterno ?? ''} ${item.idInstalacion2.idCliente2.apellidoMaterno ?? ''}`.trim(),
-                  }
-                : null,
-            }
-          : null,
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
       }));
+
       //APi response
       const result: ApiResponseCommon = {
         data: data,
@@ -368,144 +456,193 @@ ORDER BY i.Id DESC;
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al obtener paginado Instalaciones',
-        error,
+        message:
+          'Ocurrió un problema al intentar cargar la paginación de instalaciones.',
+        error: error.message,
       });
     }
   }
 
   async findAllList(
-    cliente: number,
     idUser: number,
+    cliente: number,
+    rol: number,
   ): Promise<ApiResponseCommon> {
     try {
-      let instalaciones: any[] = [];
-      switch (idUser) {
+      let instalaciones;
+
+      switch (rol) {
         case 1:
-          // Usuario administrador - obtiene todas las instalaciones
-          instalaciones = await this.usuariosinstalacionesRepository.find({
-            relations: [
-              'idInstalacion2',
-              'idInstalacion2.dispositivos',
-              'idInstalacion2.blueVoxs',
-              'idInstalacion2.vehiculos',
-              'idInstalacion2.idCliente2',
-            ],
-            where: {
-              estatus: 1,
-              idUsuario: idUser,
-              idInstalacion2: { estatus: 1 },
-            },
-            select: {
-              id: true,
-              idUsuario: true,
-              idInstalacion: true,
-              idInstalacion2: {
-                id: true,
-                fechaCreacion: true,
-                fechaActualizacion: true,
-                estatus: true,
-                idCliente: true,
-                dispositivos: { id: true, numeroSerie: true },
-                blueVoxs: { id: true, numeroSerie: true },
-                vehiculos: { id: true, placa: true },
-                idCliente2: {
-                  id: true,
-                  nombre: true,
-                  apellidoPaterno: true,
-                  apellidoMaterno: true,
-                },
-              },
-            },
-          });
+          // Usuario SuperAdministrador - obtiene todas las instalaciones
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE i.Estatus = 1
+
+ORDER BY i.Id DESC;
+
+  `,
+          );
+          break;
+
+        case 2:
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE i.IdCliente = ?
+  AND i.Estatus = 1
+
+ORDER BY i.Id DESC;
+
+  `,
+            [cliente],
+          );
           break;
 
         default:
           // Usuarios normales - solo sus instalaciones asignadas
-          instalaciones = await this.usuariosinstalacionesRepository.find({
-            relations: [
-              'idInstalacion2',
-              'idInstalacion2.dispositivos',
-              'idInstalacion2.blueVoxs',
-              'idInstalacion2.vehiculos',
-              'idInstalacion2.idCliente2',
-            ],
-            where: {
-              idUsuario: idUser,
-              estatus: 1,
-              idInstalacion2: {
-                idCliente: cliente,
-                estatus: 1,
-              },
-            },
-            select: {
-              id: true,
-              idUsuario: true,
-              idInstalacion: true,
-              idInstalacion2: {
-                id: true,
-                fechaCreacion: true,
-                fechaActualizacion: true,
-                estatus: true,
-                idCliente: true,
-                dispositivos: { id: true, numeroSerie: true },
-                blueVoxs: { id: true, numeroSerie: true },
-                vehiculos: { id: true, placa: true },
-                idCliente2: {
-                  id: true,
-                  nombre: true,
-                  apellidoPaterno: true,
-                  apellidoMaterno: true,
-                },
-              },
-            },
-          });
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación */*/*/* para resto Usuarios
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+  
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+  
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+  
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+  
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM UsuariosInstalaciones ui
+INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE ui.IdUsuario = ?
+  AND ui.Estatus = 1
+  AND i.Estatus = 1
+
+ORDER BY i.Id DESC;
+
+  `,
+            [idUser],
+          );
           break;
       }
 
       if (instalaciones.length === 0) {
-        throw new NotFoundException('Instalaciones no encontrado');
+        throw new NotFoundException('No se encontraron instalaciones.');
       }
 
       // 🔥 Transformación de datos (ids → number, nombreCompleto)
       const data = instalaciones.map((item) => ({
         ...item,
         id: Number(item.id),
-        idUsuario: Number(item.idUsuario),
-        idInstalacion: Number(item.idInstalacion),
-        idInstalacion2: item.idInstalacion2
-          ? {
-              ...item.idInstalacion2,
-              id: Number(item.idInstalacion2.id),
-              idCliente: Number(item.idInstalacion2.idCliente),
-              dispositivos: item.idInstalacion2.dispositivos
-                ? {
-                    ...item.idInstalacion2.dispositivos,
-                    id: Number(item.idInstalacion2.dispositivos.id),
-                  }
-                : null,
-              blueVoxs: item.idInstalacion2.blueVoxs
-                ? {
-                    ...item.idInstalacion2.blueVoxs,
-                    id: Number(item.idInstalacion2.blueVoxs.id),
-                  }
-                : null,
-              vehiculos: item.idInstalacion2.vehiculos
-                ? {
-                    ...item.idInstalacion2.vehiculos,
-                    id: Number(item.idInstalacion2.vehiculos.id),
-                  }
-                : null,
-              idCliente2: item.idInstalacion2.idCliente2
-                ? {
-                    ...item.idInstalacion2.idCliente2,
-                    id: Number(item.idInstalacion2.idCliente2.id),
-                    nombreCompleto:
-                      `${item.idInstalacion2.idCliente2.nombre ?? ''} ${item.idInstalacion2.idCliente2.apellidoPaterno ?? ''} ${item.idInstalacion2.idCliente2.apellidoMaterno ?? ''}`.trim(),
-                  }
-                : null,
-            }
-          : null,
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
       }));
 
       const result: ApiResponseCommon = {
@@ -518,114 +655,198 @@ ORDER BY i.Id DESC;
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al obtener listado Instalaciones',
+        message: 'No fue posible obtener el listado de instalaciones.',
         error,
       });
     }
   }
 
-  async findOne(id: number, idUser: number, cliente: number) {
+  async findOne(id: number, idUser: number, cliente: number, rol: number) {
     try {
       let instalaciones;
-      switch (idUser) {
+      switch (rol) {
         case 1:
-          // Usuario administrador - obtiene todas las instalaciones
-          instalaciones = await this.instalacionesRepository.findOne({
-            relations: ['blueVoxs', 'idCliente2', 'dispositivos', 'vehiculos'],
-            where: { id: id },
-            select: {
-              id: true,
-              fechaCreacion: true,
-              fechaActualizacion: true,
-              estatus: true,
-              dispositivos: { id: true, numeroSerie: true },
-              blueVoxs: { id: true, numeroSerie: true },
-              vehiculos: { id: true, placa: true },
-              idCliente2: {
-                id: true,
-                nombre: true,
-                apellidoPaterno: true,
-                apellidoMaterno: true,
-              },
-            },
-          });
+          // Usuario SuperAdministrador - obtiene todas las instalaciones
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE i.Id = ?
+
+ORDER BY i.Id DESC;
+
+  `,
+            [id],
+          );
+          break;
+
+        case 2:
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+
+WHERE i.IdCliente = ?
+  AND i.Id = ?
+
+ORDER BY i.Id DESC;
+
+  `,
+            [cliente, id],
+          );
           break;
 
         default:
           // Usuarios normales - solo sus instalaciones asignadas
-          const permiso = await this.usuariosinstalacionesRepository.find({
-            where: { idUsuario: idUser, idInstalacion: id, estatus: 1 },
-          });
-          if (permiso.length === 0)
-            throw new BadRequestException(`Acceso denegado`);
+          instalaciones = await this.usuariosinstalacionesRepository.query(
+            `
+SELECT
+  -- Instalación */*/*/* para resto Usuarios
+  i.Id AS id,
+  i.FechaCreacion AS fechaCreacion,
+  i.FechaActualizacion AS fechaActualizacion,
+  i.Estatus AS estatus,
+  
+  -- Dispositivo
+  i.IdDispositivo AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+  
+  -- BlueVox
+  i.IdBlueVox AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+  
+  -- Vehículo
+  i.IdVehiculo AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+  
+  -- Cliente
+  i.IdCliente AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
 
-          instalaciones = await this.instalacionesRepository.findOne({
-            relations: ['blueVoxs', 'idCliente2', 'dispositivos', 'vehiculos'],
+FROM UsuariosInstalaciones ui
+INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-            where: { id: id, idCliente: cliente },
-            select: {
-              id: true,
-              fechaCreacion: true,
-              fechaActualizacion: true,
-              estatus: true,
-              dispositivos: { id: true, numeroSerie: true },
-              blueVoxs: { id: true, numeroSerie: true },
-              vehiculos: { id: true, placa: true },
-              idCliente2: {
-                id: true,
-                nombre: true,
-                apellidoPaterno: true,
-                apellidoMaterno: true,
-              },
-            },
-          });
+WHERE ui.IdUsuario = ?
+  AND ui.Estatus = 1
+  AND i.Id = ?
+
+ORDER BY i.Id DESC;
+
+  `,
+            [idUser, id],
+          );
           break;
       }
       if (!instalaciones) {
-        throw new NotFoundException('instalaciones no encontrado');
+        throw new NotFoundException('No se encontraron instalaciones.');
       }
 
       // 🔥 Transformamos ids a number y añadimos nombreCompleto
-      const transformado = {
-        ...instalaciones,
-        id: Number(instalaciones.id),
-        dispositivos: instalaciones.dispositivos
-          ? {
-              ...instalaciones.dispositivos,
-              id: Number(instalaciones.dispositivos.id),
-            }
-          : null,
-        blueVoxs: instalaciones.blueVoxs
-          ? {
-              ...instalaciones.blueVoxs,
-              id: Number(instalaciones.blueVoxs.id),
-            }
-          : null,
-        vehiculos: instalaciones.vehiculos
-          ? {
-              ...instalaciones.vehiculos,
-              id: Number(instalaciones.vehiculos.id),
-            }
-          : null,
-        idCliente2: instalaciones.idCliente2
-          ? {
-              ...instalaciones.idCliente2,
-              id: Number(instalaciones.idCliente2.id),
-              nombreCompleto: `${instalaciones.idCliente2.nombre ?? ''} ${
-                instalaciones.idCliente2.apellidoPaterno ?? ''
-              } ${instalaciones.idCliente2.apellidoMaterno ?? ''}`.trim(),
-            }
-          : null,
-      };
+      const data = instalaciones.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        idDispositivo: Number(item.idDispositivo),
+        idBlueVox: Number(item.idBlueVox),
+        idVehiculo: Number(item.idVehiculo),
+        idCliente: Number(item.idCliente),
+      }));
 
-      return { data: transformado };
+      return { data: data };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Error al obtener Instalaciones Por ID',
-        error,
+        message:
+          'Ocurrió un problema al intentar acceder a las instalaciones por ID.',
+        error: error.message,
       });
     }
   }
@@ -634,11 +855,12 @@ ORDER BY i.Id DESC;
     id: number,
     idUser: number,
     cliente: number,
+    rol: number,
     updateInstalacioneEstatusDto: UpdateInstalacioneEstatusDto,
   ) {
     try {
       let instalacion;
-      switch (idUser) {
+      switch (rol) {
         case 1:
           // Usuario administrador - obtiene todas las instalaciones
           instalacion = await this.instalacionesRepository.findOne({
@@ -648,12 +870,6 @@ ORDER BY i.Id DESC;
 
         default:
           // Usuarios normales - solo sus instalaciones asignadas
-          const permiso = await this.usuariosinstalacionesRepository.find({
-            where: { idUsuario: idUser, idInstalacion: id, estatus: 1 },
-          });
-          if (permiso.length === 0)
-            throw new BadRequestException(`Acceso denegado`);
-
           instalacion = await this.instalacionesRepository.findOne({
             where: { id: id, idCliente: cliente },
           });
@@ -668,22 +884,94 @@ ORDER BY i.Id DESC;
 
       //Actualizamos el estatus
       const estatus = updateInstalacioneEstatusDto.estatus;
+      if (estatus === 1) {
+        // ✅ VALIDACIÓN MEJORADA: Verificar todos los conflictos con relaciones
+        const errores: string[] = [];
+
+        // Verificar dispositivo CON relaciones
+        const dispositivoEnUso = await this.instalacionesRepository.findOne({
+          where: {
+            idDispositivo: instalacion.idDispositivo,
+            estatus: 1,
+          },
+          relations: ['dispositivos'],
+        });
+        if (dispositivoEnUso) {
+          errores.push(
+            `Dispositivo "${dispositivoEnUso.dispositivos.numeroSerie}" ya está en uso`,
+          );
+        }
+
+        // Verificar BlueVox CON relaciones
+        const blueVoxEnUso = await this.instalacionesRepository.findOne({
+          where: { idBlueVox: instalacion.idBlueVox, estatus: 1 },
+          relations: ['blueVoxs'],
+        });
+        if (blueVoxEnUso) {
+          errores.push(
+            `BlueVox "${blueVoxEnUso.blueVoxs.numeroSerie}" ya está en uso`,
+          );
+        }
+
+        // Verificar Vehículo CON relaciones
+        const vehiculoEnUso = await this.instalacionesRepository.findOne({
+          where: { idVehiculo: instalacion.idVehiculo, estatus: 1 },
+          relations: ['vehiculos'],
+        });
+        if (vehiculoEnUso) {
+          errores.push(
+            `Vehículo con placa "${vehiculoEnUso.vehiculos.placa}" ya está en uso`,
+          );
+        }
+
+        // Si hay conflictos, lanzar error con todos los detalles
+        if (errores.length > 0) {
+          throw new BadRequestException({
+            message: `No se puede crear la instalación debido a los siguientes conflictos`,
+            errors: errores,
+            conflictsCount: errores.length,
+          });
+        }
+
+        // Cambiar estatus de componentes a 0 (liberados)
+        const body = { estatus: 0 };
+        await this.dispositivosRepository.update(
+          instalacion.idDispositivo,
+          body,
+        );
+        await this.bluevoxsRepository.update(instalacion.idBlueVox, body);
+        await this.vehiculosRepository.update(instalacion.idVehiculo, body);
+      } else if (estatus === 0) {
+        // Desactivar instalación → activar componentes
+        const body = { estatus: 1 };
+        await this.dispositivosRepository.update(
+          instalacion.idDispositivo,
+          body
+        );
+        await this.bluevoxsRepository.update(instalacion.idBlueVox, body);
+        await this.vehiculosRepository.update(instalacion.idVehiculo, body);
+      }
+
+
       await this.instalacionesRepository.update(id, { estatus: estatus });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateInstalacioneEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
-        `Se cambio el estatus de instalacion con id: ${instalacion.id}`,
+        `Se actualizó el estatus de la instalación con ID: ${instalacion.id}.`,
         'UPDATE',
-        `UPDATE CLIENTE SET Estatus = ${estatus} WHERE id = ${id}`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         13,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Estatus instalaciones actualizado correctamente',
+        message:
+          'El estatus de las instalaciones ha sido actualizado con éxito.',
         estatus: { estatus: estatus },
         data: {
           id: id,
@@ -694,12 +982,25 @@ ORDER BY i.Id DESC;
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateInstalacioneEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Instalaciones',
+        `Se cambio el estatus de instalacion con id: ${id}`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        13,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new InternalServerErrorException(
-        `Error al cambiar estatus de instalaciones con id: ${id}`,
-      );
+      throw new InternalServerErrorException({
+        message: `Ocurrió un problema al intentar modificar el estatus de la instalación con ID: ${id}.`,
+        error: error.message,
+      });
     }
   }
 
@@ -707,11 +1008,12 @@ ORDER BY i.Id DESC;
     id: number,
     idUser: number,
     cliente: number,
+    rol: number,
     updateInstalacioneDto: UpdateInstalacioneDto,
   ): Promise<ApiCrudResponse> {
     try {
       let instalacion;
-      switch (idUser) {
+      switch (rol) {
         case 1:
           // Usuario administrador - obtiene todas las instalaciones
           instalacion = await this.instalacionesRepository.findOne({
@@ -721,12 +1023,6 @@ ORDER BY i.Id DESC;
 
         default:
           // Usuarios normales - solo sus instalaciones asignadas
-          const permiso = await this.usuariosinstalacionesRepository.find({
-            where: { idUsuario: idUser, idInstalacion: id, estatus: 1 },
-          });
-          if (permiso.length === 0)
-            throw new BadRequestException(`Acceso denegado`);
-
           instalacion = await this.instalacionesRepository.findOne({
             where: { id: id, idCliente: cliente },
           });
@@ -737,36 +1033,50 @@ ORDER BY i.Id DESC;
       }
       if (!instalacion) {
         throw new NotFoundException(
-          `Instalaciones con id: ${id} no encontrado`,
+          `No se encontró la instalación con ID: ${id}.`,
         );
       }
 
       //Actualizamos datos
       await this.instalacionesRepository.update(id, updateInstalacioneDto);
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateInstalacioneDto };
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
         `Se actualizo instalacion con id: ${instalacion.id}`,
         'UPDATE',
-        `UPDATE Instalaciones (...) VALUES (...) -> id:  ${instalacion.id}, Estatus: ${instalacion.estatus}, IdDispositivo: ${updateInstalacioneDto.idDispositivo}, IdBlueVox: ${updateInstalacioneDto.idBlueVox}, IdVehiculo: ${updateInstalacioneDto.idVehiculo}, IdCliente: ${updateInstalacioneDto.idCliente}`,
-        Number(idUser),
+        `${querylogger}`,
+        idUser,
         13,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Instalaciones actualizado correctamente',
+        message: 'Las instalaciones se actualizaron con éxito.',
         data: {
           id: id,
           nombre:
-            `${instalacion.id} dispositivo:${instalacion.idDispositivo} bluevox: ${instalacion.idBlueVox} vehiculo: ${instalacion.idVehiculo}` ||
+            `Instalación ${instalacion.id} asociada a Dispositivo: ${instalacion.idDispositivo}, BlueVox: ${instalacion.idBlueVox} y Vehículo: ${instalacion.idVehiculo}.` ||
             '',
         },
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateInstalacioneDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Instalaciones',
+        `Se actualizo instalacion con id: ${id}`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        13,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -781,10 +1091,11 @@ ORDER BY i.Id DESC;
     id: number,
     cliente: number,
     idUser: number,
+    rol: number,
   ): Promise<ApiCrudResponse> {
     try {
       let instalacion;
-      switch (idUser) {
+      switch (rol) {
         case 1:
           // Usuario administrador - obtiene todas las instalaciones
           instalacion = await this.instalacionesRepository.findOne({
@@ -794,12 +1105,6 @@ ORDER BY i.Id DESC;
 
         default:
           // Usuarios normales - solo sus instalaciones asignadas
-          const permiso = await this.usuariosinstalacionesRepository.find({
-            where: { idUsuario: idUser, idInstalacion: id, estatus: 1 },
-          });
-          if (permiso.length === 0)
-            throw new BadRequestException(`Acceso denegado`);
-
           instalacion = await this.instalacionesRepository.findOne({
             where: { id: id, idCliente: cliente },
           });
@@ -807,21 +1112,23 @@ ORDER BY i.Id DESC;
       }
       if (!instalacion) {
         throw new NotFoundException(
-          `Instalaciones con id: ${id} no encontrado,`,
+          `La instalación con ID: ${id} no está disponible.`,
         );
       }
 
       //Actualizamos datos
       await this.instalacionesRepository.update(id, { estatus: 0 });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Instalaciones',
-        `Se elimino instalacion con id: ${instalacion.id}`,
-        'DELETE',
-        `DELETE FROM Instalaciones WHERE Id=${id}`,
-        Number(idUser),
+        `La instalación con ID: ${instalacion.id} ha sido eliminada exitosamente.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
         13,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -837,6 +1144,18 @@ ORDER BY i.Id DESC;
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Instalaciones',
+        `La instalación con ID: ${id} ha sido eliminada exitosamente.`,
+        'UPDATE',
+        `${querylogger}`,
+        idUser,
+        13,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

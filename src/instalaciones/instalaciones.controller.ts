@@ -44,7 +44,7 @@ export class InstalacionesController {
     @Param('page', ParseIntPipe) page: number,
     @Param('limit', ParseIntPipe) limit: number,
     @Request() req,
-  ): Promise<ApiResponseCommon> {
+  ) {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
     const rol = req.user.rol;
@@ -55,14 +55,16 @@ export class InstalacionesController {
   async findAllList(@Request() req): Promise<ApiResponseCommon> {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
-    return await this.instalacionesService.findAllList(+cliente,+idUser);
+    const rol = req.user.rol;
+    return await this.instalacionesService.findAllList(+idUser, +cliente, +rol);
   }
 
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
-    return await this.instalacionesService.findOne(+id,+idUser,+cliente);
+    const rol = req.user.rol;
+    return await this.instalacionesService.findOne(+id,+idUser,+cliente, +rol);
   }
 
   @Patch('estatus/:id')
@@ -73,10 +75,12 @@ export class InstalacionesController {
   ) {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
+    const rol = req.user.rol;
     return this.instalacionesService.updateEstatus(
       +id,
       +idUser,
       +cliente,
+      +rol,
       updateInstalacioneEstatusDto,
     );
   }
@@ -89,10 +93,12 @@ export class InstalacionesController {
   ) {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
+    const rol = req.user.rol;
     return await this.instalacionesService.update(
       +id,
       +idUser,
       +cliente,
+      +rol,
       updateInstalacioneDto,
     );
   }
@@ -101,6 +107,7 @@ export class InstalacionesController {
   remove(@Param('id') id: string, @Request() req) {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
-    return this.instalacionesService.remove(+id, +cliente, +idUser);
+    const rol = req.user.rol;
+    return this.instalacionesService.remove(+id, +cliente, +idUser, +rol);
   }
 }
