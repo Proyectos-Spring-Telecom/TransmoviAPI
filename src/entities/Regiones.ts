@@ -23,6 +23,9 @@ export class Regiones {
   @Column("varchar", { name: "Descripcion", nullable: true, length: 255 })
   descripcion: string | null;
 
+  @Column('json', { name: 'Geocerca', nullable: true })
+  geocerca: object | null;
+
   @Column("datetime", {
     name: "FechaCreacion",
     default: () => "CURRENT_TIMESTAMP",
