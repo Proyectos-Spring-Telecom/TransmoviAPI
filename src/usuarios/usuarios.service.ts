@@ -77,7 +77,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 
 ORDER BY u.Id DESC
 LIMIT ? OFFSET ?;
@@ -127,7 +127,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE c.Id = ?
 ORDER BY u.Id DESC
 LIMIT ? OFFSET ?;
@@ -218,7 +218,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE u.Estatus = 1
 ORDER BY u.Id DESC;
         `,
@@ -256,7 +256,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE c.Id = ?
 AND u.Estatus = 1
 ORDER BY u.Id DESC;
@@ -384,7 +384,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE u.Id = ?
 ORDER BY u.Id DESC
         `,
@@ -423,7 +423,7 @@ SELECT
 
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
-INNER JOIN Clientes c ON u.IdCliente = c.Id
+LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE u.Id = ?
 AND c.Id = ?
 ORDER BY u.Id DESC
