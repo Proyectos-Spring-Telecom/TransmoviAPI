@@ -80,7 +80,7 @@ export class MailService {
 </head>
 <body>
   <div class="container">
-    <img src="https://transmovi.s3.us-east-2.amazonaws.com/usuarios/fb4c24f2-d748-4206-9e15-8c20d6dc1936.jpeg" alt="Transmovi" class="logo">
+    <img src="https://transmovi.s3.us-east-2.amazonaws.com/logos/transmovi.png" alt="Transmovi" class="logo">
     <h1>¡Bienvenido, ${to}!</h1>
     <p>
       Gracias por registrarte en <strong>Transmovi</strong>. 

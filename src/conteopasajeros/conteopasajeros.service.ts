@@ -8,7 +8,7 @@ import { CreateConteoPasajerosDto } from './dto/create-conteopasajero.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConteoPasajeros } from 'src/entities/ConteoPasajeros';
 import { Between, MoreThanOrEqual, Repository } from 'typeorm';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 
 @Injectable()
@@ -20,7 +20,7 @@ export class ConteopasajerosService {
   ) {}
 
   async create(
-    idUser: string,
+    idUser: number,
     createConteopasajeroDto: CreateConteoPasajerosDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -29,14 +29,16 @@ export class ConteopasajerosService {
       );
       const conteoPasajeroSave = await this.conteopasajeroRepository.save(newConteoPasajero);
 
-      // Registro en la bitácora
+      // Registro en la bitácora SUCCESS
+      const querylogger = { createConteopasajeroDto };
       await this.bitacoraLogger.logToBitacora(
         'ConteoPasajeros',
         `Se creó un ConteoPasajeros con Numero de serie BlueVoxs: ${createConteopasajeroDto.numeroSerieBlueVox}`,
         'CREATE',
-        `INSERT INTO ConteoPasajeros (...) VALUES (...) -> id: ${conteoPasajeroSave.id}, Entradas: ${conteoPasajeroSave.entradas}, Salidas: ${conteoPasajeroSave.salidas}, Diferencia: ${conteoPasajeroSave.diferencia}, FechaHora: ${conteoPasajeroSave.fechaHora}, NumeroSerieBlueVox ${conteoPasajeroSave.numeroSerieBlueVox}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         23,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       const result: ApiCrudResponse = {
@@ -49,12 +51,24 @@ export class ConteopasajerosService {
       };
       return result;
     } catch (error) {
+      // Registro en la bitácora ERROR
+      const querylogger = { createConteopasajeroDto };
+      await this.bitacoraLogger.logToBitacora(
+        'ConteoPasajeros',
+        `Se creó un ConteoPasajeros con Numero de serie BlueVoxs: ${createConteopasajeroDto.numeroSerieBlueVox}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        23,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
       throw new InternalServerErrorException({
         message: 'Error al crear ConteoPasajeros',
-        error,
+        error: error.message,
       });
     }
   }
@@ -87,6 +101,7 @@ export class ConteopasajerosService {
       }
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros',
+        error: error.message,
       });
     }
   }
@@ -112,6 +127,7 @@ export class ConteopasajerosService {
       }
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros',
+        error: error.message,
       });
     }
   }
@@ -133,6 +149,7 @@ export class ConteopasajerosService {
       }
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros',
+        error: error.message,
       });
     }
   }
@@ -166,6 +183,7 @@ export class ConteopasajerosService {
     } catch (error) {
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por fecha',
+        error: error.message,
       });
     }
   }
@@ -243,6 +261,7 @@ export class ConteopasajerosService {
     } catch (error) {
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por fecha y hora',
+        error: error.message,
       });
     }
   }
@@ -277,6 +296,7 @@ export class ConteopasajerosService {
     } catch (error) {
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros de hoy',
+        error: error.message,
       });
     }
   }
@@ -312,6 +332,7 @@ export class ConteopasajerosService {
   } catch (error) {
     throw new InternalServerErrorException({
       message: 'Error al obtener conteo pasajeros de la última semana',
+      error: error.message,
     });
   }
 }
@@ -355,6 +376,7 @@ export class ConteopasajerosService {
     } catch (error) {
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por BlueVox y fecha',
+        error: error.message,
       });
     }
   }

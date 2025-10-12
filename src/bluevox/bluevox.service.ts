@@ -52,7 +52,7 @@ export class BluevoxService {
         'Bluevoxs',
         `Se creó un BlueVox con número de serie: ${bluevoxSave.numeroSerie}.`,
         'CREATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.SUCCESS,
@@ -76,7 +76,7 @@ export class BluevoxService {
         'Bluevoxs',
         `Se creó un BlueVox con número de serie: ${createBlueVoxDto.numeroSerie}.`,
         'CREATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.ERROR,
@@ -159,8 +159,10 @@ SELECT
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
 
-ORDER BY b.Id DESC;
+ORDER BY b.Id DESC
+LIMIT ? OFFSET ?;
         `,
+            [limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -197,9 +199,10 @@ FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
 WHERE b.IdCliente = ?
 
-ORDER BY b.Id DESC;
+ORDER BY b.Id DESC
+LIMIT ? OFFSET ?;
         `,
-            [cliente],
+            [cliente, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -425,7 +428,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se actualizo el bluevox con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.SUCCESS,
@@ -450,7 +453,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se actualizo el bluevox con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.ERROR,
@@ -485,7 +488,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se actualizo el estatus del bluevoxs con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.SUCCESS,
@@ -509,7 +512,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se actualizo el estatus del bluevoxs con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.ERROR,
@@ -540,7 +543,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se eliminó el bluevoxs con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.SUCCESS,
@@ -563,7 +566,7 @@ ORDER BY b.Id DESC;
         'BlueVoxs',
         `Se eliminó el bluevoxs con ID: ${id}`,
         'UPDATE',
-        `${querylogger}`,
+        querylogger,
         idUser,
         12,
         EstatusEnumBitcora.ERROR,

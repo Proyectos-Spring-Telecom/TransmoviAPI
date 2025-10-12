@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Pasajeros } from 'src/entities/Pasajeros';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 @Injectable()
 export class PasajerosService {
   constructor(
@@ -39,14 +39,17 @@ export class PasajerosService {
       const newPasajero =
         await this.pasajeroRepository.create(createPasajeroDto);
       const pasajeroSave = await this.pasajeroRepository.save(newPasajero);
-      //-----Registro en la bitacora-----
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { createPasajeroDto };
       await this.bitacoraLogger.logToBitacora(
         'Pasajeros',
         `Se creó un pasajero con nombre: ${createPasajeroDto.nombre}`,
         'CREATE',
-        `INSERT INTO Pasajeros (...) VALUES (...) ->  nombre: ${createPasajeroDto.nombre} apellido paterno: ${createPasajeroDto.apellidoPaterno} apellido materno: ${createPasajeroDto.apellidoMaterno}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         21,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //API response
@@ -61,6 +64,20 @@ export class PasajerosService {
       };
       return result;
     } catch (error) {
+
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { createPasajeroDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Pasajeros',
+        `Se creó un pasajero con nombre: ${createPasajeroDto.nombre}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        21,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -154,15 +171,20 @@ export class PasajerosService {
       }
       const { estatus } = updatePasajeroEstatusDto;
       await this.pasajeroRepository.update(id, { estatus });
-      //-----Registro en la bitacora-----
+
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updatePasajeroEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Pasajero',
-        `Se cambio del modulo ${pasajero.nombre} con id: ${id} a estatus: ${estatus}`,
+        `Se cambio del pasajero ${pasajero.nombre} con id: ${id} a estatus: ${estatus}`,
         'UPDATE',
-        `UPDATE Pasajeros SET Estatus = ${estatus} WHERE id = ${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         21,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -175,6 +197,19 @@ export class PasajerosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updatePasajeroEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Pasajero',
+        `Se cambio del pasajero con id: ${id} a estatus: ${updatePasajeroEstatusDto.estatus}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        21,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -203,15 +238,19 @@ export class PasajerosService {
       const pasajeroSave = await this.pasajeroRepository.findOne({
         where: { id: id },
       });
-      //-----Registro en la bitacora-----
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updatePasajeroDto };
       await this.bitacoraLogger.logToBitacora(
         'Pasajeros',
         `Se cambio del datos del pasajero: ${pasajero.nombre} con id: ${id}`,
         'UPDATE',
-        `UPDATE Modulos SET (...) WHERE id = ${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         21,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -224,6 +263,19 @@ export class PasajerosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updatePasajeroDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Pasajeros',
+        `Se cambio del datos del pasajero con id: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        21,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -242,15 +294,19 @@ export class PasajerosService {
         );
       }
       await this.pasajeroRepository.update(id, { estatus: 0 });
-      //-----Registro en la bitacora-----
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Pasajeros',
         `Se elimino pasajero: ${pasajero.nombre} con id: ${id}`,
         'DELETE',
-        `DELETE FROM Pasajeros WHERE id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         21,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       const result: ApiCrudResponse = {
         status: 'success',
         message: 'Pasajero eliminado correctamente',
@@ -262,6 +318,18 @@ export class PasajerosService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Pasajeros',
+        `Se elimino pasajero con id: ${id}`,
+        'DELETE',
+        querylogger,
+        idUser,
+        21,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

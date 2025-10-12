@@ -13,7 +13,7 @@ import { Repository } from 'typeorm';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Usuarios } from 'src/entities/Usuarios';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { UpdateUsuariosInstalacionesEstatusDto } from './dto/update-usuariosinstalacione-estatus.dto';
 
 @Injectable()
@@ -85,14 +85,16 @@ export class UsuariosinstalacionesService {
         );
       }
 
-      // --- Registro en la bitácora ---
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { createUsuariosInstalacionesDto };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosInstalaciones',
         `Se crearon permisos para usuario: ${createUsuariosInstalacionesDto.idUsuario} con instalaciones: ${createUsuariosInstalacionesDto.idsInstalaciones.join(', ')}`,
         'CREATE',
-        `INSERT INTO UsuariosInstalaciones (IdUsuario, IdInstalacion)`,
+        querylogger,
         idUser,
         8,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // Api response
@@ -108,6 +110,19 @@ export class UsuariosinstalacionesService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { createUsuariosInstalacionesDto };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosInstalaciones',
+        `Se crearon permisos para usuario: ${createUsuariosInstalacionesDto.idUsuario} con instalaciones: ${createUsuariosInstalacionesDto.idsInstalaciones.join(', ')}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        8,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+      
       if (error instanceof HttpException) {
         throw error;
       }
@@ -233,7 +248,7 @@ export class UsuariosinstalacionesService {
 
   async update(
     id: number,
-    idUser: string,
+    idUser: number,
     updateUsuariosinstalacioneDto: UpdateUsuariosinstalacioneDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -304,14 +319,16 @@ export class UsuariosinstalacionesService {
         }
       }
 
-      // ----- Registro en la bitácora -----
+      // ----- Registro en la bitácora ----- SUCCESS
+      const querylogger = { updateUsuariosinstalacioneDto };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosInstalaciones',
         `Se actualizaron las instalaciones del usuario: con ID: ${id}`,
         'UPDATE',
-        `UPDATE UsuariosInstalaciones Where IdUsuario=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         8,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
@@ -328,6 +345,18 @@ export class UsuariosinstalacionesService {
 
       return result;
     } catch (error) {
+      // ----- Registro en la bitácora ----- ERROR
+      const querylogger = { updateUsuariosinstalacioneDto };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosInstalaciones',
+        `Se actualizaron las instalaciones del usuario: con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        8,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -338,10 +367,9 @@ export class UsuariosinstalacionesService {
     }
   }
 
-  //-----********-----*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
   async updateEstatus(
     id: number,
-    idUser: string,
+    idUser: number,
     updateUsuariosInstalacionesEstatusDto: UpdateUsuariosInstalacionesEstatusDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -362,14 +390,16 @@ export class UsuariosinstalacionesService {
         estatus: estatus,
       });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateUsuariosInstalacionesEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosInstalaciones',
         `Se actualizo estatus: ${estatus} de usuarioinstalacion con id: ${usuarioinstalacion.id}`,
         'UPDATE',
-        `UPDATE FROM UsuariosInstalaciones SET Estatus= ${estatus} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         8,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -386,6 +416,19 @@ export class UsuariosinstalacionesService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateUsuariosInstalacionesEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosInstalaciones',
+        `Se actualizo estatus: ${updateUsuariosInstalacionesEstatusDto.estatus} de usuarioinstalacion con id: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        8,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -395,7 +438,7 @@ export class UsuariosinstalacionesService {
     }
   }
 
-  async remove(id: number, idUser: string): Promise<ApiCrudResponse> {
+  async remove(id: number, idUser: number): Promise<ApiCrudResponse> {
     try {
       const usuarioinstalacion =
         await this.usuariosinstalacionesRepository.findOne({
@@ -412,14 +455,16 @@ export class UsuariosinstalacionesService {
         estatus: 0,
       });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosInstalaciones',
         `Se elimino usuarioinstalacion con id: ${usuarioinstalacion.id}`,
         'DELETE',
-        `DELETE FROM UsuariosInstalaciones WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         8,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -435,6 +480,18 @@ export class UsuariosinstalacionesService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosInstalaciones',
+        `Se elimino usuarioinstalacion con id: ${id}`,
+        'DELETE',
+        querylogger,
+        idUser,
+        8,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

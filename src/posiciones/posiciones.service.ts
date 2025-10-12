@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CreatePosicionesDto } from './dto/create-posicione.dto';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Posiciones } from 'src/entities/Posiciones';
 import { Repository } from 'typeorm';
@@ -20,7 +20,7 @@ export class PosicionesService {
   ) {}
 
   async create(
-    idUser: string,
+    idUser: number,
     createPosicionesDto: CreatePosicionesDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -28,14 +28,16 @@ export class PosicionesService {
       const newPosicion =  await this.posicionesRepository.create(createPosicionesDto);
       const posicionSave = await this.posicionesRepository.save(newPosicion);
 
-      // Registro en la bitácora
+      // Registro en la bitácora----- SUCCESS
+      const querylogger = { createPosicionesDto };
       await this.bitacoraLogger.logToBitacora(
         'Posiciones',
         `Se creó una Posicion con Numero de serie Dispositivo: ${posicionSave.numeroSerieDispositivo}`,
         'CREATE',
-        `INSERT INTO Posiciones (...) VALUES (...) -> id: ${posicionSave.id}, Exactitud: ${posicionSave.exactitud}, Estado: ${posicionSave.estado}, Velocidad: ${posicionSave.velocidad}, Direccion: ${posicionSave.direccion}, Latitud: ${posicionSave.latitud}, Longitud: ${posicionSave.longitud}, FechaHora: ${posicionSave.fechaHora}, FHRegistro: ${posicionSave.fhRegistro}, NumeroSerieDispositivo: ${posicionSave.numeroSerieDispositivo}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         24,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //APis Response
@@ -49,6 +51,19 @@ export class PosicionesService {
       };
       return result;
     } catch (error) {
+      // Registro en la bitácora----- ERROR
+      const querylogger = { createPosicionesDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Posiciones',
+        `Se creó una Posicion con Numero de serie Dispositivo: ${createPosicionesDto.numeroSerieDispositivo}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        24,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
