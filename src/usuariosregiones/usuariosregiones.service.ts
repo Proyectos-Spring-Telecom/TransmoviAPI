@@ -11,7 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { UpdateUsuariosRegionesEstatusDto } from './dto/update-usuariosregione-estatus.dto';
 import { Regiones } from 'src/entities/Regiones';
 import { Usuarios } from 'src/entities/Usuarios';
@@ -84,14 +84,16 @@ export class UsuariosregionesService {
         );
       }
 
-      // --- Registro en la bitácora ---
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { createUsuariosRegionesDto };
       await this.bitacoraLogger.logToBitacora(
         'Permisos',
         `Se creó el permiso para usuario: ${createUsuariosRegionesDto.idUsuario} con Id region ${createUsuariosRegionesDto.idsRegiones}`,
         'CREATE',
-        `INSERT INTO UsuariosRegiones (IdUsuario, IdRegion) VALUES ('${createUsuariosRegionesDto.idUsuario}', '${createUsuariosRegionesDto.idsRegiones}')`,
-        Number(idUser),
+        querylogger,
+        idUser,
         7,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -107,6 +109,18 @@ export class UsuariosregionesService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { createUsuariosRegionesDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Permisos',
+        `Se creó el permiso para usuario: ${createUsuariosRegionesDto.idUsuario} con Id region ${createUsuariosRegionesDto.idsRegiones}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        7,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -235,7 +249,7 @@ export class UsuariosregionesService {
 
   async update(
     id: number,
-    idUser: string,
+    idUser: number,
     updateUsuariosregioneDto: UpdateUsuariosregioneDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -305,14 +319,16 @@ export class UsuariosregionesService {
         }
       }
 
-      // ----- Registro en la bitácora -----
+      // ----- Registro en la bitácora ----- SUCCESS
+      const querylogger = { updateUsuariosregioneDto };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosRegiones',
         `Se actualizaron las regiones del usuario: con ID: ${id}`,
         'UPDATE',
-        `UPDATE UsuariosRegiones Where IdUsuario=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         7,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       // ----- Api response -----
@@ -329,6 +345,18 @@ export class UsuariosregionesService {
 
       return result;
     } catch (error) {
+      // ----- Registro en la bitácora ----- ERROR
+      const querylogger = { updateUsuariosregioneDto };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosRegiones',
+        `Se actualizaron las regiones del usuario: con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        7,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -341,7 +369,7 @@ export class UsuariosregionesService {
   //-----********-----*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*
   async updateEstatus(
     id: number,
-    idUser: string,
+    idUser: number,
     updateUsuariosRegionesEstatusDto: UpdateUsuariosRegionesEstatusDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -359,14 +387,16 @@ export class UsuariosregionesService {
       //Actualizamos datos
       await this.usuarioregionesRepository.update(id, { estatus: estatus });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { updateUsuariosRegionesEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosRegiones',
         `Se actualizo estatus: ${estatus} de usuarioregion con id: ${usuarioregion.id}`,
         'UPDATE',
-        `UPDATE FROM UsuariosRegiones SET Estatus= ${estatus} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         7,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -383,6 +413,19 @@ export class UsuariosregionesService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { updateUsuariosRegionesEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosRegiones',
+        `Se actualizo estatus: ${updateUsuariosRegionesEstatusDto.estatus} de usuarioregion con id: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        7,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -392,7 +435,7 @@ export class UsuariosregionesService {
     }
   }
 
-  async remove(id: number, idUser: string): Promise<ApiCrudResponse> {
+  async remove(id: number, idUser: number): Promise<ApiCrudResponse> {
     try {
       const usuarioregion = await this.usuarioregionesRepository.findOne({
         where: { id: id },
@@ -406,14 +449,16 @@ export class UsuariosregionesService {
       //Actualizamos datos
       await this.usuarioregionesRepository.update(id, { estatus: 0 });
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'UsuariosRegiones',
         `Se elimino usuarioregion con id: ${usuarioregion.id}`,
         'DELETE',
-        `DELETE FROM UsuariosRegiones WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         7,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -429,6 +474,18 @@ export class UsuariosregionesService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'UsuariosRegiones',
+        `Se elimino usuarioregion con id: ${id}`,
+        'DELETE',
+        querylogger,
+        idUser,
+        7,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

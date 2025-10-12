@@ -12,7 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
 import { Roles } from 'src/entities/Roles';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { UpdateRolEstatusDto } from './dto/update-rol.dto';
 import { Response } from 'express';
 
@@ -25,7 +25,7 @@ export class RolesService {
   ) {}
 
   async create(
-    idUser: string,
+    idUser: number,
     createRoleDto: CreateRolDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -37,14 +37,17 @@ export class RolesService {
       }
       const newRol = await this.rolesRepository.create(createRoleDto);
       const rolSave = await this.rolesRepository.save(newRol);
-      //-----Registro en la bitacora-----
+
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { createRoleDto };
       await this.bitacoraLogger.logToBitacora(
         'Roles',
         `Se creó un rol con nombre: ${rolSave.nombre}`,
         'CREATE',
-        `INSERT INTO Roles (...) VALUES (...) -> nombre:  ${rolSave.nombre} descripcion: ${rolSave.descripcion}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         3,
+        EstatusEnumBitcora.SUCCESS,
       );
 
       //Api response
@@ -58,6 +61,18 @@ export class RolesService {
       };
       return result;
     } catch (error) {
+      //-----Registro en la bitacora----- ERROR
+      const querylogger = { createRoleDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Roles',
+        `Se creó un rol con nombre: ${createRoleDto.nombre}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        3,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -147,7 +162,7 @@ export class RolesService {
 
   async update(
     id: number,
-    idUser: string,
+    idUser: number,
     updateRoleDto: UpdateRoleDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -157,15 +172,18 @@ export class RolesService {
       //actualizamos el rol
       await this.rolesRepository.update(id, updateRoleDto);
 
-      // --- Registro en la bitácora ---
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { updateRoleDto };
       await this.bitacoraLogger.logToBitacora(
         'Roles',
         `Se actualizo el rol: ${updateRoleDto?.nombre}`,
         'UPDATE',
-        `UPDATE Roles SET... WHERE Id=${id} VALUES ('${updateRoleDto?.nombre}', '${updateRoleDto?.descripcion}')`,
-        Number(idUser),
+        querylogger,
+        idUser,
         3,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -178,6 +196,20 @@ export class RolesService {
       };
       return result;
     } catch (error) {
+
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { updateRoleDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Roles',
+        `Se actualizo el rol: ${updateRoleDto?.nombre}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        3,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -190,7 +222,7 @@ export class RolesService {
 
   async updateEstatus(
     id: number,
-    idUser: string,
+    idUser: number,
     updateRolEstatusDto: UpdateRolEstatusDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -202,15 +234,19 @@ export class RolesService {
       const rolResult = await this.rolesRepository.update(id, {
         estatus: updateRolEstatusDto.estatus,
       });
-      // --- Registro en la bitácora ---
+
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { updateRolEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Roles',
         `Se actualizo a estatus ${updateRolEstatusDto.estatus} del rol: ${rol.nombre}`,
         'UPDATE',
-        `UPDATE Roles SET Estatus=${updateRolEstatusDto.estatus} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         3,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -223,6 +259,18 @@ export class RolesService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { updateRolEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Roles',
+        `Se actualizo a estatus ${updateRolEstatusDto.estatus} del rol con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        3,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }
@@ -233,7 +281,7 @@ export class RolesService {
     }
   }
 
-  async remove(id: number, idUser: string) {
+  async remove(id: number, idUser: number) {
     try {
       const rol = await this.rolesRepository.findOne({ where: { id: id } });
       if (!rol) throw new NotFoundException('Rol no encontrado');
@@ -241,15 +289,18 @@ export class RolesService {
       //Desahabilitamos el rol
       await this.rolesRepository.update(id, { estatus: 0 });
 
-      // --- Registro en la bitácora ---
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Roles',
         `Se desactivo el rol: ${rol.nombre}`,
         'UPDATE',
-        `UPDATE Rols SET Estatus=${0} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         3,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -261,6 +312,19 @@ export class RolesService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Roles',
+        `Se desactivo el rol con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        3,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }

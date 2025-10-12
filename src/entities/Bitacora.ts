@@ -25,8 +25,8 @@ export class Bitacora {
   @Column("varchar", { name: "Accion", nullable: true, length: 45 })
   accion: string | null;
 
-  @Column("varchar", { name: "Query", nullable: true, length: 1000 })
-  query: string | null;
+  @Column('json', { name: "Query", nullable: true})
+  query: object | null;
 
   @Column("datetime", {
     name: "FechaCreacion",

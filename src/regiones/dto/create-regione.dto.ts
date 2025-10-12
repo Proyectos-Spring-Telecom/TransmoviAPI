@@ -1,5 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateRegionesDto {
   @IsString()
@@ -14,13 +22,23 @@ export class CreateRegionesDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(255, { message: 'La descripción no puede exceder los 255 caracteres' })
+  @MaxLength(255, {
+    message: 'La descripción no puede exceder los 255 caracteres',
+  })
   @ApiProperty({
     description: 'Descripción de la región',
     example: 'Cobertura de rutas y vehículos en la zona norte de la ciudad',
     required: false,
   })
   descripcion?: string;
+
+  @ApiPropertyOptional({
+    description: 'Geocerca',
+    example: { lat: 18.12345, lng: -99.12345 },
+  })
+  @IsOptional()
+  @IsObject()
+  geocerca?: object | null;
 
   @IsInt()
   @IsNotEmpty({ message: 'El estatus es obligatorio' })

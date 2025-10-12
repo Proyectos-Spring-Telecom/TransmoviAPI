@@ -27,22 +27,32 @@ export class ClientesController {
     const idUser = req.user.userId;
     return await this.clientesService.createCliente(createClienteDto, idUser);
   }
+    //Obtener todos los clientes
+  @Get('list')
+  async getAllListClientes(@Request() req,): Promise<ApiResponseCommon> {
+    const cliente = req.user.cliente;
+    const idUser = req.user.userId;
+    const rol = req.user.rol;
+    return this.clientesService.getAllListClientes(+idUser, +cliente, +rol);
+  }
   //Obtener todos los clientes con paginado
   @Get(':page/:limit')
   getAllClientes(
     @Param('page', ParseIntPipe) page: number,
     @Param('limit', ParseIntPipe) limit: number,
+    @Request() req,
   ): Promise<ApiResponseCommon> {
-    return this.clientesService.getAllClientes(page, limit);
-  }
-  //Obtener todos los clientes
-  @Get('list')
-  async getAllListClientes(): Promise<ApiResponseCommon> {
-    return this.clientesService.getAllListClientes();
+    const cliente = req.user.cliente;
+    const idUser = req.user.userId;
+    const rol = req.user.rol;
+    return this.clientesService.getAllClientes(+idUser, +cliente, +rol, page, limit);
   }
   //Obtener solo un cliente
   @Get(':id')
-  getOneCliente(@Param('id') id: string) {
+  getOneCliente(@Param('id') id: string, @Request() req,) {
+    const cliente = req.user.cliente;
+    const idUser = req.user.userId;
+    const rol = req.user.rol;
     return this.clientesService.getOneCliente(+id);
   }
 

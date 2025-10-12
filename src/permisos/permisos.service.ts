@@ -11,7 +11,7 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { UpdatePermisoEstatusDto } from './dto/update-permiso-estatus.dto';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { UsuariosPermisos } from 'src/entities/UsuariosPermisos';
 
 @Injectable()
@@ -99,15 +99,19 @@ export class PermisosService {
       };
       const permisoRoot = await this.usuarioPermiso.create(asignarRoot);
       this.usuarioPermiso.save(permisoRoot);
-      // --- Registro en la bitácora ---
+
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { createPermiso };
       await this.bitacoraLogger.logToBitacora(
         'Permisos',
         `Se creó el permiso: ${savedPermiso.nombre}`,
         'CREATE',
-        `INSERT INTO Permisos (Nombre, Descripcion) VALUES ('${savedPermiso.nombre}', '${savedPermiso.descripcion}')`,
+        querylogger,
         Number(idUsuario),
         4,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       const idPer = savedPermiso.id;
       //Api response
       const result: ApiCrudResponse = {
@@ -120,6 +124,19 @@ export class PermisosService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { createPermiso };
+      await this.bitacoraLogger.logToBitacora(
+        'Permisos',
+        `Se creó el permiso: ${createPermiso.nombre}`,
+        'CREATE',
+        querylogger,
+        Number(idUsuario),
+        4,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
       if (error instanceof HttpException) {
         throw error;
       }
@@ -129,7 +146,7 @@ export class PermisosService {
 
   async updateEstatus(
     id: number,
-    idUser: string,
+    idUser: number,
     updatePermisoEstatusDto: UpdatePermisoEstatusDto,
   ): Promise<ApiCrudResponse> {
     try {
@@ -141,15 +158,19 @@ export class PermisosService {
       const permisoResult = await this.permisoRepository.update(id, {
         estatus: updatePermisoEstatusDto.estatus,
       });
-      // --- Registro en la bitácora ---
+
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { updatePermisoEstatusDto };
       await this.bitacoraLogger.logToBitacora(
         'Permisos',
         `Se actualizo a estatus ${updatePermisoEstatusDto.estatus} del permiso: ${permiso.nombre}`,
         'UPDATE',
-        `UPDATE Permiso SET Estatus=${updatePermisoEstatusDto.estatus} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         4,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -162,6 +183,18 @@ export class PermisosService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { updatePermisoEstatusDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Permisos',
+        `Se actualizo a estatus ${updatePermisoEstatusDto.estatus} del permiso ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        4,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       return error;
     }
   }
@@ -169,7 +202,7 @@ export class PermisosService {
   async update(
     id: number,
     updatePermiso: UpdatePermisoDto,
-    idUser: string,
+    idUser: number,
   ): Promise<ApiCrudResponse> {
     try {
       const permisoActualizar = {
@@ -186,15 +219,19 @@ export class PermisosService {
       const permisoResult = await this.permisoRepository.findOne({
         where: { id: id },
       });
-      // --- Registro en la bitácora ---
+
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { updatePermiso };
       await this.bitacoraLogger.logToBitacora(
         'Permisos',
         `Se actualizo permiso: ${permisoResult?.nombre}`,
         'UPDATE',
-        `UPDATE Permisos SET... WHERE Id=${id} VALUES ('${permisoResult?.nombre}', '${permisoResult?.descripcion}')`,
-        Number(idUser),
+        querylogger,
+        idUser,
         4,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -207,11 +244,23 @@ export class PermisosService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { updatePermiso };
+      await this.bitacoraLogger.logToBitacora(
+        'Permisos',
+        `Se actualizo permiso con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        4,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       return error;
     }
   }
 
-  async remove(id: number, idUser: string): Promise<ApiCrudResponse> {
+  async remove(id: number, idUser: number): Promise<ApiCrudResponse> {
     try {
       const permiso = await this.permisoRepository.findOne({
         where: { id: id },
@@ -219,15 +268,19 @@ export class PermisosService {
       if (!permiso) throw new NotFoundException('Permiso no encontrado');
       //Desahabilitamos el permiso
       await this.permisoRepository.update(id, { estatus: 0 });
-      // --- Registro en la bitácora ---
+
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
         'Permisos',
         `Se desactivo el permiso: ${permiso.nombre}`,
         'UPDATE',
-        `UPDATE Rol SET Estatus=${0} WHERE Id=${id}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         4,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //Api response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -239,6 +292,18 @@ export class PermisosService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { id: id, estatus: 0 };
+      await this.bitacoraLogger.logToBitacora(
+        'Permisos',
+        `Se desactivo el permiso con ID: ${id}`,
+        'UPDATE',
+        querylogger,
+        idUser,
+        4,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
       if (error instanceof HttpException) {
         throw error;
       }

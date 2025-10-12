@@ -32,7 +32,7 @@ export class S3Service {
   async uploadFile(
     file: Express.Multer.File,
     folder: string,
-    idUser: string,
+    idUser: number,
     idModule: number,
   ) {
     try {
@@ -74,13 +74,14 @@ export class S3Service {
 
       const publicUrl = `https://${this.bucket}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
-      //-----Registro en la bitacora-----
+      //-----Registro en la bitacora----- SUCCESS
+      const querylogger = { data: `INSERT INTO ${folder} (...) VALUES (...) -> bucket:  ${this.bucket} url: ${publicUrl}` };
       await this.bitacoraLogger.logToBitacora(
         `${folder}`,
         `Se subio archivo al bucket: ${this.bucket}`,
         'CREATE',
-        `INSERT INTO ${folder} (...) VALUES (...) -> bucket:  ${this.bucket} url: ${publicUrl}`,
-        Number(idUser),
+        querylogger,
+        idUser,
         idModule,
       );
 

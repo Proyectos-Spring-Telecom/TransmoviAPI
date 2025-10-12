@@ -9,7 +9,7 @@ import { CreateTransaccioneDto } from './dto/create-transaccione.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transacciones } from 'src/entities/Transacciones';
-import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
+import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { Dispositivos } from 'src/entities/Dispositivos';
 import { MonederosService } from 'src/monederos/monederos.service';
@@ -63,15 +63,18 @@ export class TransaccionesService {
       );
       const transaccionSave = await this.transaccionesRepository.save(newTransaccion);
 
-      // --- Registro en la bitácora ---
+      // --- Registro en la bitácora --- SUCCESS
+      const querylogger = { createTransaccioneDto };
       await this.bitacoraLogger.logToBitacora(
         'Transacciones',
         `Se realizo una transaccion de tipo ${transaccion}`,
         'CREATE',
-        `INSERT INTO Transacciones (TipoTransaccion, Monto, Latitud, Longitud, FechaHora, NumeroSerieMonedero, NumeroSerieDispositivo) Values (${createTransaccioneDto.tipoTransaccion}, ${montoFinal}, ${createTransaccioneDto.latitud}, ${createTransaccioneDto.longitud}, ${createTransaccioneDto.fechaHora}, ${createTransaccioneDto.numeroSerieMonedero}, ${createTransaccioneDto.numeroSerieDispositivo})`,
-        Number(idUser),
+        querylogger,
+        idUser,
         25,
+        EstatusEnumBitcora.SUCCESS,
       );
+
       //API response
       const result: ApiCrudResponse = {
         status: 'success',
@@ -84,6 +87,19 @@ export class TransaccionesService {
       };
       return result;
     } catch (error) {
+      // --- Registro en la bitácora --- ERROR
+      const querylogger = { createTransaccioneDto };
+      await this.bitacoraLogger.logToBitacora(
+        'Transacciones',
+        `Se realizo una transaccion de tipo ${createTransaccioneDto.tipoTransaccion}`,
+        'CREATE',
+        querylogger,
+        idUser,
+        25,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+      
       if (error instanceof HttpException) {
         throw error;
       }
