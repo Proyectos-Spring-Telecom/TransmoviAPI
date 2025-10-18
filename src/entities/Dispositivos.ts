@@ -6,54 +6,57 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
-} from "typeorm";
-import { Clientes } from "./Clientes";
-import { Instalaciones } from "./Instalaciones";
-import { Posiciones } from "./Posiciones";
-import { Transacciones } from "./Transacciones";
-import { applySchema } from "src/common/apply-schema.decorator";
+} from 'typeorm';
+import { Clientes } from './Clientes';
+import { Instalaciones } from './Instalaciones';
+import { Posiciones } from './Posiciones';
+import { Transacciones } from './Transacciones';
+import { applySchema } from 'src/common/apply-schema.decorator';
 
 @applySchema
-@Index("UQ_Dispositivos_NumeroSerie", ["numeroSerie"], { unique: true })
-@Index("UQ_Dispositivos_IdCliente_Id", ["id", "idCliente"], { unique: true })
-@Index("FK_Dispositivos_Clientes", ["idCliente"], {})
-@Entity("Dispositivos")
+@Index('UQ_Dispositivos_NumeroSerie', ['numeroSerie'], { unique: true })
+@Index('UQ_Dispositivos_IdCliente_Id', ['id', 'idCliente'], { unique: true })
+@Index('FK_Dispositivos_Clientes', ['idCliente'], {})
+@Entity('Dispositivos')
 export class Dispositivos {
-  @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
+  @PrimaryGeneratedColumn({ type: 'bigint', name: 'Id' })
   id: number;
 
-  @Column("varchar", { name: "NumeroSerie", unique: true, length: 100 })
+  @Column('varchar', { name: 'NumeroSerie', unique: true, length: 100 })
   numeroSerie: string;
 
-  @Column("varchar", { name: "Marca", length: 100 })
+  @Column('varchar', { name: 'Marca', length: 100 })
   marca: string;
 
-  @Column("varchar", { name: "Modelo", length: 100 })
+  @Column('varchar', { name: 'Modelo', length: 100 })
   modelo: string;
 
-  @Column("datetime", {
-    name: "FechaCreacion",
-    default: () => "CURRENT_TIMESTAMP",
+  @Column('datetime', {
+    name: 'FechaCreacion',
+    default: () => 'CURRENT_TIMESTAMP',
   })
   fechaCreacion: Date;
 
-  @Column("datetime", {
-    name: "FechaActualizacion",
-    default: () => "CURRENT_TIMESTAMP",
+  @Column('datetime', {
+    name: 'FechaActualizacion',
+    default: () => 'CURRENT_TIMESTAMP',
   })
   fechaActualizacion: Date;
 
-  @Column("tinyint", { name: "Estatus", default: () => "'1'" })
+  @Column('tinyint', { name: 'Estatus', default: () => "'1'" })
   estatus: number;
 
-  @Column("bigint", { name: "IdCliente" })
+  @Column('tinyint', { name: 'EstadoActual', unsigned: true })
+  estadoActual: number;
+
+  @Column('bigint', { name: 'IdCliente' })
   idCliente: number;
 
   @ManyToOne(() => Clientes, (clientes) => clientes.dispositivos, {
-    onDelete: "NO ACTION",
-    onUpdate: "NO ACTION",
+    onDelete: 'NO ACTION',
+    onUpdate: 'NO ACTION',
   })
-  @JoinColumn([{ name: "IdCliente", referencedColumnName: "id" }])
+  @JoinColumn([{ name: 'IdCliente', referencedColumnName: 'id' }])
   idCliente2: Clientes;
 
   @OneToMany(() => Instalaciones, (instalaciones) => instalaciones.dispositivos)
@@ -61,13 +64,13 @@ export class Dispositivos {
 
   @OneToMany(
     () => Posiciones,
-    (posiciones) => posiciones.numeroSerieDispositivo2
+    (posiciones) => posiciones.numeroSerieDispositivo2,
   )
   posiciones: Posiciones[];
 
   @OneToMany(
     () => Transacciones,
-    (transacciones) => transacciones.numeroSerieDispositivo2
+    (transacciones) => transacciones.numeroSerieDispositivo2,
   )
   transacciones: Transacciones[];
 }

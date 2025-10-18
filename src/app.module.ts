@@ -68,7 +68,11 @@ import Joi from 'joi';
         entities: [__dirname + '/entities/*{.ts,.js}'],
         synchronize: false, //Nunca poner en true 
         dateStrings: false,
-        timezone: 'Z'
+        timezone: 'Z',
+        extra: {
+        // Evita que bigint se devuelvan como string
+        decimalNumbers: true,
+      },
       }),
     }),
 
