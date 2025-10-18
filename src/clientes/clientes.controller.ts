@@ -54,7 +54,7 @@ export class ClientesController {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
     const rol = req.user.rol;
-    return this.clientesService.getOneCliente(+id);
+    return this.clientesService.getOneClientePrueba(+id);
   }
 
     //Actualizar el estatus del cliente

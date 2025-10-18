@@ -136,7 +136,7 @@ FROM Clientes
 ORDER BY Id DESC
   LIMIT ? OFFSET ?;
             `,
-            [limit, offset]
+            [limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -151,7 +151,22 @@ FROM Clientes
           break;
 
         default:
-           // Usuario Administrador - obtiene todas las regiones
+          const clientesFiltrado = await this.clienteRepository.query(
+            `CALL spGetClientes(?);`,
+            [cliente],
+          );
+
+          // 2. Extraer los IDs de los clientes desde el resultado
+          const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+          const ids = idsFiltrados
+            .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+            .filter(Boolean);
+          if (ids.length === 0) {
+            return { data: [] }; // No hay clientes que consultar
+          }
+
+          // 3. Construir el query dinámico con los IDs
+          const placeholders = ids.map(() => '?').join(', ');
           clientes = await this.clienteRepository.query(
             `
 SELECT
@@ -181,11 +196,11 @@ SELECT
   Estatus AS estatusCliente
   
 FROM Clientes
-WHERE Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+WHERE Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 ORDER BY Id DESC
   LIMIT ? OFFSET ?;
             `,
-            [cliente, limit, offset]
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -193,11 +208,11 @@ ORDER BY Id DESC
             `
   SELECT COUNT(*) AS total
 FROM Clientes
-WHERE Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+WHERE Id IN (${placeholders})    -- 🔹 aquí colocas el ID del cliente que quieres consultar
 ORDER BY Id DESC
 
   `,
-  [cliente]
+            [...ids],
           );
           break;
       }
@@ -206,7 +221,6 @@ ORDER BY Id DESC
       const data = clientes.map((item) => ({
         ...item,
         id: Number(item.id),
-        idCliente: Number(item.idCliente),
       }));
 
       const total = Number(totalResult[0]?.total || 0);
@@ -257,6 +271,22 @@ ORDER BY Id DESC;
 
         default:
           // Usuarios normales - solo sus regiones asignadas
+                    const clientesFiltrado = await this.clienteRepository.query(
+            `CALL spGetClientes(?);`,
+            [cliente],
+          );
+
+          // 2. Extraer los IDs de los clientes desde el resultado
+          const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+          const ids = idsFiltrados
+            .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+            .filter(Boolean);
+          if (ids.length === 0) {
+            return { data: [] }; // No hay clientes que consultar
+          }
+
+          // 3. Construir el query dinámico con los IDs
+          const placeholders = ids.map(() => '?').join(', ');
           clientes = await this.clienteRepository.query(
             `
 SELECT
@@ -265,12 +295,12 @@ SELECT
   ApellidoPaterno AS apellidoPaterno,
   ApellidoMaterno AS apellidoMaterno
 FROM Clientes
-WHERE Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+WHERE Id IN (${placeholders})  -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND Estatus = 1
 ORDER BY Id DESC;
 
             `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -279,7 +309,6 @@ ORDER BY Id DESC;
       const data = clientes.map((item) => ({
         ...item,
         id: Number(item.id),
-        idCliente: Number(item.idCliente),
       }));
 
       const result: ApiResponseCommon = {
@@ -309,6 +338,75 @@ ORDER BY Id DESC;
       }
       return { data: cliente };
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException({
+        message: `Error al obtener el cliente con ID: ${id}.`,
+      });
+    }
+  }
+
+  //Obtener el cliente por ID
+  async getOneClientePrueba(id: number) {
+    try {
+      const clientes = await this.clienteRepository.query(
+        `
+CALL spGetClientes(?);
+      `,
+        [id],
+      );
+
+      // 2. Extraer los IDs de los clientes desde el resultado
+      const data = clientes[0]; // El primer índice contiene los resultados
+      const ids = data
+        .map((cliente: any) => Number(cliente.Id))
+        .filter(Boolean);
+
+      if (ids.length === 0) {
+        return { data: [] }; // No hay clientes que consultar
+      }
+
+      // 3. Construir el query dinámico con los IDs
+      const placeholders = ids.map(() => '?').join(', ');
+
+      const query = `
+      SELECT
+        Id AS id,
+        RFC AS rfc,
+        TipoPersona AS tipoPersona,
+        Nombre AS nombre,
+        ApellidoPaterno AS apellidoPaterno,
+        ApellidoMaterno AS apellidoMaterno,
+        Telefono AS telefono,
+        Correo AS correo,
+        Estado AS estado,
+        Municipio AS municipio,
+        Colonia AS colonia,
+        Calle AS calle,
+        EntreCalles AS entreCalles,
+        NumeroExterior AS numeroExterior,
+        NumeroInterior AS numeroInterior,
+        CP AS cp,
+        NombreEncargado AS nombreEncargado,
+        TelefonoEncargado AS telefonoEncargado,
+        CorreoEncargado AS correoEncargado,
+        ConstanciaSituacionFiscal AS constanciaSituacionFiscal,
+        ComprobanteDomicilio AS comprobanteDomicilio,
+        ActaConstitutiva AS actaConstitutiva,
+        Logotipo AS logotipo,
+        Estatus AS estatusCliente
+      FROM Clientes
+      WHERE Id IN (${placeholders})
+      ORDER BY Id DESC;
+    `;
+
+      // 4. Ejecutar el query con los IDs como parámetros
+      const detalles = await this.clienteRepository.query(query, ids);
+
+      return { data: clientes };
+    } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }

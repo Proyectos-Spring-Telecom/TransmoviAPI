@@ -52,7 +52,7 @@ export class MailService {
                             <h5 style="color: #002136; font-size: 30px; text-align:center">
                                 ¡Bienvenido!
                             </h5>
-                            <p style="color: #002136; font-family: 'Open Sans', sans-serif; font-size: 16px; text-align: center; margin-top: -30px;">${name} nos alegra que estés aquí, te damos la bienvenida a Transmovi. <strong>Por favor, confirma tu correo electrónico haciendo click en el siguiente botón.</strong></p>
+                            <p style="color: #002136; font-family: 'Open Sans', sans-serif; font-size: 16px; text-align: center; margin-top: -30px;">${name} nos alegra que estés aquí, te damos la bienvenida a Transmovi. <strong>Por favor, confirma tu correo electrónico haciendo clic en el siguiente botón.</strong></p>
                             <a href=${url} style="font-size: 18px; padding: 0.9rem; background-color: #43cc7a; color: #FFFFFF; border-radius: 30px; text-decoration: none; display: inline-block; margin-top: 13px; ">Confirmar correo electrónico</a>
                         </td>
                     </tr>
@@ -94,7 +94,7 @@ export class MailService {
   }
 
   async sendResetPasswordEmail(to: string,name: string, token: string) {
-    const url = `http://localhost:3000/reset-password?token=${token}`;
+    const url = `https://transmovi.mx/transmoviDev/#/account/signup?token=${token}`;
     // 👆 Este debe apuntar a tu frontend Angular (puedes ajustarlo a localhost:3000 si haces la prueba desde backend)
 
     await this.transporter.sendMail({
@@ -128,7 +128,7 @@ export class MailService {
                             <h5 style="color: #002136; font-size: 30px; text-align:center">
                                 Restablecer Contraseña
                             </h5>
-                            <p style="color: #002136; font-family: 'Open Sans', sans-serif; font-size: 16px; text-align: center; margin-top: -30px;">Hola, haz click en el siguiente botón para restablecer tu contraseña. Si no has solicitado una nueva contraseña, <strong>ignora este correo</strong>.</p>
+                            <p style="color: #002136; font-family: 'Open Sans', sans-serif; font-size: 16px; text-align: center; margin-top: -30px;">Hola, haz clic en el siguiente botón para restablecer tu contraseña. Si no has solicitado una nueva contraseña, <strong>ignora este correo</strong>.</p>
                             <a href= ${url} style="font-size: 18px; padding: 0.9rem; background-color: #43cc7a; color: #FFFFFF; border-radius: 30px; text-decoration: none; display: inline-block; margin-top: 13px; ">Restablecer Contraseña</a>
                         </td>
                     </tr>

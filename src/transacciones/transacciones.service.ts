@@ -111,22 +111,82 @@ export class TransaccionesService {
 
   async findAllTransacciones(
     page: number,
-    limit: number,
+    limit: number
   ): Promise<ApiResponseCommon> {
     try {
-      const transacciones = await this.transaccionesRepository.find();
-      if (transacciones.length === 0)
-        throw new NotFoundException('Transacciones no encontradas');
-      const [data, total] = await this.transaccionesRepository.findAndCount({
-        relations: [],
-        skip: (page - 1) * limit,
-        take: limit,
-        order: { fechaHora: 'DESC' },
-      });
+      let totalResult;
+      const offset = (page - 1) * limit;
+      const transacciones = await this.transaccionesRepository.query(
+        `
+SELECT 
+    -- Transacción
+    t.Id AS id,
+    t.TipoTransaccion AS tipoTransaccion,
+    t.Monto AS monto,
+    t.Latitud AS latitud,
+    t.Longitud AS longitud,
+    t.FechaHora AS fechaHora,
+    t.FHRegistro AS fhRegistro,
+    t.NumeroSerieMonedero AS numeroSerieMonedero,
+    t.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Dispositivo (puede ser NULL)
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+    
+
+    -- Pasajero (a través del monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+
+
+FROM Transacciones t
+LEFT JOIN Dispositivos d 
+    ON t.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON t.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+    
+    ORDER BY t.Id DESC
+  LIMIT ? OFFSET ?;
+        `,
+        [limit, offset]
+      );
+
+      // Query para total (sin paginación)
+      totalResult = await this.transaccionesRepository.query(
+        `
+   SELECT COUNT(*) AS total
+FROM Transacciones t
+LEFT JOIN Dispositivos d 
+    ON t.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON t.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+		
+  `
+      );
+
+      const total = Number(totalResult[0]?.total || 0);
+
+      // 🔥 Transformación de datos (ids → number, nombreCompleto)
+      const data = transacciones.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        monto: Number(item.monto),
+        latitud: Number(item.latitud),
+        longitud: Number(item.longitud),
+        idPasajero: Number(item.idPasajero),
+      }));
 
       //API Response
       const result: ApiResponseCommon = {
-        data,
+        data:data,
         paginated: {
           total: total,
           page,
@@ -139,7 +199,7 @@ export class TransaccionesService {
         throw error;
       }
       throw new BadRequestException({
-        message: 'Error al obtener transacciones',
+        message: "Error al obtener transacciones",
       });
     }
   }
