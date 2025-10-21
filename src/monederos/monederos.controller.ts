@@ -29,13 +29,16 @@ export class MonederosController {
     return this.monederosService.createMonedero(createMonederoDto, +idUser);
   }
 
-  @Get(':page/:limit')
+  @Get(":page/:limit")
   findAllMonederos(
-    @Param('page', ParseIntPipe) page: number,
-    @Param('limit', ParseIntPipe) limit: number,
+    @Param("page", ParseIntPipe) page: number,
+    @Param("limit", ParseIntPipe) limit: number,
     @Request() req
   ): Promise<ApiResponseCommon> {
-    return this.monederosService.findAllMonederos(page,limit);
+    const idUser = req.user.userId;
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return this.monederosService.findAllPagMonederos(+idUser, +cliente, +rol, page, limit);
   }
 
   @Get('list')

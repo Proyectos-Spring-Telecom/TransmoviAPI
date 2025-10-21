@@ -17,12 +17,15 @@ import {
   EstatusEnumBitcora,
 } from 'src/common/ApiResponse';
 import { UpdateTurnosEstatusDto } from './dto/update-turno-estatus.dto';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class TurnosService {
   constructor(
     @InjectRepository(Turnos)
     private readonly turnosRepository: Repository<Turnos>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -82,11 +85,32 @@ export class TurnosService {
     }
   }
 
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   private async consultarTurnoPaginado(
     cliente: number,
     limit: number,
     offset: number,
   ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT
   -- Turno
@@ -146,16 +170,16 @@ INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
-WHERE c.Id = ?
-AND c.Estatus = 1
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY t.Id DESC
   LIMIT ? OFFSET ?;
    `;
-    return this.turnosRepository.query(query, [cliente, limit, offset]);
+    return this.turnosRepository.query(query, [...ids, limit, offset]);
   }
 
   private async consultarTotalTurnosPaginados(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `  
   SELECT COUNT(*) AS total
 FROM Turnos t
@@ -167,11 +191,10 @@ INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
-WHERE c.Id = ?
-AND c.Estatus = 1
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   
 `;
-    return await this.turnosRepository.query(query, [cliente]);
+    return await this.turnosRepository.query(query, [...ids]);
   }
 
   async findAll(
@@ -426,6 +449,7 @@ WHERE ui.IdUsuario = ?
   }
 
   private async consultarTurnoListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT
   -- Turno
@@ -487,11 +511,11 @@ INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
 WHERE t.Estatus = 1
 AND c.Estatus = 1
-AND c.Id = ?
+AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY t.Id DESC;
    `;
-    return this.turnosRepository.query(query, [cliente]);
+    return this.turnosRepository.query(query, [...ids]);
   }
 
   async findAllList(idUser: number, cliente: number, rol: number) {
@@ -561,6 +585,7 @@ INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
 WHERE t.Estatus = 1
+AND c.Estatus = 1
 
 ORDER BY t.Id DESC;
             `,
@@ -568,15 +593,15 @@ ORDER BY t.Id DESC;
           break;
 
         case 2:
-          turnos = await this.consultarTurnoListado(cliente)
+          turnos = await this.consultarTurnoListado(cliente);
           break;
 
         case 8:
-          turnos = await this.consultarTurnoListado(cliente)
+          turnos = await this.consultarTurnoListado(cliente);
           break;
 
         case 10:
-          turnos = await this.consultarTurnoListado(cliente)
+          turnos = await this.consultarTurnoListado(cliente);
           break;
 
         default:
@@ -645,6 +670,7 @@ WHERE ui.IdUsuario = ?
   AND ui.Estatus = 1
   AND i.Estatus = 1
   AND t.Estatus = 1
+  AND c.Estatus = 1
 
 ORDER BY t.Id DESC;
             `,
@@ -676,6 +702,76 @@ ORDER BY t.Id DESC;
         error: error.message,
       });
     }
+  }
+
+  private async consultarTurnoOne(cliente: number, id: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `
+SELECT
+  -- Turno
+  t.Id AS id,
+  t.Inicio AS inicio,
+  t.Fin AS fin,
+  t.FechaCreacion AS fechaCreacion,
+  t.FechaActualizacion AS fechaActualizacion,
+  t.Estatus AS estatus,
+
+  -- Instalación
+  i.Id AS idInstalacion,
+  i.FechaCreacion AS fechaCreacionInstalacion,
+  i.FechaActualizacion AS fechaActualizacionInstalacion,
+  i.Estatus AS estatusInstalacion,
+
+  -- Dispositivo
+  d.Id AS idDispositivo,
+  d.NumeroSerie AS numeroSerieDispositivo,
+  d.Marca AS marcaDispositivo,
+  d.Modelo AS modeloDispositivo,
+
+  -- BlueVox
+  b.Id AS idBlueVox,
+  b.NumeroSerie AS numeroSerieBlueVox,
+  b.Marca AS marcaBlueVox,
+  b.Modelo AS modeloBlueVox,
+
+  -- Vehículo
+  v.Id AS idVehiculo,
+  v.Marca AS marcaVehiculo,
+  v.Modelo AS modeloVehiculo,
+  v.Placa AS placaVehiculo,
+  v.NumeroEconomico AS numeroEconomicoVehiculo,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
+
+  -- Operador
+  o.Id AS idOperador,
+  o.NumeroLicencia AS numeroLicencia,
+  o.FechaNacimiento AS fechaNacimientoOperador,
+  u.Nombre AS nombreOperador,
+  u.ApellidoPaterno AS apellidoPaternoOperador,
+  u.ApellidoMaterno AS apellidoMaternoOperador
+
+FROM Turnos t
+INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c ON t.IdCliente = c.Id
+INNER JOIN Operadores o ON t.IdOperador = o.Id
+INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+
+WHERE t.Estatus = 1
+AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND t.Id = ?
+
+ORDER BY t.Id DESC;
+   `;
+    return this.turnosRepository.query(query, [...ids, id]);
   }
 
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
@@ -753,73 +849,15 @@ ORDER BY t.Id DESC;
           break;
 
         case 2:
-          turnos = await this.turnosRepository.query(
-            `
-SELECT
-  -- Turno
-  t.Id AS id,
-  t.Inicio AS inicio,
-  t.Fin AS fin,
-  t.FechaCreacion AS fechaCreacion,
-  t.FechaActualizacion AS fechaActualizacion,
-  t.Estatus AS estatus,
+          turnos = await this.consultarTurnoOne(cliente,id)
+          break;
 
-  -- Instalación
-  i.Id AS idInstalacion,
-  i.FechaCreacion AS fechaCreacionInstalacion,
-  i.FechaActualizacion AS fechaActualizacionInstalacion,
-  i.Estatus AS estatusInstalacion,
-
-  -- Dispositivo
-  d.Id AS idDispositivo,
-  d.NumeroSerie AS numeroSerieDispositivo,
-  d.Marca AS marcaDispositivo,
-  d.Modelo AS modeloDispositivo,
-
-  -- BlueVox
-  b.Id AS idBlueVox,
-  b.NumeroSerie AS numeroSerieBlueVox,
-  b.Marca AS marcaBlueVox,
-  b.Modelo AS modeloBlueVox,
-
-  -- Vehículo
-  v.Id AS idVehiculo,
-  v.Marca AS marcaVehiculo,
-  v.Modelo AS modeloVehiculo,
-  v.Placa AS placaVehiculo,
-  v.NumeroEconomico AS numeroEconomicoVehiculo,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente,
-
-  -- Operador
-  o.Id AS idOperador,
-  o.NumeroLicencia AS numeroLicencia,
-  o.FechaNacimiento AS fechaNacimientoOperador,
-  u.Nombre AS nombreOperador,
-  u.ApellidoPaterno AS apellidoPaternoOperador,
-  u.ApellidoMaterno AS apellidoMaternoOperador
-
-FROM Turnos t
-INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
-INNER JOIN Clientes c ON t.IdCliente = c.Id
-INNER JOIN Operadores o ON t.IdOperador = o.Id
-INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-
-WHERE t.IdCliente = ?
-  AND t.Id = 1
-
-ORDER BY t.Id DESC;
-            `,
-            [cliente, id],
-          );
+        case 8:
+        turnos = await this.consultarTurnoOne(cliente,id)
+          break;
+        
+        case 10:
+          turnos = await this.consultarTurnoOne(cliente,id)
           break;
 
         default:

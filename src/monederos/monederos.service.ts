@@ -105,6 +105,97 @@ export class MonederosService {
     }
   }
 
+  //Obtener todos los monederos
+  async findAllPagMonederos(
+    idUser: number,
+    cliente: number,
+    rol: number,
+    page: number,
+    limit: number,
+  ): Promise<ApiResponseCommon> {
+    try {
+      const offset = (page - 1) * limit;
+      let totalResult;
+      const monederos = await this.monederoRepository.query(
+        `
+SELECT 
+    m.Id AS id,
+    m.NumeroSerie AS numeroSerie,
+    m.Saldo AS saldo,
+    m.FechaActivacion AS fechaActivacion,
+    m.FechaCreacion AS fechaCreacion,
+    m.FechaActualizacion AS fechaActualizacion,
+    m.Estatus AS estatus,
+    m.IdPasajero AS idPasajero,
+    m.IdCliente AS idCliente,
+
+    p.Id AS idPasajeroMonederos,
+    p.Nombre AS pasajeroNombre,
+    p.ApellidoPaterno AS pasajeroApellidoPaterno,
+    p.ApellidoMaterno AS pasajeroApellidoMaterno,
+    CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
+
+    c.Id AS idClienteMonederos,
+    c.Nombre AS clienteNombre,
+    c.ApellidoPaterno AS clienteApellidoPaterno,
+    c.ApellidoMaterno AS clienteApellidoMaterno,
+    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+
+FROM Monederos m
+LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+INNER JOIN Clientes c ON m.IdCliente = c.Id
+
+
+
+ORDER BY m.Id DESC;
+
+            `,
+      );
+
+      totalResult = await this.monederoRepository.query(
+        `
+  SELECT COUNT(*) AS total
+FROM Monederos m
+LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+INNER JOIN Clientes c ON m.IdCliente = c.Id
+
+
+  `,
+        [idUser],
+      );
+
+      const data = monederos.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        saldo: Number(item.saldo),
+        idPasajero: Number(item.idPasajero),
+        idCliente: Number(item.idCliente),
+        idPasajeroMonedero: Number(item.idPasajeroMonederos),
+        idClienteMonedero: Number(item.idClienteMonedero),
+      }));
+
+      const total = Number(totalResult[0]?.total || 0);
+
+      //APi response
+      const result: ApiResponseCommon = {
+        data: data,
+        paginated: {
+          total: total,
+          page,
+          lastPage: Math.ceil(total / limit),
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Hubo un error al obtener el listado de monederos.',
+      );
+    }
+  }
+
   //Obtener todos los monederos paginado
   async findAllMonederos(
     page: number,
@@ -187,6 +278,7 @@ LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 WHERE m.Estatus = 1 -- estatus activo
+AND c.Estatus = 1
 
 ORDER BY m.Id DESC;
 

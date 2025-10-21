@@ -108,8 +108,8 @@ export class CreateUsuarioDto {
 
   @IsInt()
   @ApiProperty({ description: 'Cliente asignado', example: 5 })
-  @IsOptional()
-  idCliente?: number;
+  @IsNotEmpty()
+  idCliente: number;
 
   @IsNotEmpty()
   @IsArray()

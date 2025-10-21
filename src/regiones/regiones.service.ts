@@ -18,6 +18,7 @@ import {
 } from 'src/common/ApiResponse';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { UpdateRegionesEstatusDto } from './dto/update-regione-estatus.dto';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class RegionesService {
@@ -26,9 +27,12 @@ export class RegionesService {
     private readonly regionesRepository: Repository<Regiones>,
     @InjectRepository(UsuariosRegiones)
     private readonly usuarioregionesRepository: Repository<UsuariosRegiones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
+  //Crear Region
   async create(
     idUser: number,
     cliente: number,
@@ -120,6 +124,77 @@ export class RegionesService {
     }
   }
 
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
+  //Funcion para obtener paginado por clientes
+  private async consultarRegionesPagina(
+    cliente: number,
+    limit: number,
+    offset: number,
+  ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `
+SELECT
+  -- Región
+  r.Id AS id,
+  r.Nombre AS nombre,
+  r.Descripcion AS descripcion,
+  r.Geocerca AS geocerca,
+  r.FechaCreacion AS fechaCreacion,
+  r.FechaActualizacion AS fechaActualizacion,
+  r.Estatus AS estatus,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Regiones r
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+
+WHERE 
+  r.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+ORDER BY r.Id DESC
+  LIMIT ? OFFSET ?;
+    `;
+    return this.regionesRepository.query(query, [...ids, limit, offset]);
+  }
+
+  //Obtener total para la funcion de paginado
+  private async consultarTotalRegionesPaginados(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `  
+  SELECT COUNT(*) AS total
+  FROM Regiones r
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+WHERE 
+  r.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+`;
+    return await this.regionesRepository.query(query, [...ids]);
+  }
+
   //Paginado
   async findAll(
     cliente: number,
@@ -158,7 +233,7 @@ SELECT
 FROM Regiones r
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-ORDER BY r.Nombre ASC
+ORDER BY r.Id DESC
   LIMIT ? OFFSET ?;
 
             `,
@@ -178,150 +253,26 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 
         case 2:
           // Usuario administrador - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-
-ORDER BY r.Nombre ASC
-  LIMIT ? OFFSET ?;
-
-            `,
-            [cliente, limit, offset],
-          );
+          regiones = await this.consultarRegionesPagina(cliente, limit, offset);
 
           // Query para total (sin paginación)
-          totalResult = await this.regionesRepository.query(
-            `
-  SELECT COUNT(*) AS total
-  FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-
-  `,
-            [cliente],
-          );
+          totalResult = await this.consultarTotalRegionesPaginados(cliente);
           break;
 
         case 8:
           // Usuario Reportes - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC
-  LIMIT ? OFFSET ?;
-
-            `,
-            [cliente, limit, offset],
-          );
+          regiones = await this.consultarRegionesPagina(cliente, limit, offset);
 
           // Query para total (sin paginación)
-          totalResult = await this.regionesRepository.query(
-            `
-  SELECT COUNT(*) AS total
-  FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-  `,
-            [cliente],
-          );
+          totalResult = await this.consultarTotalRegionesPaginados(cliente);
           break;
 
         case 10:
           // Usuario Capturistas - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC
-  LIMIT ? OFFSET ?;
-
-            `,
-            [cliente, limit, offset],
-          );
+          regiones = await this.consultarRegionesPagina(cliente, limit, offset);
 
           // Query para total (sin paginación)
-          totalResult = await this.regionesRepository.query(
-            `
-  SELECT COUNT(*) AS total
-  FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-  `,
-            [cliente],
-          );
+          totalResult = await this.consultarTotalRegionesPaginados(cliente);
           break;
 
         default:
@@ -353,10 +304,8 @@ INNER JOIN Usuarios u ON ur.IdUsuario = u.Id
 WHERE 
   ur.IdUsuario = ?       -- 🔹 ID del usuario a filtrar
   AND ur.Estatus = 1
-  AND r.Estatus =  1
-  AND c.Estatus = 1
 
-ORDER BY r.Nombre ASC
+ORDER BY r.Id DESC
   LIMIT ? OFFSET ?;
 
             `,
@@ -375,10 +324,9 @@ INNER JOIN Usuarios u ON ur.IdUsuario = u.Id
 WHERE 
   ur.IdUsuario = ?       -- 🔹 ID del usuario a filtrar
   AND ur.Estatus = 1
-  AND c.Estatus = 1
 
   `,
-  [idUser]
+            [idUser],
           );
           break;
       }
@@ -414,6 +362,41 @@ WHERE
     }
   }
 
+  //Funcion Obtener listado por cliente
+  private async consultarRegionesListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `
+SELECT
+  -- Región
+  r.Id AS id,
+  r.Nombre AS nombre,
+  r.Descripcion AS descripcion,
+  r.Geocerca AS geocerca,
+  r.FechaCreacion AS fechaCreacion,
+  r.FechaActualizacion AS fechaActualizacion,
+  r.Estatus AS estatus,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Regiones r
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+
+WHERE 
+  r.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+  AND r.Estatus = 1
+  AND c.Estatus = 1
+
+ORDER BY r.Id DESC
+    `;
+    return this.regionesRepository.query(query, [...ids]);
+  }
+
+  //Obtener listado
   async findAllList(cliente: number, idUser: number, rol: number) {
     try {
       let regiones;
@@ -447,7 +430,7 @@ WHERE
   AND c.Estatus = 1
   
 
-ORDER BY r.Nombre ASC;
+ORDER BY r.Id DESC;
 
             `,
           );
@@ -455,109 +438,16 @@ ORDER BY r.Nombre ASC;
 
         case 2:
           // Usuario administrador - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND r.Estatus = 1
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [cliente],
-          );
+          regiones = await this.consultarRegionesListado(cliente);
           break;
         case 8:
           // Usuario Reportes - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND r.Estatus = 1
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [cliente],
-          );
+          regiones = await this.consultarRegionesListado(cliente);
           break;
 
         case 10:
           // Usuario Capturistas - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND r.Estatus = 1
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [cliente],
-          );
+          regiones = await this.consultarRegionesListado(cliente);
           break;
 
         default:
@@ -592,7 +482,7 @@ WHERE
   AND r.Estatus = 1
   AND c.Estatus = 1
 
-ORDER BY r.Nombre ASC;
+ORDER BY r.Id DESC;
 
             `,
             [idUser],
@@ -623,11 +513,44 @@ ORDER BY r.Nombre ASC;
     }
   }
 
+  private async consultarRegionesOne(cliente: number, id: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `
+SELECT
+  -- Región
+  r.Id AS id,
+  r.Nombre AS nombre,
+  r.Descripcion AS descripcion,
+  r.Geocerca AS geocerca,
+  r.FechaCreacion AS fechaCreacion,
+  r.FechaActualizacion AS fechaActualizacion,
+  r.Estatus AS estatus,
+
+  -- Cliente
+  c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente
+
+FROM Regiones r
+INNER JOIN Clientes c ON r.IdCliente = c.Id
+
+WHERE 
+  r.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+  AND r.Id = ?
+
+ORDER BY r.Id DESC
+    `;
+    return this.regionesRepository.query(query, [...ids, id]);
+  }
+
+
   async findOne(idUser: number, id: number, cliente: number, rol: number) {
     try {
       let regiones;
       //Obtenemos ConteoPasajeros
-      
+
       switch (rol) {
         case 1:
           // Usuario SuperAdministrador - obtiene todas las regiones
@@ -655,121 +578,27 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
   r.Id = ?
-  AND c.Estatus = 1
   
 
-ORDER BY r.Nombre ASC;
+ORDER BY r.Id DESC;
 
             `,
-            [id]
+            [id],
           );
           break;
 
         case 2:
           // Usuario administrador - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.Id = ?
-  AND r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [id, cliente],
-          );
+          regiones = await this.consultarRegionesOne(cliente, id)
           break;
         case 8:
           // Usuario Reportes - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.Id = ?
-  AND r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [id, cliente],
-          );
+          regiones = await this.consultarRegionesOne(cliente, id)
           break;
 
         case 10:
           // Usuario Capturistas - obtiene todas las regiones de su cliente
-          regiones = await this.regionesRepository.query(
-            `
-SELECT
-  -- Región
-  r.Id AS id,
-  r.Nombre AS nombre,
-  r.Descripcion AS descripcion,
-  r.Geocerca AS geocerca,
-  r.FechaCreacion AS fechaCreacion,
-  r.FechaActualizacion AS fechaActualizacion,
-  r.Estatus AS estatus,
-
-  -- Cliente
-  c.Id AS idCliente,
-  c.Nombre AS nombreCliente,
-  c.ApellidoPaterno AS apellidoPaternoCliente,
-  c.ApellidoMaterno AS apellidoMaternoCliente,
-  c.Estatus AS estatusCliente
-
-FROM Regiones r
-INNER JOIN Clientes c ON r.IdCliente = c.Id
-
-WHERE 
-  r.Id = ?
-  AND r.IdCliente = ?   -- 🔹 aquí filtras por el ID del cliente
-  AND c.Estatus = 1
-
-ORDER BY r.Nombre ASC;
-
-            `,
-            [id, cliente],
-          );
+          regiones = await this.consultarRegionesOne(cliente, id)
           break;
 
         default:
@@ -802,13 +631,12 @@ WHERE
   ur.IdUsuario = ?       -- 🔹 ID del usuario a filtrar
   AND ur.Estatus = 1
   AND r.Id = ?
-  AND c.Estatus = 1
   AND u.Estatus = 1
 
-ORDER BY r.Nombre ASC;
+ORDER BY r.Id DESC;
 
             `,
-            [id, idUser],
+            [idUser, id],
           );
           break;
       }

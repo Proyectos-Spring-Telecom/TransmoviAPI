@@ -1,6 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateInstalacionesDto } from './create-instalacione.dto';
-import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 
 export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   @ApiProperty({
@@ -9,15 +9,16 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   })
   @IsOptional({ message: 'El IdDispositivo es obligatorio' })
   @IsNumber()
-  idDispositivo: number;
+  idDispositivo?: number;
 
   @ApiProperty({
     description: 'ID del dispositivo asociado a la instalación',
     example: 101,
   })
   @IsOptional({ message: 'Para saber el estado de los componentes en caso de cambiarlos' })
-  @IsNumber()
-  estatusDispositivoAnterior: number;
+  @IsInt()
+  @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
+  estatusDispositivoAnterior?: number;
 
   @ApiProperty({
     description: 'ID del BlueVox asociado a la instalación',
@@ -25,15 +26,16 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   })
   @IsOptional({ message: 'El IdBlueVox es obligatorio' })
   @IsNumber()
-  idBlueVox: number;
+  idBlueVox?: number;
 
   @ApiProperty({
     description: 'ID del dispositivo asociado a la instalación',
     example: 101,
   })
   @IsOptional({ message: 'Para saber el estado de los componentes en caso de cambiarlos' })
-  @IsNumber()
-  estatusBluevoxsAnterior: number;
+  @IsInt()
+  @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
+  estatusBluevoxsAnterior?: number;
 
   @ApiProperty({
     description: 'ID del cliente asociado a la instalación',
@@ -41,22 +43,13 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   })
   @IsOptional({ message: 'El IdCliente es obligatorio' })
   @IsNumber()
-  idCliente: number;
-
-  @IsOptional()
-  @IsInt()
-  @IsIn([0, 1], { message: 'Solo se permite 0 o 1' })
-  @ApiProperty({
-    description: 'Estatus del usuario (1=Activo, 0=Inactivo)',
-    example: 1,
-  })
-  estatus?: number = 1;
+  idCliente?: number;
 
   @ApiProperty({
     description: 'Comentario acerca de los componentes',
     example: 404,
   })
-  @IsNumber()
+  @IsString()
   @IsOptional()
-  comentarios: number;
+  comentarios?: string;
 }

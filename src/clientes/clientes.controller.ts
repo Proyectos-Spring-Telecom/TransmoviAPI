@@ -54,7 +54,7 @@ export class ClientesController {
     const cliente = req.user.cliente;
     const idUser = req.user.userId;
     const rol = req.user.rol;
-    return this.clientesService.getOneClientePrueba(+id);
+    return this.clientesService.getOneCliente(+id);
   }
 
     //Actualizar el estatus del cliente
@@ -65,9 +65,11 @@ export class ClientesController {
     @Body() updateClienteEstatusDto: UpdateClienteEstatusDto,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
+    const cliente = req.user.cliente;
     return this.clientesService.updateClienteStatus(
       +id,
       idUser,
+      +cliente,
       updateClienteEstatusDto,
     );
   }
@@ -87,6 +89,7 @@ export class ClientesController {
   @Delete(':id')
   async removeClientes(@Param('id') id: string, @Request() req): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.clientesService.removeCliente(+id, idUser);
+    const cliente = req.user.cliente;
+    return await this.clientesService.removeCliente(+id, idUser, +cliente);
   }
 }

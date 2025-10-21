@@ -89,6 +89,27 @@ export class ClientesService {
       });
     }
   }
+
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   //Obtener todos los clientes
   async getAllClientes(
     idUser: number,
@@ -133,7 +154,7 @@ SELECT
   Estatus AS estatusCliente
   
 FROM Clientes
-ORDER BY Id DESC
+ORDER BY Id ASC
   LIMIT ? OFFSET ?;
             `,
             [limit, offset],
@@ -151,22 +172,7 @@ FROM Clientes
           break;
 
         default:
-          const clientesFiltrado = await this.clienteRepository.query(
-            `CALL spGetClientes(?);`,
-            [cliente],
-          );
-
-          // 2. Extraer los IDs de los clientes desde el resultado
-          const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
-          const ids = idsFiltrados
-            .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
-            .filter(Boolean);
-          if (ids.length === 0) {
-            return { data: [] }; // No hay clientes que consultar
-          }
-
-          // 3. Construir el query dinámico con los IDs
-          const placeholders = ids.map(() => '?').join(', ');
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           clientes = await this.clienteRepository.query(
             `
 SELECT
@@ -197,7 +203,7 @@ SELECT
   
 FROM Clientes
 WHERE Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-ORDER BY Id DESC
+ORDER BY Id ASC
   LIMIT ? OFFSET ?;
             `,
             [...ids, limit, offset],
@@ -209,7 +215,7 @@ ORDER BY Id DESC
   SELECT COUNT(*) AS total
 FROM Clientes
 WHERE Id IN (${placeholders})    -- 🔹 aquí colocas el ID del cliente que quieres consultar
-ORDER BY Id DESC
+ORDER BY Id ASC
 
   `,
             [...ids],
@@ -264,29 +270,14 @@ SELECT
   ApellidoMaterno AS apellidoMaterno
 FROM Clientes
 WHERE Estatus = 1
-ORDER BY Id DESC;
+ORDER BY Id ASC;
             `,
           );
           break;
 
         default:
           // Usuarios normales - solo sus regiones asignadas
-                    const clientesFiltrado = await this.clienteRepository.query(
-            `CALL spGetClientes(?);`,
-            [cliente],
-          );
-
-          // 2. Extraer los IDs de los clientes desde el resultado
-          const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
-          const ids = idsFiltrados
-            .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
-            .filter(Boolean);
-          if (ids.length === 0) {
-            return { data: [] }; // No hay clientes que consultar
-          }
-
-          // 3. Construir el query dinámico con los IDs
-          const placeholders = ids.map(() => '?').join(', ');
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           clientes = await this.clienteRepository.query(
             `
 SELECT
@@ -297,7 +288,7 @@ SELECT
 FROM Clientes
 WHERE Id IN (${placeholders})  -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND Estatus = 1
-ORDER BY Id DESC;
+ORDER BY Id ASC;
 
             `,
             [...ids],
@@ -338,75 +329,6 @@ ORDER BY Id DESC;
       }
       return { data: cliente };
     } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new BadRequestException({
-        message: `Error al obtener el cliente con ID: ${id}.`,
-      });
-    }
-  }
-
-  //Obtener el cliente por ID
-  async getOneClientePrueba(id: number) {
-    try {
-      const clientes = await this.clienteRepository.query(
-        `
-CALL spGetClientes(?);
-      `,
-        [id],
-      );
-
-      // 2. Extraer los IDs de los clientes desde el resultado
-      const data = clientes[0]; // El primer índice contiene los resultados
-      const ids = data
-        .map((cliente: any) => Number(cliente.Id))
-        .filter(Boolean);
-
-      if (ids.length === 0) {
-        return { data: [] }; // No hay clientes que consultar
-      }
-
-      // 3. Construir el query dinámico con los IDs
-      const placeholders = ids.map(() => '?').join(', ');
-
-      const query = `
-      SELECT
-        Id AS id,
-        RFC AS rfc,
-        TipoPersona AS tipoPersona,
-        Nombre AS nombre,
-        ApellidoPaterno AS apellidoPaterno,
-        ApellidoMaterno AS apellidoMaterno,
-        Telefono AS telefono,
-        Correo AS correo,
-        Estado AS estado,
-        Municipio AS municipio,
-        Colonia AS colonia,
-        Calle AS calle,
-        EntreCalles AS entreCalles,
-        NumeroExterior AS numeroExterior,
-        NumeroInterior AS numeroInterior,
-        CP AS cp,
-        NombreEncargado AS nombreEncargado,
-        TelefonoEncargado AS telefonoEncargado,
-        CorreoEncargado AS correoEncargado,
-        ConstanciaSituacionFiscal AS constanciaSituacionFiscal,
-        ComprobanteDomicilio AS comprobanteDomicilio,
-        ActaConstitutiva AS actaConstitutiva,
-        Logotipo AS logotipo,
-        Estatus AS estatusCliente
-      FROM Clientes
-      WHERE Id IN (${placeholders})
-      ORDER BY Id DESC;
-    `;
-
-      // 4. Ejecutar el query con los IDs como parámetros
-      const detalles = await this.clienteRepository.query(query, ids);
-
-      return { data: clientes };
-    } catch (error) {
-      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -487,9 +409,11 @@ CALL spGetClientes(?);
   async updateClienteStatus(
     id: number,
     idUser: number,
+    cliente: number,
     updateClienteEstatusDto: UpdateClienteEstatusDto,
   ): Promise<ApiCrudResponse> {
     try {
+      const { ids, placeholders } = await this.clienteHijos(cliente);
       const usuario = await this.clienteRepository.findOne({
         where: { id: id },
       });
@@ -497,7 +421,14 @@ CALL spGetClientes(?);
         throw new NotFoundException(`Cliente con ID: ${id} no encontrado`);
       }
       const estatus = updateClienteEstatusDto.estatus;
-      await this.clienteRepository.update(id, { estatus });
+      await this.clienteRepository.query(
+        `
+        UPDATE Clientes
+        SET Estatus = ${estatus}
+        WHERE Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+        `,
+        [...ids],
+      );
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { updateClienteEstatusDto };
@@ -545,8 +476,13 @@ CALL spGetClientes(?);
     }
   }
   //Eliminar cliente
-  async removeCliente(id: number, idUser: number): Promise<ApiCrudResponse> {
+  async removeCliente(
+    id: number,
+    idUser: number,
+    cliente: number,
+  ): Promise<ApiCrudResponse> {
     try {
+      const { ids, placeholders } = await this.clienteHijos(cliente);
       const clienteEliminar = await this.clienteRepository.findOne({
         where: { id: id },
       });
@@ -555,7 +491,14 @@ CALL spGetClientes(?);
           `El cliente con ID: ${id} no fue encontrado.`,
         );
       }
-      await this.clienteRepository.update(id, { estatus: 0 });
+      await this.clienteRepository.query(
+        `
+        UPDATE Clientes
+        SET Estatus = 0
+        WHERE Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+        `,
+        [...ids],
+      );
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { id: id, estatus: 0 };

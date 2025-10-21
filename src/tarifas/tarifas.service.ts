@@ -19,6 +19,7 @@ import {
   EstatusEnumBitcora,
 } from 'src/common/ApiResponse';
 import { UpdateTarifasEstatusDto } from './dto/update-tarifa-estatus.dto';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class TarifasService {
@@ -29,6 +30,8 @@ export class TarifasService {
     private readonly derroterosRepository: Repository<Derroteros>,
     @InjectRepository(UsuariosRegiones)
     private readonly usuariosregionesRepository: Repository<UsuariosRegiones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
   async create(
@@ -94,9 +97,28 @@ export class TarifasService {
     }
   }
 
-  private async consultarTarifasListado(
-    cliente: number
-  ) {
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
+  private async consultarTarifasListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT 
   -- Datos de la tarifa
@@ -145,7 +167,7 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?            -- Filtrado por cliente
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND c.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
@@ -154,9 +176,7 @@ WHERE c.Id = ?            -- Filtrado por cliente
 
 ORDER BY t.Id DESC
     `;
-    return this.usuariosregionesRepository.query(query, [
-      cliente,
-    ]);
+    return this.usuariosregionesRepository.query(query, [...ids]);
   }
 
   async findAllList(idUser: number, cliente: number, rol: number) {
@@ -223,24 +243,23 @@ WHERE c.Estatus = 1
 ORDER BY t.Id DESC
 
       `,
-           
           );
           break;
 
         case 2:
           // Usuario Administrador - obtiene todas las regiones
-          data = await this.consultarTarifasListado(cliente)
+          data = await this.consultarTarifasListado(cliente);
           break;
 
         case 8:
           // Consulta de datos paginados Usuario Reportes
-          data = await this.consultarTarifasListado(cliente)
+          data = await this.consultarTarifasListado(cliente);
           break;
 
         case 10:
           // Usuario Administrador - obtiene todas las regiones
-          data = await this.consultarTarifasListado(cliente)
-          break
+          data = await this.consultarTarifasListado(cliente);
+          break;
 
         default:
           // Consulta de datos paginados Usuario Capturista
@@ -299,11 +318,11 @@ WHERE ur.IdUsuario = ?
   AND ru.Estatus = 1
   AND d.Estatus = 1
   AND t.Estatus = 1
-  AND c.Id = ?  -- Filtro por cliente específico
+  AND c.Estatus = 1
 
 ORDER BY t.Id DESC;
       `,
-            [idUser, cliente], // parámetro seguro
+            [idUser], // parámetro seguro
           );
           break;
       }
@@ -345,6 +364,7 @@ ORDER BY t.Id DESC;
     limit: number,
     offset: number,
   ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT 
   -- Datos de la tarifa
@@ -393,7 +413,7 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?            -- Filtrado por cliente
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND c.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
@@ -404,7 +424,7 @@ ORDER BY t.Id DESC
   LIMIT ? OFFSET ?;
     `;
     return this.usuariosregionesRepository.query(query, [
-      cliente,
+      ...ids,
       limit,
       offset,
     ]);
@@ -496,7 +516,6 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
-  AND c.Estatus = 1
 
 ORDER BY t.Id DESC
   LIMIT ? OFFSET ?
@@ -518,7 +537,6 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
-  AND c.Estatus = 1
   `,
           );
           break;
@@ -603,12 +621,11 @@ WHERE ur.IdUsuario = ?
   AND ru.Estatus = 1
   AND d.Estatus = 1
   AND t.Estatus = 1
-  AND c.Id = ?  -- Filtro por cliente específico
 
 ORDER BY t.Id DESC
   LIMIT ? OFFSET ?
   `,
-            [idUser, cliente, limit, offset],
+            [idUser, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -626,9 +643,8 @@ WHERE ur.IdUsuario = ?
   AND ru.Estatus = 1         -- Ruta activa
   AND d.Estatus = 1          -- Derrotero activo
   AND t.Estatus = 1          -- Tarifa activa
-  AND r.IdCliente = ?;       -- Cliente específico
   `,
-            [idUser, cliente],
+            [idUser],
           );
           break;
       }
@@ -674,8 +690,9 @@ WHERE ur.IdUsuario = ?
     }
   }
 
-  private async consultarTotalTarifasOne(id: number, cliente: number) { 
-        const query = `  
+  private async consultarTotalTarifasOne(id: number, cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
+    const query = `  
 
 SELECT 
   -- Datos de la tarifa
@@ -727,13 +744,12 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
-  AND c.Estatus = 1
-  AND c.Id = ? 
+  AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND t.Id = ?
 
 ORDER BY t.Id DESC
 `;
-    return await this.usuariosregionesRepository.query(query, [cliente, id]);
+    return await this.usuariosregionesRepository.query(query, [...ids, id]);
   }
 
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
@@ -793,7 +809,6 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
-  AND c.Estatus = 1
   AND t.Id = ?
 
 ORDER BY t.Id DESC
@@ -802,20 +817,20 @@ ORDER BY t.Id DESC
           );
           break;
 
-          case 2:
+        case 2:
           // Usuario Administrador - obtiene todas las regiones
-          data = await this.consultarTotalTarifasOne(id, cliente)
+          data = await this.consultarTotalTarifasOne(id, cliente);
           break;
 
         case 8:
           // Consulta de datos paginados Usuario Reportes
-          data = await this.consultarTotalTarifasOne(id, cliente)
+          data = await this.consultarTotalTarifasOne(id, cliente);
           break;
 
         case 10:
           // Usuario Administrador - obtiene todas las regiones
-          data = await this.consultarTotalTarifasOne(id, cliente)
-          break
+          data = await this.consultarTotalTarifasOne(id, cliente);
+          break;
 
         default:
           data = await this.usuariosregionesRepository.query(
@@ -873,11 +888,10 @@ WHERE ur.IdUsuario = ?
   AND ru.Estatus = 1
   AND d.Estatus = 1
   AND t.Id = ?
-  AND c.Id = ?  -- Filtro por cliente específico
 
 ORDER BY t.Id DESC
   `,
-            [idUser, id, cliente],
+            [idUser, id],
           );
 
           break;

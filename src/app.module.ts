@@ -32,6 +32,7 @@ import { ViajesModule } from './viajes/viajes.module';
 import { ViajesconteosModule } from './viajesconteos/viajesconteos.module';
 import { ViajestransaccionesModule } from './viajestransacciones/viajestransacciones.module';
 import { MailModule } from './mail/mail.module';
+import { HistoricoinstalacionesModule } from './historicoinstalaciones/historicoinstalaciones.module';
 import Joi from 'joi';
 
 @Module({
@@ -133,6 +134,8 @@ import Joi from 'joi';
     ViajestransaccionesModule,
 
     MailModule,
+
+    HistoricoinstalacionesModule,
     
   ], 
  controllers: [AppController],

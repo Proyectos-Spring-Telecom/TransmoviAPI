@@ -6,7 +6,9 @@ import {
   IsInt,
   MaxLength,
   IsIn,
+  IsEnum,
 } from 'class-validator';
+import { EstadoComponente } from 'src/common/estado-componente.enum';
 
 export class CreateDispositivoDto {
   @IsString()
@@ -37,6 +39,19 @@ export class CreateDispositivoDto {
   @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
   @ApiProperty({ description: 'Estatus del cliente', example: 1 })
   estatus?: number = 1;
+
+  @ApiProperty({
+    enum: EstadoComponente,
+    description: "Estado actual del componente",
+    example: EstadoComponente.DISPONIBLE,
+  })
+  @IsEnum(EstadoComponente, {
+    message:
+      "estadoActual debe ser un valor válido: " +
+      "0 (Inactivo), 1 (Disponible), 2 (Asignado), 3 (En Mantenimiento), 4 (Dañado), 5 (Retirado)",
+  })
+  @IsOptional()
+  estadoActual?: EstadoComponente = EstadoComponente.DISPONIBLE;
 
   @IsInt({ message: 'IdCliente debe ser un número entero' })
   @ApiProperty({

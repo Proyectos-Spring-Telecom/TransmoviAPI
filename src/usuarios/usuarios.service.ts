@@ -24,8 +24,9 @@ import { ClientesService } from 'src/clientes/clientes.service';
 import { UsuariosPermisos } from 'src/entities/UsuariosPermisos';
 import { UpdateUsuarioOperadorDto } from './dto/update-usuario-operador.dto';
 import { UpdateUsuarioContrasena } from './dto/update-usuario-contrasena.dto';
-import { MailService } from 'src/mail/mail.service'; 
+import { MailService } from 'src/mail/mail.service';
 import { JwtService } from '@nestjs/jwt';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class UsuariosService {
@@ -36,9 +37,31 @@ export class UsuariosService {
     private readonly clientesService: ClientesService,
     @InjectRepository(UsuariosPermisos)
     private usuariosPermisosRepository: Repository<UsuariosPermisos>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly emailService: MailService,
     private readonly jwtService: JwtService,
   ) {}
+
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
 
   // Obtener todos los usuarios con paginación
   async getAllUsuario(
@@ -104,6 +127,7 @@ LIMIT ? OFFSET ?;
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           // Consulta de datos paginados resto Usuario
           usuarios = await this.usuarioRepository.query(
             `
@@ -135,11 +159,12 @@ SELECT
 FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
 LEFT JOIN Clientes c ON u.IdCliente = c.Id
-WHERE c.Id = ?
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND u.Estatus = 1
 ORDER BY u.Id DESC
 LIMIT ? OFFSET ?;
         `,
-            [cliente, limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -148,9 +173,10 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
   FROM Usuarios u
   INNER JOIN Clientes c ON u.IdCliente = c.Id
-	WHERE c.Id = ?
+	WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND u.Estatus = 1
   `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -231,6 +257,7 @@ ORDER BY u.Id DESC;
 
         default:
           // Consulta de datos listado resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           usuarios = await this.usuarioRepository.query(
             `
 SELECT
@@ -262,10 +289,11 @@ FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
 LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE c.Id = ?
+AND u.Estatus IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND u.Estatus = 1
 ORDER BY u.Id DESC;
         `,
-            [cliente],
+            [...ids],
           );
 
           break;
@@ -293,7 +321,7 @@ ORDER BY u.Id DESC;
     }
   }
 
-  //Obtener todos los usuarios por rol
+  //Obtener usuarios operador
   async getAllListUsuariosRol(): Promise<ApiResponseCommon> {
     try {
       const usuarios = await this.usuarioRepository.find({
@@ -317,8 +345,11 @@ ORDER BY u.Id DESC;
     }
   }
 
-  //Obtener todos los usuarios por cliente
-  async getAllListUsuariosCliente(id: number, cliente: number): Promise<ApiResponseCommon> {
+  //Obtener usuarios por cliente
+  async getAllListUsuariosCliente(
+    id: number,
+    cliente: number,
+  ): Promise<ApiResponseCommon> {
     try {
       const usuarios = await this.usuarioRepository.find({
         where: { estatus: 1, idCliente: cliente },
@@ -338,7 +369,8 @@ ORDER BY u.Id DESC;
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Se produjo un error al intentar obtener los usuarios asociados al cliente.',
+        message:
+          'Se produjo un error al intentar obtener los usuarios asociados al cliente.',
         error: error.message,
       });
     }
@@ -391,6 +423,7 @@ ORDER BY u.Id DESC
 
         default:
           // Consulta de datos paginados resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           usuarioData = await this.usuarioRepository.query(
             `
 SELECT
@@ -422,10 +455,11 @@ FROM Usuarios u
 INNER JOIN Roles r ON u.IdRol = r.Id
 LEFT JOIN Clientes c ON u.IdCliente = c.Id
 WHERE u.Id = ?
-AND c.Id = ?
+AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND u.Estatus = 1
 ORDER BY u.Id DESC
         `,
-            [id, cliente],
+            [id, ...ids],
           );
           break;
       }
@@ -476,7 +510,7 @@ ORDER BY u.Id DESC
       });
       if (!usuario) {
         throw new NotFoundException(
-          `Usuario con nombre de usuario: ${ updateUsuarioOperadorDto.userName } no encontrado.`,
+          `Usuario con nombre de usuario: ${updateUsuarioOperadorDto.userName} no encontrado.`,
         );
       }
 
@@ -574,6 +608,10 @@ ORDER BY u.Id DESC
 
       const newUser = await this.usuarioRepository.create(createUsuarioDto);
 
+      //Activamos su ingreso
+      newUser.emailConfirmado = 1
+      newUser.estatus = 1
+
       const userSave = await this.usuarioRepository.save(newUser); //creamos el usuario
 
       if (createUsuarioDto.permisosIds.length > 0) {
@@ -587,15 +625,21 @@ ORDER BY u.Id DESC
         await this.usuariosPermisosRepository.save(usuariosPermisos);
       }
 
-      const payload = { 
+      const payload = {
         id: userSave.id,
         email: userSave.userName,
-      }
+      };
 
       //datos del correo
-      const token = this.jwtService.sign(payload, { expiresIn: `${process.env.JWT_CONFIRMACION}` })
-      const name = `${userSave.nombre} ${userSave.apellidoPaterno} ${userSave.apellidoMaterno}`
-      await this.emailService.sendConfirmationEmail(userSave.userName, name,token);
+      const token = this.jwtService.sign(payload, {
+        expiresIn: `${process.env.JWT_CONFIRMACION}`,
+      });
+      const name = `${userSave.nombre} ${userSave.apellidoPaterno} ${userSave.apellidoMaterno}`;
+      await this.emailService.sendConfirmationEmail(
+        userSave.userName,
+        name,
+        token,
+      );
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { createUsuarioDto };
@@ -762,7 +806,10 @@ ORDER BY u.Id DESC
         const cliente = await this.clientesService.getOneCliente(
           Number(updateUsuarioDto.idCliente),
         );
-        if (!cliente) throw new BadRequestException('No se encontró el cliente especificado.');
+        if (!cliente)
+          throw new BadRequestException(
+            'No se encontró el cliente especificado.',
+          );
       }
 
       const { permisosIds, ...usuarioUpdate } = updateUsuarioDto;

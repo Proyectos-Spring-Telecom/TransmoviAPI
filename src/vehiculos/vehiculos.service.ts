@@ -18,6 +18,7 @@ import {
 } from 'src/common/ApiResponse';
 import { UpdateVehiculoEstatusDto } from './dto/update-vehiculos-estatus.dto';
 import { Instalaciones } from 'src/entities/Instalaciones';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class VehiculosService {
@@ -26,6 +27,8 @@ export class VehiculosService {
     private readonly vehiculoRepository: Repository<Vehiculos>,
     @InjectRepository(Instalaciones)
     private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
   async create(createVehiculoDto: CreateVehiculoDto, idUser: number) {
@@ -86,7 +89,27 @@ export class VehiculosService {
     }
   }
 
-  //Obtener los bluevox por cliente
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
+  //Obtener los bluevox por cliente /*/*Nulos
   async findAllListClientes(id: number, cliente: number) {
     try {
       const vehiculos = await this.vehiculoRepository.find({
@@ -176,6 +199,7 @@ LIMIT ? OFFSET ?;
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           // Consulta de datos paginados resto Usuario
           vehiculos = await this.vehiculoRepository.query(
             `
@@ -205,11 +229,11 @@ SELECT
 
 FROM Vehiculos v
 INNER JOIN Clientes c ON v.IdCliente = c.Id
-WHERE c.Id = ?
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 ORDER BY v.Id DESC
 LIMIT ? OFFSET ?;
         `,
-            [cliente, limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -218,9 +242,9 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
   FROM Vehiculos v
   INNER JOIN Clientes c ON v.IdCliente = c.Id
-	WHERE c.Id = ?
+	WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -287,12 +311,15 @@ SELECT
 FROM Vehiculos v
 INNER JOIN Clientes c ON v.IdCliente = c.Id
 WHERE v.Estatus = 1
+AND v.EstadoActual = 1
+AND c.Estatus = 1
 ORDER BY v.Id DESC;
         `,
           );
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           // Consulta de datos listado resto Usuario
           vehiculos = await this.vehiculoRepository.query(
             `
@@ -322,11 +349,13 @@ SELECT
 
 FROM Vehiculos v
 INNER JOIN Clientes c ON v.IdCliente = c.Id
-WHERE c.Id = ?
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND v.Estatus = 1
+AND v.EstadoActual = 1
+AND c.Estatus = 1
 ORDER BY v.Id DESC;
         `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -399,6 +428,7 @@ ORDER BY v.Id DESC;
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           vehiculos = await this.vehiculoRepository.query(
             `
 SELECT
@@ -428,10 +458,10 @@ SELECT
 FROM Vehiculos v
 INNER JOIN Clientes c ON v.IdCliente = c.Id
 WHERE v.Id = ?
-AND c.Id = ?
+AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 ORDER BY v.Id DESC;
         `,
-            [id, cliente],
+            [id, ...ids],
           );
           break;
       }
@@ -468,16 +498,19 @@ ORDER BY v.Id DESC;
       });
       if (!vehiculo) throw new NotFoundException('Vehículo no encontrado.');
       const estatus = updateVehiculoEstausDto.estatus;
-      if (estatus === 1) {
+      if (estatus === 0) {
         const vehiculoInstalacion = await this.instalacionesRepository.findOne({
-          where: {idVehiculo: vehiculo.id, estatus: 1}
+          where: { idVehiculo: vehiculo.id, estatus: 1 },
         });
         if (vehiculoInstalacion)
           throw new BadRequestException(
-            'No es posible completar la operación: Vehiculo ya se encuentra asignado a una instalación.',
+            'No es posible completar la operación: Vehiculo se encuentra asignado a una instalación.',
           );
+        await this.vehiculoRepository.update(id, { estadoActual: estatus });
+      } else {
+        await this.vehiculoRepository.update(id, { estadoActual: estatus });
       }
-      
+
       await this.vehiculoRepository.update(id, { estatus: estatus });
 
       //-----Registro en la bitacora----- SUCCESS
@@ -595,6 +628,15 @@ ORDER BY v.Id DESC;
         where: { id: id },
       });
       if (!vehiculo) throw new NotFoundException('Vehículo no encontrado.');
+      const vehiculoInstalacion = await this.instalacionesRepository.findOne({
+        where: { idVehiculo: vehiculo.id, estatus: 1 },
+      });
+      if (vehiculoInstalacion)
+        throw new BadRequestException(
+          'No es posible completar la operación: Vehiculo se encuentra asignado a una instalación.',
+        );
+      await this.vehiculoRepository.update(id, { estadoActual: 0 });
+
       await this.vehiculoRepository.update(id, { estatus: 0 });
 
       //-----Registro en la bitacora----- SUCCESS

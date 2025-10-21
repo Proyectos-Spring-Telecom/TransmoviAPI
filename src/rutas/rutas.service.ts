@@ -19,6 +19,7 @@ import {
 } from 'src/common/ApiResponse';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { UpdateRutasEstatusDto } from './dto/update-ruta-estatus.dto';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class RutasService {
@@ -29,6 +30,8 @@ export class RutasService {
     private readonly rutasRepository: Repository<Rutas>,
     @InjectRepository(UsuariosRegiones)
     private readonly usuarioregionesRepository: Repository<UsuariosRegiones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -95,7 +98,32 @@ export class RutasService {
     }
   }
 
-  private async consultarRutasPaginado(cliente: number, limit: number, offset: number) {
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
+  private async consultarRutasPaginado(
+    cliente: number,
+    limit: number,
+    offset: number,
+  ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT 
   -- RUTA
@@ -139,17 +167,21 @@ LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
-  c.Id = ?        -- 🔹 aquí filtras por el Id del cliente
+  c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND r.Estatus = 1
-  AND c.Estatus = 1
 ORDER BY ru.Id DESC
 
   LIMIT ? OFFSET ?;
     `;
-    return this.usuarioregionesRepository.query(query, [cliente,limit, offset]);
+    return this.usuarioregionesRepository.query(query, [
+      ...ids,
+      limit,
+      offset,
+    ]);
   }
 
   private async consultarTotalRutasPaginados(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `  
     SELECT COUNT(*) AS total
 FROM Rutas ru
@@ -158,13 +190,12 @@ LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
-  c.Id = ?        -- 🔹 aquí filtras por el Id del cliente
+  c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND r.Estatus = 1
-  AND c.Estatus = 1
 `;
-    return await this.usuarioregionesRepository.query(query, [cliente]);
+    return await this.usuarioregionesRepository.query(query, [...ids]);
   }
-  
+
   async obtenerRutasPorUsuarioSQL(
     idUser: number,
     cliente: number,
@@ -317,12 +348,11 @@ WHERE
   WHERE ur.IdUsuario = ?
     AND ur.Estatus = 1
     AND r.Estatus = 1
-    AND c.Id = ?
   
   ORDER BY ru.Id DESC
   LIMIT ? OFFSET ?;
   `,
-          [idUser, cliente, limit, offset],
+          [idUser, limit, offset],
         );
 
         // Query para total (sin paginación)
@@ -338,9 +368,8 @@ WHERE
   WHERE ur.IdUsuario = ?
     AND ur.Estatus = 1
     AND r.Estatus = 1
-    AND c.Id = ?
   `,
-          [idUser, cliente],
+          [idUser],
         );
         break;
     }
@@ -370,6 +399,7 @@ WHERE
   }
 
   private async consultarRutasListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
     SELECT 
   -- RUTA
@@ -413,13 +443,13 @@ LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
-      c.Id = ?
+      c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND c.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
 ORDER BY ru.Id DESC;
-    `
-    return await this.usuarioregionesRepository.query(query, [cliente]);
+    `;
+    return await this.usuarioregionesRepository.query(query, [...ids]);
   }
 
   async findAllList(idUser: number, cliente: number, rol: number) {
@@ -474,6 +504,7 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE 
   r.Estatus = 1
   AND ru.Estatus = 1
+  AND c.Estatus = 1
 ORDER BY ru.Id DESC
   `,
           );
@@ -481,17 +512,17 @@ ORDER BY ru.Id DESC
 
         case 2:
           // Consulta de datos paginados Usuario Administrador
-          rutas = await this.consultarRutasListado(cliente)
+          rutas = await this.consultarRutasListado(cliente);
           break;
 
         case 8:
           // Consulta de datos paginados Usuario Reportes
-          rutas = await this.consultarRutasListado(cliente)
+          rutas = await this.consultarRutasListado(cliente);
           break;
 
         case 10:
           // Consulta de datos paginados Usuario Capturista
-          rutas = await this.consultarRutasListado(cliente)
+          rutas = await this.consultarRutasListado(cliente);
           break;
 
         default:
@@ -538,12 +569,11 @@ WHERE ur.IdUsuario = ?
   AND r.Estatus = 1
   AND ru.Estatus = 1
   AND c.Estatus = 1
-  AND c.Id = ? -- filtro por cliente
 
 ORDER BY ru.Id DESC;
 
             `,
-            [idUser, cliente],
+            [idUser],
           );
           break;
       }
@@ -582,6 +612,7 @@ ORDER BY ru.Id DESC;
   }
 
   private async consultarRutasOne(id: number, cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
      SELECT 
   -- RUTA
@@ -625,13 +656,12 @@ LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
-      c.Id = ?
-  AND c.Estatus = 1
+      c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND r.Estatus = 1
   AND ru.Id = ?
 ORDER BY ru.Id DESC;
-    `
-    return await this.usuarioregionesRepository.query(query, [cliente, id]);
+    `;
+    return await this.usuarioregionesRepository.query(query, [...ids, id]);
   }
 
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
@@ -684,8 +714,7 @@ LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
 WHERE 
-      c.Estatus = 1
-  AND r.Estatus = 1
+      r.Estatus = 1
   AND ru.Id = ?
 ORDER BY ru.Id DESC;
 
@@ -696,7 +725,7 @@ ORDER BY ru.Id DESC;
 
         default:
           // Consulta de datos paginados Usuario SuperAdministrador
-          ruta = await this.consultarRutasOne(id, cliente)
+          ruta = await this.consultarRutasOne(id, cliente);
           break;
       }
 
@@ -743,7 +772,7 @@ ORDER BY ru.Id DESC;
     try {
       const ruta = await this.rutasRepository.findOne({ where: { id: id } });
       if (!ruta) throw new NotFoundException('Ruta no encontrada');
-      
+
       const estatus = updateRutasEstatusDto.estatus;
       await this.rutasRepository.update(id, { estatus: estatus });
 
@@ -802,7 +831,7 @@ ORDER BY ru.Id DESC;
     try {
       const ruta = await this.rutasRepository.findOne({ where: { id: id } });
       if (!ruta) throw new NotFoundException('Ruta no encontrada');
-      
+
       await this.rutasRepository.update(id, updateRutaDto);
 
       // Registro en la bitácora SUCCESS

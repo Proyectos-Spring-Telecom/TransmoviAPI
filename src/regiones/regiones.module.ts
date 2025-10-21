@@ -5,9 +5,10 @@ import { BitacoraModule } from 'src/bitacora/bitacora.module';
 import { Regiones } from 'src/entities/Regiones';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
+import { Clientes } from 'src/entities/Clientes';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Regiones,UsuariosRegiones]), BitacoraModule],
+  imports: [TypeOrmModule.forFeature([Regiones,UsuariosRegiones,Clientes]), BitacoraModule],
   controllers: [RegionesController],
   providers: [RegionesService],
 })

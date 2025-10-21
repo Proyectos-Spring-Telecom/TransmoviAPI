@@ -73,6 +73,9 @@ export class Vehiculos {
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
+  @Column('tinyint', { name: 'EstadoActual', unsigned: true })
+  estadoActual: number;
+
   @Column("bigint", { name: "IdCliente" })
   idCliente: number;
 
