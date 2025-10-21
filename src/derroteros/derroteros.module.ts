@@ -6,9 +6,10 @@ import { Rutas } from 'src/entities/Rutas';
 import { Derroteros } from 'src/entities/Derroteros';
 import { BitacoraModule } from 'src/bitacora/bitacora.module';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
+import { Clientes } from 'src/entities/Clientes';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Rutas,Derroteros,UsuariosRegiones]), BitacoraModule],
+  imports: [TypeOrmModule.forFeature([Rutas,Derroteros,UsuariosRegiones,Clientes]), BitacoraModule],
   controllers: [DerroterosController],
   providers: [DerroterosService],
 })

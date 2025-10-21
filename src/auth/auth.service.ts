@@ -3,6 +3,7 @@ import {
   HttpException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -34,14 +35,26 @@ export class AuthService {
   async singInPin(loginAuthPin: LoginAuthPinDto) {
     try {
       const user = await this.usuariosRepository.findOne({
-        relations: ['idRol2'],
+        relations: ['idRol2', 'idCliente2'],
         where: {
           userName: loginAuthPin.userName,
           dispositivoId: loginAuthPin.dispositivoId,
           estatus: 1,
+          emailConfirmado: 1,
+          idCliente2: {
+            estatus: 1,
+          },
         },
       });
-      console.log({ data: user });
+      if (user?.idCliente2?.estatus === 0) {
+        throw new UnauthorizedException(
+          'Acceso denegado: el cliente ha sido dado de baja.',
+        );
+      }
+      if (!user) {
+        throw new NotFoundException('No se encontró al usuario.');
+      }
+
       if (
         !user ||
         !user.pinHash ||
@@ -98,10 +111,20 @@ export class AuthService {
   async signIn(loginAuthDto: LoginAuthDto) {
     try {
       const user = await this.usuariosRepository.findOne({
-        relations: ['idRol2'],
-        where: { userName: loginAuthDto.userName, estatus: 1 },
+        relations: ['idRol2', 'idCliente2'],
+        where: {
+          userName: loginAuthDto.userName,
+          estatus: 1,
+          emailConfirmado: 1,
+          idCliente2: {
+            estatus: 1,
+          },
+        },
       });
-      console.log({ data: user });
+      if (!user) {
+        throw new NotFoundException('No se encontró al usuario.');
+      }
+
       if (
         !user ||
         !(await bcrypt.compare(loginAuthDto.password, user.passwordHash))

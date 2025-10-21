@@ -6,9 +6,10 @@ import { Tarifas } from 'src/entities/Tarifas';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Derroteros } from 'src/entities/Derroteros';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
+import { Clientes } from 'src/entities/Clientes';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tarifas,Derroteros,UsuariosRegiones]), BitacoraModule],
+  imports: [TypeOrmModule.forFeature([Tarifas,Derroteros,UsuariosRegiones,Clientes]), BitacoraModule],
   controllers: [TarifasController],
   providers: [TarifasService],
 })

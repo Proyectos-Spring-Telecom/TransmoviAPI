@@ -206,13 +206,58 @@ LEFT JOIN Pasajeros p
 
   async findAllListTransacciones(): Promise<ApiResponseCommon> {
     try {
-      const transacciones = await this.transaccionesRepository.find();
-      if (transacciones.length === 0)
-        throw new NotFoundException('Transacciones no encontradas');
+      const transacciones = await this.transaccionesRepository.query(
+        `
+SELECT 
+    -- Transacción
+    t.Id AS id,
+    t.TipoTransaccion AS tipoTransaccion,
+    t.Monto AS monto,
+    t.Latitud AS latitud,
+    t.Longitud AS longitud,
+    t.FechaHora AS fechaHora,
+    t.FHRegistro AS fhRegistro,
+    t.NumeroSerieMonedero AS numeroSerieMonedero,
+    t.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Dispositivo (puede ser NULL)
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+    
+
+    -- Pasajero (a través del monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+
+
+FROM Transacciones t
+LEFT JOIN Dispositivos d 
+    ON t.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON t.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+    
+    ORDER BY t.Id DESC
+        `,
+      );
+      
+      // 🔥 Transformación de datos (ids → number, nombreCompleto)
+      const data = transacciones.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        monto: Number(item.monto),
+        latitud: Number(item.latitud),
+        longitud: Number(item.longitud),
+        idPasajero: Number(item.idPasajero),
+      }));
 
       //API Response
       const result: ApiResponseCommon = {
-        data: transacciones,
+        data: data,
       };
       return result;
     } catch (error) {

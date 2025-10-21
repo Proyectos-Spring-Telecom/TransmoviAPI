@@ -20,6 +20,7 @@ import { Derroteros } from 'src/entities/Derroteros';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { UpdateDerroterosEstatusDto } from './dto/update-derrotero-estatus.dto';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class DerroterosService {
@@ -30,6 +31,8 @@ export class DerroterosService {
     private readonly usuariosregionesRepository: Repository<UsuariosRegiones>,
     @InjectRepository(Derroteros)
     private readonly derroterosRepository: Repository<Derroteros>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -98,11 +101,32 @@ export class DerroterosService {
     }
   }
 
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   private async consultarDerroteroPaginado(
     cliente: number,
     limit: number,
     offset: number,
   ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
   SELECT 
     -- Datos del derrotero (datos principales)
@@ -141,6 +165,10 @@ export class DerroterosService {
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -149,23 +177,23 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?               -- Filtrado por cliente
-  AND c.Estatus = 1
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND ru.Estatus = 1         -- Solo rutas activas
   AND r.Estatus = 1          -- Solo regiones activas
 
-ORDER BY i.Id DESC
+ORDER BY d.Id DESC
 
   LIMIT ? OFFSET ?;
     `;
     return this.usuariosregionesRepository.query(query, [
-      cliente,
+      ...ids,
       limit,
       offset,
     ]);
   }
 
   private async consultarTotalDerroteroPaginados(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `  
     SELECT COUNT(*) AS total
 FROM Derroteros d
@@ -174,12 +202,11 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?               -- Filtrado por cliente
-  AND c.Estatus = 1
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND ru.Estatus = 1         -- Solo rutas activas
   AND r.Estatus = 1          -- Solo regiones activas
 `;
-    return await this.usuariosregionesRepository.query(query, [cliente]);
+    return await this.usuariosregionesRepository.query(query, [...ids]);
   }
 
   async findAll(
@@ -235,6 +262,10 @@ WHERE c.Id = ?               -- Filtrado por cliente
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -249,7 +280,8 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
 ORDER BY d.Id DESC
 
   LIMIT ? OFFSET ?;
-  `,[limit, offset]
+  `,
+            [limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -294,6 +326,7 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
 
         default:
           // Consulta de datos paginados Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           data = await this.usuariosregionesRepository.query(
             `
   SELECT 
@@ -333,6 +366,10 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
   FROM Derroteros d
@@ -346,12 +383,12 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
     AND ur.Estatus = 1
     AND r.Estatus = 1
     AND ru.Estatus = 1
-    AND c.Id = ? -- Discriminacion de clientes
+    AND c.Id = IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
   ORDER BY d.Id DESC
   LIMIT ? OFFSET ?
   `,
-            [idUser, cliente, limit, offset],
+            [idUser, ...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -366,9 +403,9 @@ WHERE ur.IdUsuario = ?
   AND ur.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
-  AND r.IdCliente = ?
+  AND r.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   `,
-            [idUser, cliente],
+            [idUser, ...ids],
           );
           break;
       }
@@ -407,6 +444,7 @@ WHERE ur.IdUsuario = ?
   }
 
   private async consultarDerroteroListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
   SELECT 
     -- Datos del derrotero (datos principales)
@@ -445,6 +483,10 @@ WHERE ur.IdUsuario = ?
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -453,7 +495,7 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?               -- Filtrado por cliente
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND c.Estatus = 1
   AND ru.Estatus = 1         -- Solo rutas activas
   AND r.Estatus = 1          -- Solo regiones activas
@@ -461,7 +503,7 @@ WHERE c.Id = ?               -- Filtrado por cliente
 
 ORDER BY d.Id DESC;
     `;
-    return this.usuariosregionesRepository.query(query, [cliente]);
+    return this.usuariosregionesRepository.query(query, [...ids]);
   }
 
   async findAllList(idUser: number, cliente: number, rol: number) {
@@ -509,6 +551,10 @@ ORDER BY d.Id DESC;
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -520,6 +566,7 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 WHERE ru.Estatus = 1         -- Solo rutas activas
   AND r.Estatus = 1          -- Solo regiones activas
   AND d.Estatus = 1
+  AND c.Estatus = 1
 
 ORDER BY d.Id DESC;
       `,
@@ -543,6 +590,7 @@ ORDER BY d.Id DESC;
 
         default:
           // Consulta de datos paginados Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           data = await this.usuariosregionesRepository.query(
             `
       SELECT 
@@ -582,6 +630,10 @@ ORDER BY d.Id DESC;
 
   -- Cliente relacionado
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -596,11 +648,12 @@ WHERE ur.IdUsuario = ?
   AND r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
-   AND c.Id = ?
+  AND c.Estatus = 1
+   AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY d.Id DESC;
       `,
-            [idUser, cliente], // parámetro seguro
+            [idUser, ids], // parámetro seguro
           );
           break;
       }
@@ -631,6 +684,7 @@ ORDER BY d.Id DESC;
   }
 
   private async consultarDerroteroOne(cliente: number, id: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
   SELECT 
     -- Datos del derrotero (datos principales)
@@ -669,6 +723,10 @@ ORDER BY d.Id DESC;
 
     -- Cliente relacionado
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente,
     CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -677,8 +735,7 @@ INNER JOIN Regiones r ON ru.IdRegion = r.Id
 LEFT JOIN Regiones rf ON ru.IdRegionFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 
-WHERE c.Id = ?               -- Filtrado por cliente
-  AND c.Estatus = 1
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND ru.Estatus = 1         -- Solo rutas activas
   AND r.Estatus = 1          -- Solo regiones activas
   AND d.Estatus = 1
@@ -686,7 +743,7 @@ WHERE c.Id = ?               -- Filtrado por cliente
 
 ORDER BY d.Id DESC;
     `;
-    return this.usuariosregionesRepository.query(query, [cliente, id]);
+    return this.usuariosregionesRepository.query(query, [...ids, id]);
   }
 
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
@@ -736,6 +793,10 @@ ORDER BY d.Id DESC;
 
   -- Cliente relacionado
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -772,6 +833,7 @@ WHERE ur.IdUsuario = ?
 
         default:
           // Consulta de datos paginados Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           data = await this.usuariosregionesRepository.query(
             `
     SELECT 
@@ -813,6 +875,10 @@ WHERE ur.IdUsuario = ?
 
   -- Cliente relacionado
   c.Id AS idCliente,
+  c.Nombre AS nombreCliente,
+  c.ApellidoPaterno AS apellidoPaternoCliente,
+  c.ApellidoMaterno AS apellidoMaternoCliente,
+  c.Estatus AS estatusCliente,
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Derroteros d
@@ -827,9 +893,9 @@ WHERE ur.IdUsuario = ?
   AND r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Id = ? -- Id del derrotero
-  AND c.Id = ? -- Discriminacion de clientes
+  AND c.Id = IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
       `,
-            [idUser, id, cliente], // parámetro seguro
+            [idUser, id, ids], // parámetro seguro
           );
           break;
       }
@@ -930,8 +996,6 @@ WHERE ur.IdUsuario = ?
     updateDerroteroDto: UpdateDerroteroDto,
   ) {
     try {
-
-
       let newDerrotero = this.derroterosRepository.create(updateDerroteroDto);
 
       if (
@@ -998,10 +1062,9 @@ WHERE ur.IdUsuario = ?
     try {
       let derrotero;
       derrotero = await this.derroterosRepository.findOne({
-            where: { id: id },
-          });
-          if (!derrotero)
-            throw new NotFoundException('Derrotero no encontrado');
+        where: { id: id },
+      });
+      if (!derrotero) throw new NotFoundException('Derrotero no encontrado');
 
       //eliminado logico
       await this.derroterosRepository.update(id, { estatus: 0 });

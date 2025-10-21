@@ -18,6 +18,7 @@ import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { UpdateBlueVoxEstatusDto } from './dto/update-bluevox-estatus.dto';
 import { Instalaciones } from 'src/entities/Instalaciones';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class BluevoxService {
@@ -26,6 +27,8 @@ export class BluevoxService {
     private readonly bluevoxsRepository: Repository<BlueVoxs>,
     @InjectRepository(Instalaciones)
     private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -95,7 +98,27 @@ export class BluevoxService {
     }
   }
 
-  //Obtener los bluevox por cliente
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
+  //Obtener los bluevox por cliente -- obsoleto
   async findAllListClientes(id: number, cliente: number) {
     try {
       const bluevox = await this.bluevoxsRepository.find({
@@ -161,8 +184,6 @@ SELECT
 
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE c.Estatus = 1
-
 ORDER BY b.Id DESC
 LIMIT ? OFFSET ?;
         `,
@@ -175,13 +196,13 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE c.Estatus = 1
   `,
           );
           break;
 
         default:
           // Consulta de datos paginados resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           bluevoxs = await this.bluevoxsRepository.query(
             `
 SELECT
@@ -203,13 +224,12 @@ SELECT
 
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE b.IdCliente = ?
-AND c.Estatus = 1
+WHERE b.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY b.Id DESC
 LIMIT ? OFFSET ?;
         `,
-            [cliente, limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -218,10 +238,9 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE b.IdCliente = ?
-AND c.Estatus = 1
+WHERE b.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -283,6 +302,7 @@ SELECT
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
 WHERE b.Estatus = 1
+AND b.EstadoActual = 1
 AND c.Estatus = 1
 ORDER BY b.Id DESC;
         `,
@@ -291,6 +311,7 @@ ORDER BY b.Id DESC;
 
         default:
           // Consulta de datos listado resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           bluevoxs = await this.bluevoxsRepository.query(
             `
 SELECT
@@ -312,12 +333,13 @@ SELECT
 
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE b.IdCliente = ?
+WHERE b.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND b.Estatus = 1
+AND b.EstadoActual = 1
 AND c.Estatus = 1
 ORDER BY b.Id DESC;
         `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -336,10 +358,13 @@ ORDER BY b.Id DESC;
       if (error instanceof HttpException) {
         throw error;
       }
-      throw new BadRequestException('Se produjo un error al obtener el listado de BlueVoxs.');
+      throw new BadRequestException(
+        'Se produjo un error al obtener el listado de BlueVoxs.',
+      );
     }
   }
 
+  //Obtener por ID
   async findOne(id: number, cliente: number, rol: number) {
     try {
       let bluevoxs;
@@ -367,7 +392,6 @@ SELECT
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
 WHERE b.Id = ?
-AND c.Estatus = 1
 ORDER BY b.Id DESC;
         `,
             [id],
@@ -375,6 +399,7 @@ ORDER BY b.Id DESC;
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           bluevoxs = await this.bluevoxsRepository.query(
             `
 SELECT
@@ -396,12 +421,11 @@ SELECT
 
 FROM BlueVoxs b
 INNER JOIN Clientes c ON b.IdCliente = c.Id
-WHERE b.IdCliente = ?
+WHERE b.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND b.Id = ?
-c.Estatus = 1
 ORDER BY b.Id DESC;
         `,
-            [cliente, id],
+            [...ids, id],
           );
           break;
       }
@@ -427,12 +451,14 @@ ORDER BY b.Id DESC;
     }
   }
 
+  //Actualizar equipo
   async update(id: number, idUser: number, updateBluevoxDto: UpdateBluevoxDto) {
     try {
       const bluevox = await this.bluevoxsRepository.findOne({
         where: { id: id },
       });
-      if (!bluevox) throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
+      if (!bluevox)
+        throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
       await this.bluevoxsRepository.update(id, updateBluevoxDto);
 
       //-----Registro en la bitacora----- SUCCESS
@@ -482,6 +508,7 @@ ORDER BY b.Id DESC;
     }
   }
 
+  //actualizar estatus
   async updateEstatus(
     id: number,
     idUser: number,
@@ -491,16 +518,20 @@ ORDER BY b.Id DESC;
       const bluevoxs = await this.bluevoxsRepository.findOne({
         where: { id: id },
       });
-      if (!bluevoxs) throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
+      if (!bluevoxs)
+        throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
       const estatus = updateBlueVoxEstatusDto.estatus;
-      if (estatus === 1) {
+      if (estatus === 0) {
         const bluevoxInstalacion = await this.instalacionesRepository.findOne({
           where: { idBlueVox: bluevoxs.id, estatus: 1 },
         });
         if (bluevoxInstalacion)
           throw new BadRequestException(
-            'No es posible completar la operación: BlueVoxs ya se encuentra asignado a una instalación.',
+            'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
           );
+        await this.bluevoxsRepository.update(id, { estadoActual: estatus });
+      } else {
+        await this.bluevoxsRepository.update(id, { estadoActual: estatus });
       }
       await this.bluevoxsRepository.update(id, { estatus: estatus });
 
@@ -555,7 +586,18 @@ ORDER BY b.Id DESC;
       const bluevoxs = await this.bluevoxsRepository.findOne({
         where: { id: id },
       });
-      if (!bluevoxs) throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
+      if (!bluevoxs)
+        throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
+
+      const bluevoxInstalacion = await this.instalacionesRepository.findOne({
+        where: { idBlueVox: bluevoxs.id, estatus: 1 },
+      });
+      if (bluevoxInstalacion)
+        throw new BadRequestException(
+          'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
+        );
+      
+      await this.bluevoxsRepository.update(id, { estadoActual: 0 });
 
       await this.bluevoxsRepository.update(id, { estatus: 0 });
 

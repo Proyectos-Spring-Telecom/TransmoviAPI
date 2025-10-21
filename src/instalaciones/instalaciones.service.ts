@@ -21,6 +21,9 @@ import { UsuariosInstalaciones } from 'src/entities/UsuariosInstalaciones';
 import { Dispositivos } from 'src/entities/Dispositivos';
 import { BlueVoxs } from 'src/entities/BlueVoxs';
 import { Vehiculos } from 'src/entities/Vehiculos';
+import { Clientes } from 'src/entities/Clientes';
+import { HistoricoInstalaciones } from 'src/entities/historico-instalaciones';
+import { HistoricoinstalacionesService } from 'src/historicoinstalaciones/historicoinstalaciones.service';
 
 @Injectable()
 export class InstalacionesService {
@@ -35,7 +38,10 @@ export class InstalacionesService {
     private readonly vehiculosRepository: Repository<Vehiculos>,
     @InjectRepository(UsuariosInstalaciones)
     private readonly usuariosinstalacionesRepository: Repository<UsuariosInstalaciones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
+    private readonly historicoinstalacionesService: HistoricoinstalacionesService,
   ) {}
 
   async create(
@@ -164,6 +170,16 @@ export class InstalacionesService {
         EstatusEnumBitcora.SUCCESS,
       );
 
+      //Registro historico
+      await this.historicoinstalacionesService.createHistorico(
+        instalacionSave.id,
+        instalacionSave.idDispositivo,
+        instalacionSave.idBlueVox,
+        instalacionSave.idVehiculo,
+        instalacionSave.idCliente,
+        idUser,
+      );
+
       // API response (con mensajes corregidos)
       const result: ApiCrudResponse = {
         status: 'success',
@@ -209,11 +225,32 @@ export class InstalacionesService {
     }
   }
 
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   private async consultarInstalacionesPaginado(
     cliente: number,
     limit: number,
     offset: number,
   ) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT
   -- Instalación
@@ -254,17 +291,17 @@ INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-WHERE c.Estatus = 1
-AND c.Id = ?
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   
 
 ORDER BY i.Id DESC
 LIMIT ? OFFSET ?;
    `;
-    return this.instalacionesRepository.query(query, [cliente, limit, offset]);
+    return this.instalacionesRepository.query(query, [...ids, limit, offset]);
   }
 
   private async consultarTotalInstalacionesPaginados(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `  
   SELECT COUNT(*) AS total
   FROM Instalaciones i
@@ -273,11 +310,10 @@ INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-WHERE c.Estatus = 1
-AND c.Id = ?
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   
 `;
-    return await this.instalacionesRepository.query(query, [cliente]);
+    return await this.instalacionesRepository.query(query, [...ids]);
   }
 
   async findAll(
@@ -335,7 +371,7 @@ INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-WHERE c.Estatus = 1
+
   
 
 ORDER BY i.Id DESC
@@ -354,7 +390,7 @@ INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
-WHERE c.Estatus = 1
+
 		
   `,
           );
@@ -501,9 +537,8 @@ INNER JOIN Clientes c ON i.IdCliente = c.Id
     }
   }
 
-  private async consultarInstalacionesListado(
-    cliente: number
-  ) {
+  private async consultarInstalacionesListado(cliente: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT
   -- Instalación
@@ -545,13 +580,13 @@ INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE c.Estatus = 1
-AND c.Id = ?
+AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND i.Estatus = 1
   
 
 ORDER BY i.Id DESC
    `;
-    return this.instalacionesRepository.query(query, [cliente]);
+    return this.instalacionesRepository.query(query, [...ids]);
   }
 
   async findAllList(
@@ -617,17 +652,17 @@ ORDER BY i.Id DESC;
 
         case 2:
           // Consulta de datos paginados Usuario Administrador
-          instalaciones = await this.consultarInstalacionesListado(cliente)
+          instalaciones = await this.consultarInstalacionesListado(cliente);
           break;
 
-        case 8: 
-        // Consulta de datos paginados Usuario Reportes
-          instalaciones = await this.consultarInstalacionesListado(cliente)
-        break;
+        case 8:
+          // Consulta de datos paginados Usuario Reportes
+          instalaciones = await this.consultarInstalacionesListado(cliente);
+          break;
 
         case 10:
           // Consulta de datos paginados Usuario Capturista
-          instalaciones = await this.consultarInstalacionesListado(cliente)
+          instalaciones = await this.consultarInstalacionesListado(cliente);
           break;
 
         default:
@@ -677,6 +712,7 @@ INNER JOIN Clientes c ON i.IdCliente = c.Id
 WHERE ui.IdUsuario = ?
   AND ui.Estatus = 1
   AND i.Estatus = 1
+  AND c.Estatus = 1
 
 ORDER BY i.Id DESC;
 
@@ -712,10 +748,8 @@ ORDER BY i.Id DESC;
     }
   }
 
-    private async consultarInstalacionesOne(
-    cliente: number,
-    id: number
-  ) {
+  private async consultarInstalacionesOne(cliente: number, id: number) {
+    const { ids, placeholders } = await this.clienteHijos(cliente);
     const query = `
 SELECT
   -- Instalación
@@ -757,12 +791,11 @@ INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE i.Id = ?
-AND i.IdCliente = ?
-AND c.Estatus = 1
+AND i.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY i.Id DESC;
    `;
-    return this.instalacionesRepository.query(query, [id, cliente]);
+    return this.instalacionesRepository.query(query, [id, ...ids]);
   }
 
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
@@ -813,7 +846,6 @@ INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE i.Id = ?
-AND c.Estatus = 1
 
 ORDER BY i.Id DESC;
 
@@ -824,17 +856,17 @@ ORDER BY i.Id DESC;
 
         case 2:
           // Consulta de datos paginados Usuario Administrador
-          instalaciones = await this.consultarInstalacionesOne(cliente, id)
+          instalaciones = await this.consultarInstalacionesOne(cliente, id);
           break;
 
         case 8:
           // Consulta de datos paginados Usuario Reportes
-          instalaciones = await this.consultarInstalacionesOne(cliente, id)
+          instalaciones = await this.consultarInstalacionesOne(cliente, id);
           break;
 
         case 10:
           // Consulta de datos paginados Usuario Capturista
-          instalaciones = await this.consultarInstalacionesOne(cliente, id)
+          instalaciones = await this.consultarInstalacionesOne(cliente, id);
           break;
 
         default:
@@ -928,22 +960,10 @@ ORDER BY i.Id DESC;
     updateInstalacioneEstatusDto: UpdateInstalacioneEstatusDto,
   ) {
     try {
-      let instalacion;
-      switch (rol) {
-        case 1:
-          // Usuario administrador - obtiene todas las instalaciones
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id },
-          });
-          break;
-
-        default:
-          // Usuarios normales - solo sus instalaciones asignadas
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id, idCliente: cliente },
-          });
-          break;
-      }
+      
+      const instalacion = await this.instalacionesRepository.findOne({
+        where: { id: id },
+      });
 
       if (!instalacion) {
         throw new NotFoundException(
@@ -996,14 +1016,60 @@ ORDER BY i.Id DESC;
         // Si hay conflictos, lanzar error con todos los detalles
         if (errores.length > 0) {
           throw new BadRequestException({
-            message: `No se puede crear la instalación debido a los siguientes conflictos`,
+            message: `No se puede crear la instalación debido a los siguientes conflictos: ${errores[0]}`,
             errors: errores,
             conflictsCount: errores.length,
           });
         }
 
-        // Cambiar estatus de componentes a 0 (liberados)
-        const body = { estatus: 0 };
+        // ✅ Verificar todos los componentes esten disponibles
+        const erroresEstado: string[] = [];
+        console.log(instalacion.idDispositivo)
+        // Verificar dispositivo este disponible
+        const dispositivoEstado = await this.dispositivosRepository.findOne({
+          where: {
+            id: instalacion.idDispositivo,
+            estatus: 1,
+            estadoActual: 1,
+          },
+        });
+        if (!dispositivoEstado) {
+          erroresEstado.push(
+            `Dispositivo "${instalacion.idDispositivo}" su estado actual, no esta disponible`,
+          );
+        }
+
+        // Verificar BlueVox este disponible
+        const blueVoxEstado = await this.bluevoxsRepository.findOne({
+          where: { id: instalacion.idBlueVox, estatus: 1, estadoActual: 1 },
+        });
+        if (!blueVoxEstado) {
+          erroresEstado.push(
+            `BlueVox "${instalacion.idBlueVox}" su estado actual, no esta disponible`,
+          );
+        }
+
+        // Verificar Vehículo este disponible
+        const vehiculoEstado = await this.vehiculosRepository.findOne({
+          where: { id: instalacion.idVehiculo, estatus: 1, estadoActual: 1 },
+        });
+        if (!vehiculoEstado) {
+          erroresEstado.push(
+            `Vehículo con placa "${instalacion.idVehiculo}" su estado actual, no esta disponible`,
+          );
+        }
+
+        // Si hay conflictos, lanzar error con todos los detalles
+        if (erroresEstado.length > 0) {
+          throw new BadRequestException({
+            message: `No se puede crear la instalación debido a los siguientes conflictos: ${erroresEstado[0]}`,
+            errors: erroresEstado,
+            conflictsCount: erroresEstado.length,
+          });
+        }
+
+        // Cambiar estatus de componentes a 2 (Asignado)
+        const body = { estadoActual: 2 };
         await this.dispositivosRepository.update(
           instalacion.idDispositivo,
           body,
@@ -1011,8 +1077,8 @@ ORDER BY i.Id DESC;
         await this.bluevoxsRepository.update(instalacion.idBlueVox, body);
         await this.vehiculosRepository.update(instalacion.idVehiculo, body);
       } else if (estatus === 0) {
-        // Desactivar instalación → activar componentes
-        const body = { estatus: 1 };
+        // Desactivar instalación → activar componentes a 1(Disponible)
+        const body = { estadoActual: 1 };
         await this.dispositivosRepository.update(
           instalacion.idDispositivo,
           body,
@@ -1044,7 +1110,7 @@ ORDER BY i.Id DESC;
         data: {
           id: id,
           nombre:
-            `${instalacion.id} dispositivo:${instalacion.idDispositivo} bluevox: ${instalacion.blueVoxs} vehiculo: ${instalacion.idVehiculo}` ||
+            `${instalacion.id} dispositivo:${instalacion.idDispositivo} bluevox: ${instalacion.idBlueVox} vehiculo: ${instalacion.idVehiculo}` ||
             '',
         },
       };
@@ -1080,33 +1146,58 @@ ORDER BY i.Id DESC;
     updateInstalacioneDto: UpdateInstalacioneDto,
   ): Promise<ApiCrudResponse> {
     try {
-      let instalacion;
-      switch (rol) {
-        case 1:
-          // Usuario administrador - obtiene todas las instalaciones
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id },
-          });
-          break;
+      const instalacion = await this.instalacionesRepository.findOne({
+        where: { id: id },
+      });
 
-        default:
-          // Usuarios normales - solo sus instalaciones asignadas
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id, idCliente: cliente },
-          });
-
-          //Se asigna el idCliente obtenido del Token
-          updateInstalacioneDto.idCliente = cliente;
-          break;
-      }
       if (!instalacion) {
         throw new NotFoundException(
           `No se encontró la instalación con ID: ${id}.`,
         );
       }
 
-      //Actualizamos datos
-      await this.instalacionesRepository.update(id, updateInstalacioneDto);
+      if (updateInstalacioneDto.estatusDispositivoAnterior) {
+        await this.dispositivosRepository.update(instalacion.idDispositivo, {
+          estadoActual: updateInstalacioneDto.estatusDispositivoAnterior,
+        });
+        await this.instalacionesRepository.update(id, {
+          idDispositivo: updateInstalacioneDto.idDispositivo,
+        });
+      }
+
+      if (updateInstalacioneDto.estatusBluevoxsAnterior) {
+        await this.bluevoxsRepository.update(instalacion.idBlueVox, {
+          estadoActual: updateInstalacioneDto.estatusBluevoxsAnterior,
+        });
+        await this.instalacionesRepository.update(id, {
+          idDispositivo: updateInstalacioneDto.idBlueVox,
+        });
+      }
+
+      const instalacionActualizada = await this.instalacionesRepository.findOne(
+        {
+          where: { id: id },
+        },
+      );
+
+      const body = {
+        idInstalacion: id,
+        idDispositivo: instalacion.idDispositivo,
+        idBlueVox: instalacion.idBlueVox,
+        idVehiculo: instalacion.idVehiculo,
+        idCliente: instalacion.idCliente,
+      };
+
+      //Registro historico
+      await this.historicoinstalacionesService.updateHistorico(
+        body,
+        Number(instalacionActualizada?.idDispositivo),
+        Number(instalacionActualizada?.idBlueVox),
+        Number(instalacionActualizada?.idVehiculo),
+        Number(instalacionActualizada?.idCliente),
+        idUser,
+        updateInstalacioneDto.comentarios,
+      );
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { updateInstalacioneDto };
@@ -1163,21 +1254,10 @@ ORDER BY i.Id DESC;
   ): Promise<ApiCrudResponse> {
     try {
       let instalacion;
-      switch (rol) {
-        case 1:
-          // Usuario administrador - obtiene todas las instalaciones
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id },
-          });
-          break;
+      instalacion = await this.instalacionesRepository.findOne({
+        where: { id: id },
+      });
 
-        default:
-          // Usuarios normales - solo sus instalaciones asignadas
-          instalacion = await this.instalacionesRepository.findOne({
-            where: { id: id, idCliente: cliente },
-          });
-          break;
-      }
       if (!instalacion) {
         throw new NotFoundException(
           `La instalación con ID: ${id} no está disponible.`,
@@ -1188,7 +1268,7 @@ ORDER BY i.Id DESC;
       await this.instalacionesRepository.update(id, { estatus: 0 });
 
       // Desactivar instalación → activar componentes
-      const body = { estatus: 1 };
+      const body = { estadoActual: 1 };
       await this.dispositivosRepository.update(instalacion.idDispositivo, body);
       await this.bluevoxsRepository.update(instalacion.idBlueVox, body);
       await this.vehiculosRepository.update(instalacion.idVehiculo, body);
@@ -1212,7 +1292,7 @@ ORDER BY i.Id DESC;
         data: {
           id: id,
           nombre:
-            `${instalacion.id} dispositivo:${instalacion.idDispositivo} bluevox: ${instalacion.blueVoxs} vehiculo: ${instalacion.idVehiculo}` ||
+            `${instalacion.id} dispositivo:${instalacion.idDispositivo} bluevox: ${instalacion.idBlueVox} vehiculo: ${instalacion.idVehiculo}` ||
             '',
         },
       };

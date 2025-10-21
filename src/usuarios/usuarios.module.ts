@@ -10,10 +10,11 @@ import { PermisosModule } from 'src/permisos/permisos.module';
 import { UsuariosPermisos } from 'src/entities/UsuariosPermisos'; 
 import { MailModule } from 'src/mail/mail.module';
 import { AuthModule } from 'src/auth/auth.module';
+import { Clientes } from 'src/entities/Clientes';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Usuarios,UsuariosPermisos]),
+    TypeOrmModule.forFeature([Usuarios,UsuariosPermisos,Clientes]),
     BitacoraModule,
     ClientesModule,
     PermisosModule,

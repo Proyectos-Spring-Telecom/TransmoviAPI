@@ -19,6 +19,7 @@ import {
 } from 'src/common/ApiResponse';
 import { ClientesService } from 'src/clientes/clientes.service';
 import { Instalaciones } from 'src/entities/Instalaciones';
+import { Clientes } from 'src/entities/Clientes';
 @Injectable()
 export class DispositivosService {
   constructor(
@@ -26,6 +27,8 @@ export class DispositivosService {
     private readonly dispositivoRepository: Repository<Dispositivos>,
     @InjectRepository(Instalaciones)
     private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly clientesService: ClientesService,
   ) {}
@@ -136,6 +139,26 @@ export class DispositivosService {
     }
   }
 
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   //Obtener todos los dispositivos
   async findAllList(cliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
@@ -165,6 +188,7 @@ FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
 WHERE d.Estatus = 1
+AND d.EstadoActual = 1
 AND c.Estatus = 1
 
 ORDER BY d.Id DESC;
@@ -173,6 +197,7 @@ ORDER BY d.Id DESC;
 
         default:
           // Consulta de datos listado resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           dispositivo = await this.dispositivoRepository.query(
             `
         SELECT
@@ -195,13 +220,14 @@ ORDER BY d.Id DESC;
 FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
-WHERE d.IdCliente = ?
+WHERE d.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   AND d.Estatus = 1
+  AND d.EstadoActual = 1
   AND c.Estatus = 1
 
 ORDER BY d.Id DESC;
         `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -226,6 +252,7 @@ ORDER BY d.Id DESC;
       });
     }
   }
+
   //Obtener todos los dispositivos paginado
   async findAll(
     cliente: number,
@@ -261,7 +288,6 @@ ORDER BY d.Id DESC;
 
 FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
-WHERE c.Estatus = 1
 
 ORDER BY d.Id DESC
 LIMIT ? OFFSET ?;
@@ -275,13 +301,13 @@ LIMIT ? OFFSET ?;
               SELECT COUNT(*) AS total
 FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
-WHERE c.Estatus = 1
   `,
           );
           break;
 
         default:
           // Consulta de datos paginados resto Usuario
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           dispositivo = await this.dispositivoRepository.query(
             `
         SELECT
@@ -304,13 +330,12 @@ WHERE c.Estatus = 1
 FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
-WHERE d.IdCliente = ?
-  AND c.Estatus = 1
+WHERE d.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY d.Id DESC
 LIMIT ? OFFSET ?;
         `,
-            [cliente, limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -320,10 +345,9 @@ LIMIT ? OFFSET ?;
 FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
-WHERE d.IdCliente = ?
-  AND c.Estatus = 1
+WHERE d.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -346,7 +370,7 @@ WHERE d.IdCliente = ?
       };
       return result;
     } catch (error) {
-      console.log(error)
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -386,7 +410,6 @@ FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
 WHERE d.Id = ?
-AND c.Estatus = 1
 
 ORDER BY d.Id DESC;
         `,
@@ -396,6 +419,7 @@ ORDER BY d.Id DESC;
 
         default:
           // Consulta de datos Usuarios Normales
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           dispositivo = await this.dispositivoRepository.query(
             `
         SELECT
@@ -419,12 +443,11 @@ FROM Dispositivos d
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 
 WHERE d.Id = ?
-     AND d.IdCliente = ?
-     AND c.Estatus = 1
+     AND d.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY d.Id DESC;
         `,
-            [id, cliente],
+            [id, ...ids],
           );
           break;
       }
@@ -465,7 +488,7 @@ ORDER BY d.Id DESC;
         );
       }
       const { estatus } = updateDispositivoEstatusDto;
-      if (estatus === 1) {
+      if (estatus === 0) {
         const dispositivoInstalacion =
           await this.instalacionesRepository.findOne({
             where: { idDispositivo: dispositivo.id, estatus: 1 },
@@ -473,8 +496,16 @@ ORDER BY d.Id DESC;
 
         if (dispositivoInstalacion)
           throw new BadRequestException(
-            'No es posible completar la operación: Dispositivo ya se encuentra asignado a una instalación.',
+            'No es posible completar la operación: Dispositivo se encuentra asignado a una instalación.',
           );
+
+        await this.dispositivoRepository.update(id, {
+          estadoActual: estatus,
+        });
+      } else {
+        await this.dispositivoRepository.update(id, {
+          estadoActual: estatus,
+        });
       }
       await this.dispositivoRepository.update(id, {
         estatus: estatus,
@@ -612,6 +643,21 @@ ORDER BY d.Id DESC;
           `No se encontró el dispositivo con ID: ${id}.`,
         );
       }
+
+      const dispositivoInstalacion = await this.instalacionesRepository.findOne(
+        {
+          where: { idDispositivo: dispositivo.id, estatus: 1 },
+        },
+      );
+
+      if (dispositivoInstalacion)
+        throw new BadRequestException(
+          'No es posible completar la operación: Dispositivo se encuentra asignado a una instalación.',
+        );
+
+      await this.dispositivoRepository.update(id, {
+        estadoActual: 0,
+      });
       await this.dispositivoRepository.update(id, { estatus: 0 });
 
       //-----Registro en la bitacora----- SUCCESS

@@ -12,13 +12,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Operadores } from 'src/entities/Operadores';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
-import { ApiCrudResponse, ApiResponseCommon, EstatusEnumBitcora } from 'src/common/ApiResponse';
+import {
+  ApiCrudResponse,
+  ApiResponseCommon,
+  EstatusEnumBitcora,
+} from 'src/common/ApiResponse';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class OperadoresService {
   constructor(
     @InjectRepository(Operadores)
     private readonly operadoresRepository: Repository<Operadores>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
   //Crear operador
@@ -91,6 +98,27 @@ export class OperadoresService {
       });
     }
   }
+
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   //Obtener todos los operadores
   async findAllOperadores(
     cliente: number,
@@ -139,6 +167,7 @@ SELECT
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+WHERE u.Estatus = 1
 ORDER BY o.Id DESC
 LIMIT ? OFFSET ?;
         `,
@@ -151,11 +180,13 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
+WHERE u.Estatus = 1
   `,
           );
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           // Consulta de datos paginados resto Usuario
           operadores = await this.operadoresRepository.query(
             `
@@ -191,11 +222,12 @@ SELECT
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-WHERE u.IdCliente = ?
+WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND u.Estatus = 1
 ORDER BY o.Id DESC
 LIMIT ? OFFSET ?;
         `,
-            [cliente, limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -204,9 +236,10 @@ LIMIT ? OFFSET ?;
    SELECT COUNT(*) AS total
   FROM Operadores o
   INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-	WHERE u.IdCliente = ?
+	WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+  AND u.Estatus = 1
   `,
-            [cliente],
+            [...ids],
           );
           break;
       }
@@ -285,12 +318,14 @@ SELECT
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 WHERE o.Estatus = 1
+AND u.Estatus = 1
 ORDER BY o.Id DESC;
         `,
           );
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           operadores = await this.operadoresRepository.query(
             `
 SELECT
@@ -325,15 +360,15 @@ SELECT
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-WHERE u.IdCliente = ?
+WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND o.Estatus = 1
+AND u.Estatus = 1
 ORDER BY o.Id DESC;
         `,
-            [cliente],
+            [...ids],
           );
           break;
       }
-
 
       //Forzamos a cambiar el id a number
       const data = operadores.map((item) => ({
@@ -406,8 +441,9 @@ ORDER BY o.Id DESC;
             [id],
           );
           break;
-      
+
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente)
           // Consulta de datos paginados resto Usuario
           operador = await this.operadoresRepository.query(
             `
@@ -443,11 +479,11 @@ SELECT
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-WHERE u.IdCliente = ?
+WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND o.Id = ?
 ORDER BY o.Id DESC;
         `,
-            [cliente, id],
+            [...ids, id],
           );
           break;
       }
@@ -488,11 +524,13 @@ ORDER BY o.Id DESC;
         where: { id: id },
       });
       if (!operador) {
-        throw new NotFoundException(`Operador id: ${id} con rol no encontrado.`);
+        throw new NotFoundException(
+          `Operador id: ${id} con rol no encontrado.`,
+        );
       }
       const { estatus } = updateOperadorStatusDto;
       await this.operadoresRepository.update(id, { estatus: estatus });
-      
+
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { updateOperadorStatusDto };
       await this.bitacoraLogger.logToBitacora(
@@ -605,7 +643,6 @@ ORDER BY o.Id DESC;
     }
   }
 
-
   //Eliminar Operador
   async removeOperador(id: number, idUser: number) {
     try {
@@ -642,7 +679,6 @@ ORDER BY o.Id DESC;
       };
       return result;
     } catch (error) {
-
       //-----Registro en la bitacora-----SUCCESS
       const querylogger = { id: id, estatus: 0 };
       await this.bitacoraLogger.logToBitacora(
@@ -660,7 +696,8 @@ ORDER BY o.Id DESC;
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Ha ocurrido un error durante el proceso de eliminación del operador.',
+        message:
+          'Ha ocurrido un error durante el proceso de eliminación del operador.',
         error: error.message,
       });
     }

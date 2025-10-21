@@ -174,6 +174,7 @@ LEFT JOIN Regiones regFin ON r.IdRegionFin = regFin.Id
 
         WHERE v.Estatus = 1
         AND c.Id = ?
+        AND c.Estatus = 1
 
 ORDER BY v.Id DESC
 
@@ -280,6 +281,7 @@ LEFT JOIN Regiones regInicio ON r.IdRegion = regInicio.Id
 
 -- Región de fin
 LEFT JOIN Regiones regFin ON r.IdRegionFin = regFin.Id
+WHERE c.Estatus = 1
 
 ORDER BY v.Id DESC;
             `,
@@ -738,8 +740,7 @@ LEFT JOIN Regiones regInicio ON r.IdRegion = regInicio.Id
 -- Región de fin
 LEFT JOIN Regiones regFin ON r.IdRegionFin = regFin.Id
 
-        WHERE v.Estatus = 1
-        AND c.Id = ?
+        WHERE c.Id = ?
         AND v.Id = ?
 
 ORDER BY v.Id DESC
