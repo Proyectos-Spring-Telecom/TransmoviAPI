@@ -626,7 +626,10 @@ ORDER BY b.Id DESC;
         );
 
       //logica si estado del componente esta asignado
-      if (bluevoxs.estadoActual === EstadoComponente.INACTIVO && bluevoxs.estatus === EstatusEnum.INACTIVO) {
+      if (
+        bluevoxs.estadoActual === EstadoComponente.INACTIVO &&
+        bluevoxs.estatus === EstatusEnum.INACTIVO
+      ) {
         throw new BadRequestException(
           'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
         );

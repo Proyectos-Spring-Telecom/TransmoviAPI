@@ -402,6 +402,11 @@ export class AuthService {
         EstatusEnumBitcora.SUCCESS,
       );
 
+      await this.codigoAutenticacioRepository.update(codigoValido.id, {
+        usado: EstatusEnum.INACTIVO,
+        estatus: EstatusEnum.INACTIVO,
+      });
+
       return `La verificación del usuario ${user.nombre} se ha completado con éxito.
 Muchas gracias por su preferencia.`;
     } catch (error) {
