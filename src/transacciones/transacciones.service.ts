@@ -18,6 +18,7 @@ import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { Dispositivos } from 'src/entities/Dispositivos';
 import { MonederosService } from 'src/monederos/monederos.service';
 import { PasajerosService } from 'src/pasajeros/pasajeros.service';
+import { Clientes } from 'src/entities/Clientes';
 
 @Injectable()
 export class TransaccionesService {
@@ -26,6 +27,8 @@ export class TransaccionesService {
     private readonly transaccionesRepository: Repository<Transacciones>,
     @InjectRepository(Dispositivos)
     private readonly dispositivoRepository: Repository<Dispositivos>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly monederosService: MonederosService,
     private readonly pasajeroService: PasajerosService,
@@ -125,6 +128,26 @@ export class TransaccionesService {
         `Error generar la transaccion de tipo ${createTransaccioneDto.tipoTransaccion}`,
       );
     }
+  }
+
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
   }
 
   async findAllTransacciones(
@@ -264,10 +287,11 @@ LEFT JOIN Pasajeros p
           break;
 
         default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
           transacciones = await this.transaccionesRepository.query(
             `
 SELECT 
-    -- Transacción
+    -- 🔹 Transacción
     t.Id AS id,
     t.TipoTransaccion AS tipoTransaccion,
     t.Monto AS monto,
@@ -278,18 +302,24 @@ SELECT
     t.NumeroSerieMonedero AS numeroSerieMonedero,
     t.NumeroSerieDispositivo AS numeroSerieDispositivo,
 
-    -- Dispositivo (puede ser NULL)
+    -- 🔹 Dispositivo (puede ser NULL)
     d.Marca AS marcaDispositivo,
     d.Modelo AS modeloDispositivo,
-    
 
-    -- Pasajero (a través del monedero)
+    -- 🔹 Pasajero (a través del monedero)
     p.Id AS idPasajero,
     p.Nombre AS nombrePasajero,
     p.ApellidoPaterno AS apellidoPaternoPasajero,
-    p.ApellidoMaterno AS apellidoMaternoPasajero
+    p.ApellidoMaterno AS apellidoMaternoPasajero,
 
+    -- 🔹 Monedero
+    m.Id AS idMonedero,
+    m.Saldo AS saldoMonedero,
 
+    -- 🔹 Cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.RFC AS rfcCliente
 
 FROM Transacciones t
 LEFT JOIN Dispositivos d 
@@ -298,11 +328,16 @@ INNER JOIN Monederos m
     ON t.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
-    
-    ORDER BY t.Id DESC
+INNER JOIN Clientes c
+    ON m.IdCliente = c.Id
+
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+ORDER BY t.Id DESC
+
   LIMIT ? OFFSET ?;
         `,
-            [limit, offset],
+            [...ids, limit, offset],
           );
 
           // Query para total (sin paginación)
@@ -316,8 +351,12 @@ INNER JOIN Monederos m
     ON t.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
-		
+INNER JOIN Clientes c
+    ON m.IdCliente = c.Id
+
+	WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   `,
+            [...ids],
           );
           break;
       }
@@ -355,10 +394,16 @@ LEFT JOIN Pasajeros p
     }
   }
 
-  async findAllListTransacciones(): Promise<ApiResponseCommon> {
+  async findAllListTransacciones(
+    cliente: number,
+    rol: number,
+  ): Promise<ApiResponseCommon> {
     try {
-      const transacciones = await this.transaccionesRepository.query(
-        `
+      let transacciones;
+      switch (rol) {
+        case 1:
+          transacciones = await this.transaccionesRepository.query(
+            `
 SELECT 
     -- Transacción
     t.Id AS id,
@@ -394,7 +439,65 @@ LEFT JOIN Pasajeros p
     
     ORDER BY t.Id DESC
         `,
-      );
+          );
+          break;
+
+        default:
+          const { ids, placeholders } = await this.clienteHijos(cliente);
+          transacciones = await this.transaccionesRepository.query(
+            `
+SELECT 
+    -- 🔹 Transacción
+    t.Id AS id,
+    t.TipoTransaccion AS tipoTransaccion,
+    t.Monto AS monto,
+    t.Latitud AS latitud,
+    t.Longitud AS longitud,
+    t.FechaHora AS fechaHora,
+    t.FHRegistro AS fhRegistro,
+    t.NumeroSerieMonedero AS numeroSerieMonedero,
+    t.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- 🔹 Dispositivo (puede ser NULL)
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    -- 🔹 Pasajero (a través del monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero,
+
+    -- 🔹 Monedero
+    m.Id AS idMonedero,
+    m.Saldo AS saldoMonedero,
+
+    -- 🔹 Cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Estatus AS estatusCliente
+
+FROM Transacciones t
+LEFT JOIN Dispositivos d 
+    ON t.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON t.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+    ON m.IdCliente = c.Id
+
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+ORDER BY t.Id DESC;
+
+        `,
+            [...ids],
+          );
+          break;
+      }
 
       // 🔥 Transformación de datos (ids → number, nombreCompleto)
       const data = transacciones.map((item) => ({
@@ -404,6 +507,8 @@ LEFT JOIN Pasajeros p
         latitud: Number(item.latitud),
         longitud: Number(item.longitud),
         idPasajero: Number(item.idPasajero),
+        idMonedero: Number(item.idMonedero),
+        idCliente: Number(item.idCliente),
       }));
 
       //API Response

@@ -353,26 +353,24 @@ export class AuthService {
   }
 
   //confirmacion de correo
-  async verifyUser(
-    idUser: number,
-    email: string,
-    codigoPasajeroAutenticacion: CodigoPasajeroAutenticacion,
-  ) {
+  async verifyUser(codigoPasajeroAutenticacion: CodigoPasajeroAutenticacion) {
     try {
-      const user = await this.usuariosRepository.findOne({
-        where: { id: idUser, userName: email },
-      });
-      if (!user) throw new BadRequestException('Usuario no encontrado');
       const codigoValido = await this.codigoAutenticacioRepository.findOne({
         where: {
-          idUsuario: idUser,
           codigo: codigoPasajeroAutenticacion.codigo,
           tipo: TipoCodigoAutenticacion.CONFIRMACION_CORREO,
           usado: EstatusEnum.ACTIVO,
         },
       });
-      if (!codigoValido)
+
+      if (!codigoValido) {
         throw new BadRequestException('Código inválido o ya usado');
+      }
+
+      const user = await this.usuariosRepository.findOne({
+        where: { id: codigoValido.idUsuario },
+      });
+      if (!user) throw new BadRequestException('Usuario no encontrado');
 
       function pad(n: number) {
         return n < 10 ? '0' + n : n;
@@ -407,28 +405,10 @@ export class AuthService {
       return `La verificación del usuario ${user.nombre} se ha completado con éxito.
 Muchas gracias por su preferencia.`;
     } catch (error) {
-      console.log(error); //**************Borarrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr */
-      //-----Registro en la bitacora----- ERROR
-      const querylogger = { id: idUser, EmailConfirmado: 1 };
-      await this.bitacoraLogger.logToBitacora(
-        'Usuarios',
-        `Se verifico un usuarios con ID: ${idUser}`,
-        'CREATE',
-        querylogger,
-        Number(idUser),
-        2,
-        EstatusEnumBitcora.ERROR,
-        error.message,
-      );
-
-      if (error.name === 'TokenExpiredError') {
-        throw new UnauthorizedException(
-          'Este enlace de autenticación ya no es válido. Los enlaces generados para autenticación tienen un tiempo de validez limitado. Le recomendamos generar uno nuevo para completar su acceso.',
-        );
-      } else if (error.name === 'JsonWebTokenError') {
-        throw new UnauthorizedException('Token inválido');
-      }
-      throw new UnauthorizedException('Error al verificar el usuario');
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al registrar pasajero.',
+        error: error.message,
+      });
     }
   }
 

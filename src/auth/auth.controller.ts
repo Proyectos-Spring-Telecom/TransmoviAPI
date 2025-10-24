@@ -68,18 +68,10 @@ export class AuthController {
   }
 
   @Patch('verify')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(200)
   async verifyUser(
     @Body() codigoPasajeroAutenticacion: CodigoPasajeroAutenticacion,
-    @Request() req,
   ) {
-    const idUser = req.user.userId;
-    const email = req.user.email;
-    return await this.authService.verifyUser(
-      +idUser,
-      email,
-      codigoPasajeroAutenticacion,
-    );
+    return await this.authService.verifyUser(codigoPasajeroAutenticacion);
   }
 }

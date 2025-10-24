@@ -20,7 +20,7 @@ import { UpdateBlueVoxEstatusDto } from './dto/update-bluevox-estatus.dto';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Clientes } from 'src/entities/Clientes';
 import { UpdateBluevoxEstadoDto } from './dto/update-bluevox.estado.dto';
-import { EstadoComponente } from 'src/common/estatus.enum';
+import { EstadoComponente, EstatusEnum } from 'src/common/estatus.enum';
 
 @Injectable()
 export class BluevoxService {
@@ -535,7 +535,6 @@ ORDER BY b.Id DESC;
 
       //logica si estatus es 0
       if (estatus === 0) {
-
         //buscamos que no este asiganada a una instalacion
         const bluevoxInstalacion = await this.instalacionesRepository.findOne({
           where: { idBlueVox: bluevoxs.id, estatus: 1 },
@@ -544,12 +543,16 @@ ORDER BY b.Id DESC;
           throw new BadRequestException(
             'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
           );
-        
+
         //actualizamos el estado del componente a INACTIVO
-        await this.bluevoxsRepository.update(id, { estadoActual: EstadoComponente.INACTIVO });
+        await this.bluevoxsRepository.update(id, {
+          estadoActual: EstadoComponente.INACTIVO,
+        });
       } else {
         //actualizamos el estado del componente a DISPONIBLE
-        await this.bluevoxsRepository.update(id, { estadoActual: EstadoComponente.DISPONIBLE });
+        await this.bluevoxsRepository.update(id, {
+          estadoActual: EstadoComponente.DISPONIBLE,
+        });
       }
       await this.bluevoxsRepository.update(id, { estatus: estatus });
 
@@ -604,7 +607,6 @@ ORDER BY b.Id DESC;
     id: number,
     idUser: number,
     updateBluevoxEstadoDto: UpdateBluevoxEstadoDto,
-
   ) {
     try {
       //buscamos y validamos que exista
@@ -614,8 +616,17 @@ ORDER BY b.Id DESC;
       if (!bluevoxs)
         throw new NotFoundException(`No se encontró un BlueVox con ID: ${id}.`);
 
+      //buscamos que no este asiganada a una instalacion
+      const bluevoxInstalacion = await this.instalacionesRepository.findOne({
+        where: { idBlueVox: bluevoxs.id, estatus: 1 },
+      });
+      if (bluevoxInstalacion)
+        throw new BadRequestException(
+          'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
+        );
+
       //logica si estado del componente esta asignado
-      if (bluevoxs.estadoActual === EstadoComponente.ASIGNADO ) {
+      if (bluevoxs.estadoActual === EstadoComponente.INACTIVO && bluevoxs.estatus === EstatusEnum.INACTIVO) {
         throw new BadRequestException(
           'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
         );
@@ -624,7 +635,6 @@ ORDER BY b.Id DESC;
       const estadoActual = updateBluevoxEstadoDto.estadoActual;
       //se cambia estado del componente
       await this.bluevoxsRepository.update(id, { estadoActual: estadoActual });
-      
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { updateBluevoxEstadoDto };
@@ -689,7 +699,7 @@ ORDER BY b.Id DESC;
         throw new BadRequestException(
           'No es posible completar la operación: BlueVoxs se encuentra asignado a una instalación.',
         );
-      
+
       //actualizamos el estado del componente a INACTIVO
       await this.bluevoxsRepository.update(id, { estadoActual: 0 });
 

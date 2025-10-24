@@ -38,8 +38,11 @@ export class PasajerosController {
   // ========================================
 
   @Get('list')
-  findAllListPasajero(): Promise<ApiResponseCommon> {
-    return this.pasajerosService.findAllListPasajeros();
+  findAllListPasajero(@Request() req,): Promise<ApiResponseCommon> {
+    const idUser = req.user.userId;
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return this.pasajerosService.findAllListPasajeros(+cliente, +rol);
   }
 
   @Get('main/:idUsuario')
@@ -57,8 +60,12 @@ export class PasajerosController {
   findAllPasajero(
     @Param('page', ParseIntPipe) page: number,
     @Param('limit', ParseIntPipe) limit: number,
+    @Request() req,
   ): Promise<ApiResponseCommon> {
-    return this.pasajerosService.findAllPasajeros(page, limit);
+    const idUser = req.user.userId;
+    const cliente = req.user.cliente;
+    const rol = req.user.rol;
+    return this.pasajerosService.findAllPasajeros(+cliente, +rol, page, limit);
   }
 
   @Get(':id')
