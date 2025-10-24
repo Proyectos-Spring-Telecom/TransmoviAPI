@@ -52,7 +52,7 @@ export class TransaccionesController {
     const email = req.user.email;
     const cliente = req.user.cliente;
     const rol = req.user.rol;
-    return await this.transaccionesService.findAllListTransacciones();
+    return await this.transaccionesService.findAllListTransacciones(+cliente, +rol);
   }
 
   @Get(':id')

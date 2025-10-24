@@ -1,6 +1,13 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateInstalacionesDto } from './create-instalacione.dto';
-import { IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   @ApiProperty({
@@ -15,7 +22,9 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
     description: 'ID del dispositivo asociado a la instalación',
     example: 101,
   })
-  @IsOptional({ message: 'Para saber el estado de los componentes en caso de cambiarlos' })
+  @IsOptional({
+    message: 'Para saber el estado de los componentes en caso de cambiarlos',
+  })
   @IsInt()
   @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
   estatusDispositivoAnterior?: number;
@@ -32,18 +41,12 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
     description: 'ID del dispositivo asociado a la instalación',
     example: 101,
   })
-  @IsOptional({ message: 'Para saber el estado de los componentes en caso de cambiarlos' })
+  @IsOptional({
+    message: 'Para saber el estado de los componentes en caso de cambiarlos',
+  })
   @IsInt()
   @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
   estatusBluevoxsAnterior?: number;
-
-  @ApiProperty({
-    description: 'ID del cliente asociado a la instalación',
-    example: 404,
-  })
-  @IsOptional({ message: 'El IdCliente es obligatorio' })
-  @IsNumber()
-  idCliente?: number;
 
   @ApiProperty({
     description: 'Comentario acerca de los componentes',

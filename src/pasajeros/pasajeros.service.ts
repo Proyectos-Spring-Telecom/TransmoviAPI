@@ -17,11 +17,14 @@ import {
   ApiResponseCommon,
   EstatusEnumBitcora,
 } from 'src/common/ApiResponse';
+import { Clientes } from 'src/entities/Clientes';
 @Injectable()
 export class PasajerosService {
   constructor(
     @InjectRepository(Pasajeros)
     private readonly pasajeroRepository: Repository<Pasajeros>,
+    @InjectRepository(Clientes)
+    private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
   //Crear pasajero
@@ -89,19 +92,134 @@ export class PasajerosService {
       );
     }
   }
+
+  //funcion para obtener los clientes hijos
+  private async clienteHijos(cliente: number) {
+    const clientesFiltrado = await this.clienteRepository.query(
+      `CALL spGetClientes(?);`,
+      [cliente],
+    );
+
+    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
+    const ids = idsFiltrados
+      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+      .filter(Boolean);
+    if (ids.length === 0) {
+      return { data: [] }; // No hay clientes que consultar
+    }
+
+    // 3. Construir el query dinámico con los IDs
+    const placeholders = ids.map(() => '?').join(', ');
+    return { ids, placeholders };
+  }
+
   //Obtener todos los pasajeros
   async findAllPasajeros(
+    cliente: number,
+    rol: number,
     page: number,
     limit: number,
   ): Promise<ApiResponseCommon> {
     try {
-      const [data, total] = await this.pasajeroRepository.findAndCount({
-        relations: [],
-        skip: (page - 1) * limit,
-        take: limit,
-      });
+      let pasajeros;
+      let totalResult;
+      const offset = (page - 1) * limit;
+      switch (rol) {
+        case 1:
+          pasajeros = await this.pasajeroRepository.query(
+            `
+SELECT DISTINCT
+    p.Id AS id,
+    p.Nombre AS nombre,
+    p.ApellidoPaterno AS apellidoPaterno,
+    p.ApellidoMaterno AS apellidoMaterno,
+    p.FechaNacimiento AS fechaNacimiento,
+    p.Telefono AS telefono,
+    p.Correo AS correo,
+    p.FechaCreacion AS fechaCreacion,
+    p.FechaActualizacion AS fechaActualizacion,
+    p.Estatus AS estatus,
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente
+
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+
+ORDER BY p.Id DESC
+  LIMIT ? OFFSET ?;
+        `,
+            [limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.pasajeroRepository.query(
+            `
+   SELECT COUNT(*) AS total
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+		
+  `,
+          );
+          break;
+
+        default:
+          //Resto de usuarios
+          const { ids, placeholders } = await this.clienteHijos(cliente);
+          pasajeros = await this.pasajeroRepository.query(
+            `
+SELECT DISTINCT
+    p.Id AS id,
+    p.Nombre AS nombre,
+    p.ApellidoPaterno AS apellidoPaterno,
+    p.ApellidoMaterno AS apellidoMaterno,
+    p.FechaNacimiento AS fechaNacimiento,
+    p.Telefono AS telefono,
+    p.Correo AS correo,
+    p.FechaCreacion AS fechaCreacion,
+    p.FechaActualizacion AS fechaActualizacion,
+    p.Estatus AS estatus,
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente
+
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+    
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+ORDER BY p.Id DESC
+  LIMIT ? OFFSET ?;
+        `,
+            [...ids, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.pasajeroRepository.query(
+            `
+   SELECT COUNT(*) AS total
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+	WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+  `,
+            [...ids],
+          );
+          break;
+      }
+
+      const total = Number(totalResult[0]?.total || 0);
+
       const result: ApiResponseCommon = {
-        data,
+        data: pasajeros,
         paginated: {
           total: total,
           page,
@@ -119,13 +237,75 @@ export class PasajerosService {
     }
   }
   //Obtener todos los pasajeros
-  async findAllListPasajeros(): Promise<ApiResponseCommon> {
+  async findAllListPasajeros(cliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
-      const pasajerosExistentes = await this.pasajeroRepository.find({
-        where: { estatus: 1 },
-      });
+      let pasajeros;
+      switch (rol) {
+        case 1:
+          //Resto de usuarios
+          pasajeros = await this.pasajeroRepository.query(
+            `
+SELECT DISTINCT
+    p.Id AS id,
+    p.Nombre AS nombre,
+    p.ApellidoPaterno AS apellidoPaterno,
+    p.ApellidoMaterno AS apellidoMaterno,
+    p.FechaNacimiento AS fechaNacimiento,
+    p.Telefono AS telefono,
+    p.Correo AS correo,
+    p.FechaCreacion AS fechaCreacion,
+    p.FechaActualizacion AS fechaActualizacion,
+    p.Estatus AS estatus,
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente
+
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+    
+
+ORDER BY p.Id DESC
+  LIMIT ? OFFSET ?;
+        `,
+          ); 
+          break;
+      
+        default:
+          //Resto de usuarios
+          const { ids, placeholders } = await this.clienteHijos(cliente);
+          pasajeros = await this.pasajeroRepository.query(
+            `
+SELECT DISTINCT
+    p.Id AS id,
+    p.Nombre AS nombre,
+    p.ApellidoPaterno AS apellidoPaterno,
+    p.ApellidoMaterno AS apellidoMaterno,
+    p.FechaNacimiento AS fechaNacimiento,
+    p.Telefono AS telefono,
+    p.Correo AS correo,
+    p.FechaCreacion AS fechaCreacion,
+    p.FechaActualizacion AS fechaActualizacion,
+    p.Estatus AS estatus,
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente
+
+FROM Pasajeros p
+INNER JOIN Monederos m 
+    ON p.Id = m.IdPasajero
+INNER JOIN Clientes c 
+    ON m.IdCliente = c.Id
+    
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+ORDER BY p.Id DESC
+        `,
+            [...ids],
+          );
+          break;
+      }
       const result: ApiResponseCommon = {
-        data: pasajerosExistentes,
+        data: pasajeros,
       };
       return result;
     } catch (error) {

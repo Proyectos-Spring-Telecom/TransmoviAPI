@@ -20,7 +20,7 @@ import {
 import { ClientesService } from 'src/clientes/clientes.service';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Clientes } from 'src/entities/Clientes';
-import { EstadoComponente } from 'src/common/estatus.enum';
+import { EstadoComponente, EstatusEnum } from 'src/common/estatus.enum';
 import { UpdateDispositivoEstadoDto } from './dto/update-dispositivo-estado.dto';
 @Injectable()
 export class DispositivosService {
@@ -480,7 +480,7 @@ ORDER BY d.Id DESC;
       });
     }
   }
-  
+
   //Actualizar el estatus del dispositivo
   async updateDispositivoEstatus(
     id: number,
@@ -575,6 +575,7 @@ ORDER BY d.Id DESC;
     updateDispositivoEstadoDto: UpdateDispositivoEstadoDto,
   ) {
     try {
+      //buscamos y validamos que exista
       const dispositivo = await this.dispositivoRepository.findOne({
         where: { id: id },
       });
@@ -584,9 +585,24 @@ ORDER BY d.Id DESC;
         );
       }
 
-      if (dispositivo.estadoActual === EstadoComponente.ASIGNADO) {
+      //buscamos que no este asiganada a una instalacion
+      const dispositivoInstalacion = await this.instalacionesRepository.findOne(
+        {
+          where: { idDispositivo: dispositivo.id, estatus: 1 },
+        },
+      );
+
+      if (dispositivoInstalacion)
         throw new BadRequestException(
           'No es posible completar la operación: Dispositivo se encuentra asignado a una instalación.',
+        );
+
+      if (
+        dispositivo.estadoActual === EstadoComponente.INACTIVO &&
+        dispositivo.estatus === EstatusEnum.INACTIVO
+      ) {
+        throw new BadRequestException(
+          'No es posible completar la operación: Dispositivo se encuentra dado de baja.',
         );
       }
       const { estadoActual } = updateDispositivoEstadoDto;
