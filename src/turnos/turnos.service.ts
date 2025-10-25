@@ -381,7 +381,6 @@ LEFT JOIN Usuarios u ON o.IdUsuario = u.Id
 WHERE 
   ui.IdUsuario = ?        -- 🔹 filtra por usuario
   AND ui.Estatus = 1
-  AND t.Estatus = 1
   AND i.Estatus = 1
 
 ORDER BY t.Inicio DESC
@@ -765,8 +764,7 @@ INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
-WHERE t.Estatus = 1
-AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND t.Id = ?
 
 ORDER BY t.Id DESC;
