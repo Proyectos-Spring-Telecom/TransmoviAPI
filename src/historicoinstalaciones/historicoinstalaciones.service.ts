@@ -131,6 +131,7 @@ export class HistoricoinstalacionesService {
       if (historicoActivo) {
         await this.historicoInstalacionesRepository.update(historicoActivo.id, {
           fechaBaja: fechaDesfasada,
+          comentario: comentario,
         });
       }
 
@@ -141,7 +142,6 @@ export class HistoricoinstalacionesService {
         idBlueVox: idBlueVoxUp,
         idVehiculo: idVehiculoUp, // el vehículo no cambia, pero se registra
         idCliente: idClienteUp,
-        comentario,
       });
 
       const historicoSave =
