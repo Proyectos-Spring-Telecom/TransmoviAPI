@@ -89,7 +89,7 @@ export class S3Service {
 
       return { url: publicUrl };
     } catch (error) {
-      //-----Registro en la bitacora----- SUCCESS
+      //-----Registro en la bitacora----- ERROR
       const querylogger = { data: `INSERT INTO ${folder} (...) VALUES (...) -> bucket:  ${this.bucket}` };
       await this.bitacoraLogger.logToBitacora(
         `${folder}`,
