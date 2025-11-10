@@ -321,16 +321,30 @@ ORDER BY u.Id DESC;
   }
 
   //Obtener usuarios operador
-  async getAllListUsuariosRol(id:number): Promise<ApiResponseCommon> {
+  async getAllListUsuariosRol(id: number): Promise<ApiResponseCommon> {
     try {
-      const usuarios = await this.usuarioRepository.find({
-        where: { estatus: 1, idRol: 3, idCliente: id },
-      });
-      const usuariosSinPassword = usuarios.map(
-        ({ passwordHash, ...rest }) => rest,
-      );
+      const usuarios = await this.usuarioRepository.query(
+            `
+SELECT
+  u.Id AS id,
+  u.Nombre AS nombre,
+  u.ApellidoPaterno AS apellidoPaterno,
+  u.ApellidoMaterno AS apellidoMaterno
 
-      const data = usuariosSinPassword.map((item) => ({
+FROM Usuarios u
+WHERE u.IdRol = 3
+AND u.IdCliente = ?
+AND u.Estatus = 1
+  AND u.Id NOT IN (
+    SELECT o.IdUsuario
+    FROM Operadores o
+  )
+ORDER BY u.Id DESC;
+        `,
+            [id]
+          );
+
+      const data = usuarios.map((item) => ({
         ...item,
         id: Number(item.id),
       }));
@@ -343,7 +357,7 @@ ORDER BY u.Id DESC;
         throw error;
       }
       throw new InternalServerErrorException({
-        message: 'Ocurrió un error al obtener los usuarios por roles.',
+        message: "Ocurrió un error al obtener los usuarios por roles.",
         error: error.message,
       });
     }
