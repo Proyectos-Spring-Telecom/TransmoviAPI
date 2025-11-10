@@ -123,7 +123,7 @@ export class CreateOperadoreDto {
     example: '2026-01-15',
   })
   @IsDateString()
-  fechaVencimineto: string;
+  fechaVencimiento: string;
 
   @ApiProperty({
     description: 'ID del tipo de licencia',

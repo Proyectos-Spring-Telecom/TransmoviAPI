@@ -71,7 +71,7 @@ export class OperadoresService {
         licencia: createOperadoreDto.licencia,
         numeroLicencia: createOperadoreDto.numeroLicencia,
         fechaExpedicion: createOperadoreDto.fechaExpedicion,
-        fechaVencimineto: createOperadoreDto.fechaVencimineto,
+        fechaVencimineto: createOperadoreDto.fechaVencimiento,
         idTipoLicencia: createOperadoreDto.idTipoLicencia,
         idCategoriaLicencia: createOperadoreDto.idCategoriaLicencia,
         idOperador: operador.id,
@@ -169,9 +169,10 @@ export class OperadoresService {
             `
 SELECT
   -- Datos del Operador
-  o.Id AS idOperador,
+  o.Id AS id,
   o.FechaNacimiento AS fechaNacimiento,
   o.Identificacion AS identificacion,
+  o.Foto AS foto,
   o.ComprobanteDomicilio AS comprobanteDomicilio,
   o.CertificadoMedico AS certificadoMedico,
   o.AntecedentesNoPenales AS antecedentesNoPenales,
@@ -245,9 +246,6 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-LEFT JOIN Licencias l ON l.IdOperador = o.Id
-LEFT JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-LEFT JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
 
   `,
           );
@@ -263,12 +261,13 @@ SELECT
   o.Id AS id,
   o.FechaNacimiento AS fechaNacimiento,
   o.Identificacion AS identificacion,
+  o.Foto AS foto,
   o.ComprobanteDomicilio AS comprobanteDomicilio,
   o.CertificadoMedico AS certificadoMedico,
   o.AntecedentesNoPenales AS antecedentesNoPenales,
-  o.FechaCreacion AS fechaCreacion,
-  o.FechaActualizacion AS fechaActualizacion,
-  o.Estatus AS estatus,
+  o.FechaCreacion AS fechaCreacionOperador,
+  o.FechaActualizacion AS fechaActualizacionOperador,
+  o.Estatus AS estatusOperador,
 
   -- Datos del Usuario
   u.Id AS idUsuario,
@@ -277,34 +276,54 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoUsuario,
   u.ApellidoMaterno AS apellidoMaternoUsuario,
   u.Telefono AS telefonoUsuario,
-  u.DispositivoId AS dispositivoId,
   u.FotoPerfil AS fotoPerfil,
-  u.FechaCreacion AS fechaCreacionUsuario,
-  u.FechaActualizacion AS fechaActualizacion,
-  u.Estatus AS estatusUsuario,
   u.IdRol AS idRol,
-
-  -- Datos del Cliente
   u.IdCliente AS idCliente,
-  
-  -- Datos del Usuario
-  l.Id as idLicencia,
-  l.Licencia AS licencia,
-  l.NumeroLicencia AS numeroLicencia,
-  l.FechaExpedicion AS fechaExpedicion,
-  l.FechaVencimineto AS fechaVencimiento,
-  l.IdTipoLicencia AS idTipoLicencia,
-  ctl.Nombre AS nombreTipoLicencia,
-  l.IdCategoriaLicencia AS idCategoriaLicencia,
-  ccl.Nombre AS nombreCategoriaLicencia
+
+  -- Agrupamos las licencias del operador en un JSON
+  JSON_ARRAYAGG(
+    JSON_OBJECT(
+      'idLicencia', l.Id,
+      'licencia', l.Licencia,
+      'numeroLicencia', l.NumeroLicencia,
+      'fechaExpedicion', l.FechaExpedicion,
+      'fechaVencimiento', l.FechaVencimineto,
+      'idTipoLicencia', l.IdTipoLicencia,
+      'nombreTipoLicencia', ctl.Nombre,
+      'idCategoriaLicencia', l.IdCategoriaLicencia,
+      'nombreCategoriaLicencia', ccl.Nombre
+    )
+  ) AS licencias
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
+LEFT JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
+LEFT JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
+
 WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND u.Estatus = 1
+
+GROUP BY
+  o.Id,
+  o.FechaNacimiento,
+  o.Identificacion,
+  o.ComprobanteDomicilio,
+  o.CertificadoMedico,
+  o.AntecedentesNoPenales,
+  o.FechaCreacion,
+  o.FechaActualizacion,
+  o.Estatus,
+  u.Id,
+  u.UserName,
+  u.Nombre,
+  u.ApellidoPaterno,
+  u.ApellidoMaterno,
+  u.Telefono,
+  u.FotoPerfil,
+  u.IdRol,
+  u.IdCliente
+
 ORDER BY o.Id DESC
 LIMIT ? OFFSET ?;
         `,
@@ -317,11 +336,9 @@ LIMIT ? OFFSET ?;
    SELECT COUNT(*) AS total
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
-	WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-  AND u.Estatus = 1
+
+WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+AND u.Estatus = 1
   `,
             [...ids],
           );
@@ -336,9 +353,6 @@ INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
         idUsuario: Number(item.idUsuario),
         idRol: Number(item.idRol),
         idCliente: Number(item.idCliente),
-        idLicencia: Number(item.idLicencia),
-        idTipoLicencia: Number(item.idTipoLicencia),
-        idCategoriaLicencia: Number(item.idCategoriaLicencia),
       }));
 
       const result: ApiResponseCommon = {
@@ -401,24 +415,11 @@ SELECT
   u.IdRol AS idRol,
 
   -- Datos del Cliente
-  u.IdCliente AS idCliente,
+  u.IdCliente AS idCliente
   
-  -- Datos del Usuario
-  l.Id as idLicencia,
-  l.Licencia AS licencia,
-  l.NumeroLicencia AS numeroLicencia,
-  l.FechaExpedicion AS fechaExpedicion,
-  l.FechaVencimineto AS fechaVencimiento,
-  l.IdTipoLicencia AS idTipoLicencia,
-  ctl.Nombre AS nombreTipoLicencia,
-  l.IdCategoriaLicencia AS idCategoriaLicencia,
-  ccl.Nombre AS nombreCategoriaLicencia
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
 WHERE o.Estatus = 1
 AND u.Estatus = 1
 ORDER BY o.Id DESC;
@@ -457,24 +458,12 @@ SELECT
   u.IdRol AS idRol,
 
   -- Datos del Cliente
-  u.IdCliente AS idCliente,
+  u.IdCliente AS idCliente
   
-  -- Datos del Usuario
-  l.Id as idLicencia,
-  l.Licencia AS licencia,
-  l.NumeroLicencia AS numeroLicencia,
-  l.FechaExpedicion AS fechaExpedicion,
-  l.FechaVencimineto AS fechaVencimiento,
-  l.IdTipoLicencia AS idTipoLicencia,
-  ctl.Nombre AS nombreTipoLicencia,
-  l.IdCategoriaLicencia AS idCategoriaLicencia,
-  ccl.Nombre AS nombreCategoriaLicencia
+
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
 WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND o.Estatus = 1
 AND u.Estatus = 1
@@ -528,12 +517,13 @@ SELECT
   o.Id AS id,
   o.FechaNacimiento AS fechaNacimiento,
   o.Identificacion AS identificacion,
+  o.Foto AS foto,
   o.ComprobanteDomicilio AS comprobanteDomicilio,
   o.CertificadoMedico AS certificadoMedico,
   o.AntecedentesNoPenales AS antecedentesNoPenales,
-  o.FechaCreacion AS fechaCreacion,
-  o.FechaActualizacion AS fechaActualizacion,
-  o.Estatus AS estatus,
+  o.FechaCreacion AS fechaCreacionOperador,
+  o.FechaActualizacion AS fechaActualizacionOperador,
+  o.Estatus AS estatusOperador,
 
   -- Datos del Usuario
   u.Id AS idUsuario,
@@ -542,34 +532,54 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoUsuario,
   u.ApellidoMaterno AS apellidoMaternoUsuario,
   u.Telefono AS telefonoUsuario,
-  u.DispositivoId AS dispositivoId,
   u.FotoPerfil AS fotoPerfil,
-  u.FechaCreacion AS fechaCreacionUsuario,
-  u.FechaActualizacion AS fechaActualizacion,
-  u.Estatus AS estatusUsuario,
   u.IdRol AS idRol,
-
-  -- Datos del Cliente
   u.IdCliente AS idCliente,
-  
-  -- Datos del Usuario
-  l.Id as idLicencia,
-  l.Licencia AS licencia,
-  l.NumeroLicencia AS numeroLicencia,
-  l.FechaExpedicion AS fechaExpedicion,
-  l.FechaVencimineto AS fechaVencimiento,
-  l.IdTipoLicencia AS idTipoLicencia,
-  ctl.Nombre AS nombreTipoLicencia,
-  l.IdCategoriaLicencia AS idCategoriaLicencia,
-  ccl.Nombre AS nombreCategoriaLicencia
+
+  -- Agrupamos las licencias del operador en un JSON
+  JSON_ARRAYAGG(
+    JSON_OBJECT(
+      'idLicencia', l.Id,
+      'licencia', l.Licencia,
+      'numeroLicencia', l.NumeroLicencia,
+      'fechaExpedicion', l.FechaExpedicion,
+      'fechaVencimiento', l.FechaVencimineto,
+      'idTipoLicencia', l.IdTipoLicencia,
+      'nombreTipoLicencia', ctl.Nombre,
+      'idCategoriaLicencia', l.IdCategoriaLicencia,
+      'nombreCategoriaLicencia', ccl.Nombre
+    )
+  ) AS licencias
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
-WHERE o.Id = ?
-ORDER BY o.Id DESC;
+LEFT JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
+LEFT JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
+
+WHERE o.Id = ?   -- filtra un operador específico
+
+GROUP BY
+  o.Id,
+  o.FechaNacimiento,
+  o.Identificacion,
+  o.ComprobanteDomicilio,
+  o.CertificadoMedico,
+  o.AntecedentesNoPenales,
+  o.FechaCreacion,
+  o.FechaActualizacion,
+  o.Estatus,
+  u.Id,
+  u.UserName,
+  u.Nombre,
+  u.ApellidoPaterno,
+  u.ApellidoMaterno,
+  u.Telefono,
+  u.FotoPerfil,
+  u.IdRol,
+  u.IdCliente
+
+ORDER BY o.Id DESC
         `,
             [id],
           );
@@ -585,12 +595,13 @@ SELECT
   o.Id AS id,
   o.FechaNacimiento AS fechaNacimiento,
   o.Identificacion AS identificacion,
+  o.Foto AS foto,
   o.ComprobanteDomicilio AS comprobanteDomicilio,
   o.CertificadoMedico AS certificadoMedico,
   o.AntecedentesNoPenales AS antecedentesNoPenales,
-  o.FechaCreacion AS fechaCreacion,
-  o.FechaActualizacion AS fechaActualizacion,
-  o.Estatus AS estatus,
+  o.FechaCreacion AS fechaCreacionOperador,
+  o.FechaActualizacion AS fechaActualizacionOperador,
+  o.Estatus AS estatusOperador,
 
   -- Datos del Usuario
   u.Id AS idUsuario,
@@ -599,35 +610,54 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoUsuario,
   u.ApellidoMaterno AS apellidoMaternoUsuario,
   u.Telefono AS telefonoUsuario,
-  u.DispositivoId AS dispositivoId,
   u.FotoPerfil AS fotoPerfil,
-  u.FechaCreacion AS fechaCreacionUsuario,
-  u.FechaActualizacion AS fechaActualizacion,
-  u.Estatus AS estatusUsuario,
   u.IdRol AS idRol,
-
-  -- Datos del Cliente
   u.IdCliente AS idCliente,
-  
-  -- Datos del Usuario
-  l.Id as idLicencia,
-  l.Licencia AS licencia,
-  l.NumeroLicencia AS numeroLicencia,
-  l.FechaExpedicion AS fechaExpedicion,
-  l.FechaVencimineto AS fechaVencimiento,
-  l.IdTipoLicencia AS idTipoLicencia,
-  ctl.Nombre AS nombreTipoLicencia,
-  l.IdCategoriaLicencia AS idCategoriaLicencia,
-  ccl.Nombre AS nombreCategoriaLicencia
+
+  -- Agrupamos las licencias del operador en un JSON
+  JSON_ARRAYAGG(
+    JSON_OBJECT(
+      'idLicencia', l.Id,
+      'licencia', l.Licencia,
+      'numeroLicencia', l.NumeroLicencia,
+      'fechaExpedicion', l.FechaExpedicion,
+      'fechaVencimiento', l.FechaVencimineto,
+      'idTipoLicencia', l.IdTipoLicencia,
+      'nombreTipoLicencia', ctl.Nombre,
+      'idCategoriaLicencia', l.IdCategoriaLicencia,
+      'nombreCategoriaLicencia', ccl.Nombre
+    )
+  ) AS licencias
 
 FROM Operadores o
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 LEFT JOIN Licencias l ON l.IdOperador = o.Id
-INNER JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
-INNER JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
-WHERE u.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-AND o.Id = ?
-ORDER BY o.Id DESC;
+LEFT JOIN CatTipoLicencia ctl ON l.IdTipoLicencia = ctl.Id
+LEFT JOIN CatCategoriaLicencia ccl ON l.IdCategoriaLicencia = ccl.Id
+
+WHERE o.Id = ?   -- filtra un operador específico
+
+GROUP BY
+  o.Id,
+  o.FechaNacimiento,
+  o.Identificacion,
+  o.ComprobanteDomicilio,
+  o.CertificadoMedico,
+  o.AntecedentesNoPenales,
+  o.FechaCreacion,
+  o.FechaActualizacion,
+  o.Estatus,
+  u.Id,
+  u.UserName,
+  u.Nombre,
+  u.ApellidoPaterno,
+  u.ApellidoMaterno,
+  u.Telefono,
+  u.FotoPerfil,
+  u.IdRol,
+  u.IdCliente
+
+ORDER BY o.Id DESC
         `,
             [...ids, id],
           );
@@ -644,9 +674,6 @@ ORDER BY o.Id DESC;
         idUsuario: Number(item.idUsuario),
         idRol: Number(item.idRol),
         idCliente: Number(item.idCliente),
-        idLicencia: Number(item.idLicencia),
-        idTipoLicencia: Number(item.idTipoLicencia),
-        idCategoriaLicencia: Number(item.idCategoriaLicencia),
       }));
 
       return {
