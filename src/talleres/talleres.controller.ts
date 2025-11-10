@@ -21,13 +21,14 @@ export class TalleresController {
 
   @Post()
   create(@Body() createTallereDto: CreateTallereDto, @Req() req: any) {
-    console.log(req.user.userId);
-    createTallereDto.idCliente = req.user.idCliente;
+    createTallereDto.idCliente = Number(req.user.cliente);
+
     return this.talleresService.create(createTallereDto, req.user.userId);
   }
 
   @Get()
   findAll(@Req() req:any) {
+    console.log(req.user)
     return this.talleresService.findAll(req);
   }
 
