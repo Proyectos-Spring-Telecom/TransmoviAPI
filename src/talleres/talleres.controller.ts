@@ -8,11 +8,14 @@ import {
   Delete,
   Req,
   UseGuards,
+  ParseIntPipe,
+  Request,
 } from '@nestjs/common';
 import { TalleresService } from './talleres.service';
 import { CreateTallereDto } from './dto/create-tallere.dto';
 import { UpdateTallereDto } from './dto/update-tallere.dto';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
+import { ApiResponseCommon } from 'src/common/ApiResponse';
 
 @Controller('talleres')
 @UseGuards(JwtAuthGuard)
@@ -26,10 +29,19 @@ export class TalleresController {
     return this.talleresService.create(createTallereDto, req.user.userId);
   }
 
-  @Get()
+  @Get('list')
   findAll(@Req() req:any) {
     console.log(req.user)
     return this.talleresService.findAll(req);
+  }
+
+  @Get(':page/:limit')
+  findAllPaginated(
+    @Param('page', ParseIntPipe) page: number,
+    @Param('limit', ParseIntPipe) limit: number,
+    @Request() req,
+  ): Promise<ApiResponseCommon> {
+    return this.talleresService.findAllPaginated(req, page, limit);
   }
 
   @Get(':id')
@@ -39,15 +51,14 @@ export class TalleresController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateTallereDto: UpdateTallereDto,@Req() req) {
-    return this.talleresService.update(+id, updateTallereDto,req.user.id);
+    return this.talleresService.update(+id, updateTallereDto,req.user.userId);
   }
-
-  @Patch('desactivar/:id')
+    @Patch('desactivar/:id')
   remove(@Param('id') id: number,@Req() req:any) {
-    return this.talleresService.remove(+id,Number(req.user.id));
+    return this.talleresService.remove(+id,Number(req.user.userId));
   }
   @Patch('activar/:id')
   activar(@Param('id') id: number,@Req() req:any) {
-    return this.talleresService.activar(+id,Number(req.user.id));
+    return this.talleresService.activar(+id,Number(req.user.userId));
   }
 }
