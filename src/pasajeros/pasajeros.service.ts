@@ -117,7 +117,7 @@ export class PasajerosService {
       const userSave = await this.usuariosRepository.save(newUser); //creamos el usuario
 
       //Le añadimos los permisos correspondientes
-      const permisosIds = [77, 80, 90];
+      const permisosIds = [122];
       if (permisosIds.length > 0) {
         const usuariosPermisos = permisosIds.map((permisoId) =>
           this.permisosRepository.create({
