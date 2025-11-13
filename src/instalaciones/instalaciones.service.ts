@@ -24,7 +24,7 @@ import { Vehiculos } from 'src/entities/Vehiculos';
 import { Clientes } from 'src/entities/Clientes';
 import { HistoricoInstalaciones } from 'src/entities/historico-instalaciones';
 import { HistoricoinstalacionesService } from 'src/historicoinstalaciones/historicoinstalaciones.service';
-import { EstadoComponente, EstatusEnum } from 'src/common/estatus.enum';
+import { EnumModulos, EstadoComponente, EstatusEnum } from 'src/common/estatus.enum';
 
 @Injectable()
 export class InstalacionesService {
@@ -45,6 +45,9 @@ export class InstalacionesService {
     private readonly historicoinstalacionesService: HistoricoinstalacionesService,
   ) {}
 
+  // ========================================
+  // 🔹 CREAR UN INSTALACION
+  // ========================================
   async create(
     idUser: number,
     cliente: number,
@@ -167,7 +170,7 @@ export class InstalacionesService {
         'CREATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -201,7 +204,7 @@ export class InstalacionesService {
         'CREATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -317,6 +320,9 @@ WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que qu
     return await this.instalacionesRepository.query(query, [...ids]);
   }
 
+  // ========================================
+  // 🔹 OBTENER PAGINADO DE INSTALACIONES
+  // ========================================
   async findAll(
     idUser: number,
     cliente: number,
@@ -590,6 +596,9 @@ ORDER BY i.Id DESC
     return this.instalacionesRepository.query(query, [...ids]);
   }
 
+  // ========================================
+  // 🔹 OBTENER LISTADO DE INSTALACIONES
+  // ========================================
   async findAllList(
     idUser: number,
     cliente: number,
@@ -799,6 +808,9 @@ ORDER BY i.Id DESC;
     return this.instalacionesRepository.query(query, [id, ...ids]);
   }
 
+  // ========================================
+  // 🔹 OBTENER UNA INSTALACION
+  // ========================================
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
     try {
       let instalaciones;
@@ -953,6 +965,9 @@ ORDER BY i.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ACTUALIZAR ESTATUS
+  // ========================================
   async updateEstatus(
     id: number,
     idUser: number,
@@ -961,7 +976,6 @@ ORDER BY i.Id DESC;
     updateInstalacioneEstatusDto: UpdateInstalacioneEstatusDto,
   ) {
     try {
-      
       const instalacion = await this.instalacionesRepository.findOne({
         where: { id: id },
       });
@@ -1025,7 +1039,7 @@ ORDER BY i.Id DESC;
 
         // ✅ Verificar todos los componentes esten disponibles
         const erroresEstado: string[] = [];
-        console.log(instalacion.idDispositivo)
+        console.log(instalacion.idDispositivo);
         // Verificar dispositivo este disponible
         const dispositivoEstado = await this.dispositivosRepository.findOne({
           where: {
@@ -1098,7 +1112,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1125,7 +1139,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -1139,6 +1153,9 @@ ORDER BY i.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ACTUALIZAR INSTALACION
+  // ========================================
   async update(
     id: number,
     idUser: number,
@@ -1160,21 +1177,36 @@ ORDER BY i.Id DESC;
       //verificamos que exista el dispositivo a actualizar
       if (updateInstalacioneDto.estatusDispositivoAnterior) {
         //Actualizamos el estado del dispositivo anterior
+        const estadoViejoDispositivo =
+          updateInstalacioneDto.estatusDispositivoAnterior;
         await this.dispositivosRepository.update(instalacion.idDispositivo, {
-          estadoActual: updateInstalacioneDto.estatusDispositivoAnterior,
+          estadoActual: estadoViejoDispositivo,
         });
+        //Actualizamos el estado del dispositivo nuevo a asignado
+        await this.dispositivosRepository.update(
+          Number(updateInstalacioneDto.idDispositivo),
+          { estadoActual: EstadoComponente.ASIGNADO },
+        );
         //Actualizamos el dispositivo en la instalacion
         await this.instalacionesRepository.update(id, {
           idDispositivo: updateInstalacioneDto.idDispositivo,
         });
       }
 
+      //verificamos que exista el bluevoxs a actualizar
       if (updateInstalacioneDto.estatusBluevoxsAnterior) {
+        //Actualizamos el estado del bluevoxs anterior
         await this.bluevoxsRepository.update(instalacion.idBlueVox, {
           estadoActual: updateInstalacioneDto.estatusBluevoxsAnterior,
         });
+        //Actualizamos el estado del bluevoxs nuevo a asignado
+        await this.bluevoxsRepository.update(
+          Number(updateInstalacioneDto.idBlueVox),
+          { estadoActual: EstadoComponente.ASIGNADO },
+        );
+        //Actualizamos el bluevoxs en la instalacion
         await this.instalacionesRepository.update(id, {
-          idDispositivo: updateInstalacioneDto.idBlueVox,
+          idBlueVox: updateInstalacioneDto.idBlueVox,
         });
       }
 
@@ -1192,7 +1224,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1203,7 +1235,7 @@ ORDER BY i.Id DESC;
         idVehiculo: instalacion.idVehiculo,
         idCliente: instalacion.idCliente,
       };
-      const comentario = `${updateInstalacioneDto.comentariosBluevox ?? ''} ${updateInstalacioneDto.comentariosDispositivo ?? ''}`
+      const comentario = `${updateInstalacioneDto.comentariosBluevox ?? ''} ${updateInstalacioneDto.comentariosDispositivo ?? ''}`;
 
       //Registro historico
       await this.historicoinstalacionesService.updateHistorico(
@@ -1213,7 +1245,7 @@ ORDER BY i.Id DESC;
         Number(instalacionActualizada?.idVehiculo),
         Number(instalacionActualizada?.idCliente),
         idUser,
-        comentario
+        comentario,
       );
 
       //Api response
@@ -1237,7 +1269,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -1251,6 +1283,9 @@ ORDER BY i.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ELIMINADO LOGICO
+  // ========================================
   async remove(
     id: number,
     cliente: number,
@@ -1270,7 +1305,9 @@ ORDER BY i.Id DESC;
       }
 
       //Actualizamos datos
-      await this.instalacionesRepository.update(id, { estatus: EstatusEnum.INACTIVO });
+      await this.instalacionesRepository.update(id, {
+        estatus: EstatusEnum.INACTIVO,
+      });
 
       // Desactivar instalación → activar componentes
       const body = { estadoActual: EstadoComponente.DISPONIBLE };
@@ -1286,7 +1323,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1311,7 +1348,7 @@ ORDER BY i.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        13,
+        EnumModulos.INSTALACIONES,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
