@@ -308,6 +308,14 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
           totalResult = await this.consultarTotalDerroteroPaginados(cliente);
           break;
 
+        case 3:
+          // Consulta de datos paginados Usuario Operador
+          data = await this.consultarDerroteroPaginado(cliente, limit, offset);
+
+          // Query para total (sin paginación)
+          totalResult = await this.consultarTotalDerroteroPaginados(cliente);
+          break;
+
         case 8:
           // Consulta de datos paginados Usuario Reportes
           data = await this.consultarDerroteroPaginado(cliente, limit, offset);
@@ -578,6 +586,11 @@ ORDER BY d.Id DESC;
           data = await this.consultarDerroteroListado(cliente);
           break;
 
+        case 3:
+          // Consulta de datos paginados Usuario Operador
+          data = await this.consultarDerroteroListado(cliente);
+          break;
+
         case 8:
           // Consulta de datos paginados Usuario Reportes
           data = await this.consultarDerroteroListado(cliente);
@@ -818,6 +831,11 @@ WHERE ur.IdUsuario = ?
 
         case 2:
           // Consulta de datos paginados Usuario Administrador
+          data = await this.consultarDerroteroOne(cliente, id);
+          break;
+
+        case 3:
+          // Consulta de datos paginados Usuario Operador
           data = await this.consultarDerroteroOne(cliente, id);
           break;
 

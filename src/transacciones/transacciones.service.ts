@@ -52,7 +52,7 @@ export class TransaccionesService {
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly monederosService: MonederosService,
     private readonly pasajeroService: PasajerosService,
-  ) {}
+  ) { }
 
   //Funcion para transaccion Recarga
   async createTransaccionRecarga(
@@ -448,6 +448,13 @@ SELECT
     td.NumeroSerieDispositivo AS numeroSerieDispositivo,
     td.ControlTransaccion AS controlTransaccion,
 
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
     -- Datos del dispositivo
     d.Marca AS marcaDispositivo,
     d.Modelo AS modeloDispositivo,
@@ -467,6 +474,8 @@ INNER JOIN Monederos m
     ON td.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
 
 UNION ALL
 
@@ -482,6 +491,13 @@ SELECT
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
     tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
     tr.ControlTransaccion AS controlTransaccion,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
     d.Marca AS marcaDispositivo,
     d.Modelo AS modeloDispositivo,
@@ -500,6 +516,8 @@ INNER JOIN Monederos m
     ON tr.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
 
 ORDER BY FHRegistro DESC
   LIMIT ? OFFSET ?;
@@ -575,6 +593,7 @@ FROM (
   INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
   INNER JOIN Pasajeros p ON m.IdPasajero = p.Id
   WHERE p.Id = ?
+  AND m.Estatus = 1
 
   UNION ALL
 
@@ -605,6 +624,7 @@ FROM (
   INNER JOIN Monederos m ON tr.NumeroSerieMonedero = m.NumeroSerie
   INNER JOIN Pasajeros p ON m.IdPasajero = p.Id
   WHERE p.Id = ?
+  AND m.Estatus = 1
 )
 ORDER BY FHRegistro DESC
 LIMIT ? OFFSET ?;
@@ -624,6 +644,7 @@ FROM (
     INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
     INNER JOIN Pasajeros p ON m.IdPasajero = p.Id
     WHERE p.Id = ?  -- 👈 pasajero específico
+      AND m.Estatus = 1
 
     UNION ALL
 
@@ -633,6 +654,7 @@ FROM (
     INNER JOIN Monederos m ON tr.NumeroSerieMonedero = m.NumeroSerie
     INNER JOIN Pasajeros p ON m.IdPasajero = p.Id
     WHERE p.Id = ?  -- 👈 mismo pasajero
+      AND m.Estatus = 1
 ) AS transacciones_pasajero;
 
   `,
@@ -642,6 +664,7 @@ FROM (
           break;
 
         default:
+          //resto usuarios
           const { ids, placeholders } = await this.clienteHijos(cliente);
           transacciones = await this.transaccionesrecargaRepository.query(
             `
@@ -658,6 +681,13 @@ FROM (
       td.NumeroSerieMonedero AS numeroSerieMonedero,
       td.NumeroSerieDispositivo AS numeroSerieDispositivo,
       td.ControlTransaccion AS controlTransaccion,
+
+      -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
       d.Marca AS marcaDispositivo,
       d.Modelo AS modeloDispositivo,
@@ -676,6 +706,9 @@ FROM (
       ON td.NumeroSerieMonedero = m.NumeroSerie
   LEFT JOIN Pasajeros p 
       ON m.IdPasajero = p.Id
+  INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+
   WHERE m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
   UNION ALL
@@ -692,6 +725,13 @@ FROM (
       tr.NumeroSerieMonedero AS numeroSerieMonedero,
       tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
       tr.ControlTransaccion AS controlTransaccion,
+
+      -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
       d.Marca AS marcaDispositivo,
       d.Modelo AS modeloDispositivo,
@@ -710,6 +750,9 @@ FROM (
       ON tr.NumeroSerieMonedero = m.NumeroSerie
   LEFT JOIN Pasajeros p 
       ON m.IdPasajero = p.Id
+  INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+
   WHERE m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 )
 ORDER BY FHRegistro DESC
