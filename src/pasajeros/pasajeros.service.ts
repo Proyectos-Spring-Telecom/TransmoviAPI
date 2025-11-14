@@ -347,6 +347,9 @@ SELECT DISTINCT
     p.Curp AS curp,
     c.Id AS idCliente,
     c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    c.Nombre AS nombreCliente,
     m.Id AS idMonedero,
     m.NumeroSerie AS numeroSerie,
     ct.Id AS idTipoPasajero,
@@ -405,6 +408,9 @@ SELECT DISTINCT
     p.Documentacion AS documentacion,
     p.Curp AS curp,
     c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
     c.Nombre AS nombreCliente,
     m.Id AS idMonedero,
     m.NumeroSerie AS numeroSerie,
@@ -832,7 +838,7 @@ GROUP BY p.Id, u.Id, u.UserName, NombreCompleto;
 
       //En caso de ser aprovado el pasajero se solicitada el tipo de pasajero asociado a su monedero
       //buscamos y validamos el monedero
-      if (estadoSolicitud == EnumSolicitudPasajero.APROVADO) {
+      if (estadoSolicitud == EnumSolicitudPasajero.APROBADO) {
         const monedero = await this.monederosRepository.findOne({
           where: { idPasajero: pasajero.id, estatus: EstatusEnum.ACTIVO },
         });
