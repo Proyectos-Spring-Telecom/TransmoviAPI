@@ -169,7 +169,6 @@ export class OperadoresService {
       const offset = (page - 1) * limit;
       let totalResult;
       let operadores;
-      console.log('ERRORASDASDASDASDAs', rol);
       switch (rol) {
         case 1:
           // Consulta de datos paginados Usuario SuperAdministrador
