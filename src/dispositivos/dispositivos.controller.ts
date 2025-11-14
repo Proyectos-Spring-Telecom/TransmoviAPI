@@ -11,28 +11,29 @@ import {
   Request,
   ParseIntPipe,
 } from '@nestjs/common';
-import { DispositivosService } from './dispositivos.service';
-import { CreateDispositivoDto } from './dto/create-dispositivo.dto';
-import { UpdateDispositivoDto } from './dto/update-dispositivo.dto';
+
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
-import { UpdateDispositivoEstatusDto } from './dto/update-dispositivos-estatus.dto';
 import { ApiResponseCommon } from 'src/common/ApiResponse';
-import { UpdateDispositivoEstadoDto } from './dto/update-dispositivo-estado.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { ValidadoresService } from 'src/validadores/validadores.service';
+import { CreateValidadorDto } from 'src/validadores/dto/create-validador.dto';
+import { UpdateValidadorEstatusDto } from 'src/validadores/dto/update-validador-estatus.dto';
+import { UpdateValidadorDto } from 'src/validadores/dto/update-validador.dto';
+import { UpdateValidadorEstadoDto } from 'src/validadores/dto/update-validador-estado.dto';
 
 @ApiBearerAuth('bearer-token')
 @UseGuards(JwtAuthGuard)
 @Controller('dispositivos')
 export class DispositivosController {
-  constructor(private readonly dispositivosService: DispositivosService) {}
+  constructor(private readonly dispositivosService: ValidadoresService) {}
 
   @Post()
   createDispositivo(
-    @Body() createDispositivoDto: CreateDispositivoDto,
+    @Body() createDispositivoDto: CreateValidadorDto,
     @Request() req,
   ) {
     const idUser = req.user.userId;
-    return this.dispositivosService.createDispositivo(
+    return this.dispositivosService.createValidador(
       createDispositivoDto,
       +idUser,
     );
@@ -54,7 +55,7 @@ export class DispositivosController {
     const idUser = req.user.userId;
     const cliente = req.user.cliente;
     const rol = req.user.rol;
-    return await this.dispositivosService.findAllListDispositivosClientes(+id, +cliente);
+    return await this.dispositivosService.findAllListValidadoresClientes(+id, +cliente);
   }
 
   @Get(':page/:limit')
@@ -74,17 +75,17 @@ export class DispositivosController {
     const idUser = req.user.userId;
     const cliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.dispositivosService.findOneDispositivo(+id, +cliente, +rol);
+    return this.dispositivosService.findOneValidador(+id, +cliente, +rol);
   }
 
     @Patch('actualizar/estado/:id')
   updateDispositivoEstado(
     @Param('id') id: string,
     @Request() req,
-    @Body() updateDispositivoEstadoDto: UpdateDispositivoEstadoDto,
+    @Body() updateDispositivoEstadoDto: UpdateValidadorEstadoDto,
   ) {
     const idUser = req.user.userId;
-    return this.dispositivosService.updateDispositivoEstado(
+    return this.dispositivosService.updateValidadorEstado(
       +id,
       +idUser,
       updateDispositivoEstadoDto,
@@ -95,10 +96,10 @@ export class DispositivosController {
   updateDispositivoEstatus(
     @Param('id') id: string,
     @Request() req,
-    @Body() updateDispositivoEstatusDto: UpdateDispositivoEstatusDto,
+    @Body() updateDispositivoEstatusDto: UpdateValidadorEstatusDto,
   ) {
     const idUser = req.user.userId;
-    return this.dispositivosService.updateDispositivoEstatus(
+    return this.dispositivosService.updateValidadorEstatus(
       +id,
       +idUser,
       updateDispositivoEstatusDto,
@@ -109,10 +110,10 @@ export class DispositivosController {
   updateDispositivo(
     @Param('id') id: string,
     @Request() req,
-    @Body() updateDispositivoDto: UpdateDispositivoDto,
+    @Body() updateDispositivoDto: UpdateValidadorDto,
   ) {
     const idUser = req.user.userId;
-    return this.dispositivosService.updateDispositivo(
+    return this.dispositivosService.updateValidador(
       +id,
       +idUser,
       updateDispositivoDto,
@@ -122,6 +123,6 @@ export class DispositivosController {
   @Delete(':id')
   removeDispositivo(@Param('id') id: string, @Request() req) {
     const idUser = req.user.userId;
-    return this.dispositivosService.removeDispositivo(+id, +idUser);
+    return this.dispositivosService.removeValidador(+id, +idUser);
   }
 }

@@ -310,10 +310,10 @@ WHERE ru.Estatus = 1         -- Solo rutas activas
 
         case 3:
           // Consulta de datos paginados Usuario Operador
-          data = await this.consultarDerroteroPaginado(cliente, limit, offset);
+          data = await this.consultarVariantePaginado(cliente, limit, offset);
 
           // Query para total (sin paginación)
-          totalResult = await this.consultarTotalDerroteroPaginados(cliente);
+          totalResult = await this.consultarTotalVariantePaginados(cliente);
           break;
 
         case 8:
@@ -588,7 +588,7 @@ ORDER BY d.Id DESC;
 
         case 3:
           // Consulta de datos paginados Usuario Operador
-          data = await this.consultarDerroteroListado(cliente);
+          data = await this.consultarVarianteListado(cliente);
           break;
 
         case 8:
@@ -836,7 +836,7 @@ WHERE ur.IdUsuario = ?
 
         case 3:
           // Consulta de datos paginados Usuario Operador
-          data = await this.consultarDerroteroOne(cliente, id);
+          data = await this.consultarVarianteOne(cliente, id);
           break;
 
         case 8:

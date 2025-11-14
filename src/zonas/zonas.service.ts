@@ -261,10 +261,10 @@ INNER JOIN Clientes c ON r.IdCliente = c.Id
 
         case 3:
           // Usuario operador - obtiene todas las regiones de su cliente
-          regiones = await this.consultarRegionesPagina(cliente, limit, offset);
+          zonas = await this.consultarZonasPagina(cliente, limit, offset);
 
           // Query para total (sin paginación)
-          totalResult = await this.consultarTotalRegionesPaginados(cliente);
+          totalResult = await this.consultarTotalZonasPaginados(cliente);
           break;
 
         case 8:
@@ -450,7 +450,7 @@ ORDER BY r.Id DESC;
           break;
         case 3:
           // Usuario Operador - obtiene todas las regiones de su cliente
-          regiones = await this.consultarRegionesListado(cliente);
+          zonas = await this.consultarZonasListado(cliente);
           break;
         case 8:
           // Usuario Reportes - obtiene todas las zonas de su cliente
@@ -605,7 +605,7 @@ ORDER BY r.Id DESC;
           break;
         case 3:
           // Usuario operador - obtiene todas las regiones de su cliente
-          regiones = await this.consultarRegionesOne(cliente, id)
+          zonas = await this.consultarZonasOne(cliente, id)
           break;
         case 8:
           // Usuario Reportes - obtiene todas las zonas de su cliente
