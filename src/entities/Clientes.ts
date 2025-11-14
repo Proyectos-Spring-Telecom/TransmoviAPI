@@ -16,6 +16,7 @@ import { Turnos } from "./Turnos";
 import { Usuarios } from "./Usuarios";
 import { Vehiculos } from "./Vehiculos";
 import { Viajes } from "./Viajes";
+import { TransbordosPermitidos } from "./TransbordosPermitidos";
 import { applySchema } from "src/common/apply-schema.decorator";
 
 @applySchema
@@ -157,4 +158,10 @@ export class Clientes {
 
   @OneToMany(() => Viajes, (viajes) => viajes.idCliente2)
   viajes: Viajes[];
+
+  @OneToMany(
+    () => TransbordosPermitidos,
+    (transbordosPermitidos) => transbordosPermitidos.idClienteTransbordo
+  )
+  transbordosPermitidos: TransbordosPermitidos[];
 }

@@ -50,6 +50,7 @@ import { CatTipoVerificacionesModule } from './cat-tipo-verificaciones/cat-tipo-
 import { MantenimientoVehicularModule } from './mantenimiento-vehicular/mantenimiento-vehicular.module';
 import { MantenimientoCombustibleModule } from './mantenimiento-combustible/mantenimiento-combustible.module';
 import { MantenimientoKilometrajeModule } from './mantenimiento-kilometraje/mantenimiento-kilometraje.module';
+import { TransbordosModule } from './transbordos/transbordos.module';
 import Joi from 'joi';
 
 @Module({
@@ -187,6 +188,8 @@ import Joi from 'joi';
     CattipodescuentoModule,
 
     CattipotransaccionesModule,
+
+    TransbordosModule,
   ],
   controllers: [AppController],
   providers: [AppService],
