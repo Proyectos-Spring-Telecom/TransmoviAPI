@@ -68,6 +68,6 @@ export class UpdateUsuarioOperadorDto {
   @IsOptional()
   @IsDateString()
   @ApiProperty({ description: 'Actualización de PIN', required: false })
-  actualizacionPin?: string;
+  actualizacionCodigo?: string;
   
 }

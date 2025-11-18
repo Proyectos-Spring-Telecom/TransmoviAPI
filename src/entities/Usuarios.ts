@@ -58,8 +58,8 @@ export class Usuarios {
   @Column("datetime", { name: "ActualizacionPassword", nullable: true })
   actualizacionPassword: string | null;
 
-  @Column("datetime", { name: "ActualizacionPin", nullable: true })
-  actualizacionPin: string | null;
+  @Column("datetime", { name: "ActualizacionCodigo", nullable: true })
+  actualizacionCodigo: string | null;
 
   @Column("varchar", { name: "ValidadorId", nullable: true, length: 100 })
   validadorId: string | null;
