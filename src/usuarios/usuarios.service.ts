@@ -542,10 +542,10 @@ ORDER BY u.Id DESC
 
       //encriptamos la contraseña
       const pinPassword = await bcrypt.hash(
-        updateUsuarioOperadorDto.pinHash,
+        updateUsuarioOperadorDto.codigohash,
         10,
       );
-      updateUsuarioOperadorDto.pinHash = pinPassword;
+      updateUsuarioOperadorDto.codigohash = pinPassword;
 
       //Agregamos le fecha de la actualizacion
       function pad(n: number) {

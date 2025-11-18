@@ -55,7 +55,7 @@ export class UpdateUsuarioOperadorDto {
     description: 'PIN numérico de 6 u 8 dígitos',
     examples: ['482915', '93746281'],
   })
-  pinHash: string;
+  codigohash: string;
 
   @IsString()
   @IsNotEmpty()

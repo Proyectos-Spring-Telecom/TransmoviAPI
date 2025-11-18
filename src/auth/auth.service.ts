@@ -242,8 +242,8 @@ export class AuthService {
 
       if (
         !user ||
-        !user.pinHash ||
-        !(await bcrypt.compare(loginAuthPin.pinHash, user.pinHash))
+        !user.codigohash ||
+        !(await bcrypt.compare(loginAuthPin.codigohash, user.codigohash))
       ) {
         throw new UnauthorizedException('Credenciales invalidas');
       }
