@@ -20,6 +20,7 @@ import {
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { UpdateRutasEstatusDto } from './dto/update-ruta-estatus.dto';
 import { Clientes } from 'src/entities/Clientes';
+import { EnumModulos } from 'src/common/estatus.enum';
 
 @Injectable()
 export class RutasService {
@@ -35,6 +36,9 @@ export class RutasService {
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
+  // ========================================
+  // 🔹 CREAR UNA RUTA
+  // ========================================
   async create(
     idUser: number,
     cliente: number,
@@ -61,7 +65,7 @@ export class RutasService {
         'CREATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -84,7 +88,7 @@ export class RutasService {
         'CREATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -196,6 +200,9 @@ WHERE
     return await this.usuarioregionesRepository.query(query, [...ids]);
   }
 
+  // ========================================
+  // 🔹 OBTENER PAGINADO DE RUTAS
+  // ========================================
   async obtenerRutasPorUsuarioSQL(
     idUser: number,
     cliente: number,
@@ -460,6 +467,9 @@ ORDER BY ru.Id DESC;
     return await this.usuarioregionesRepository.query(query, [...ids]);
   }
 
+  // ========================================
+  // 🔹 OBTENER LISTADO DE RUTAS
+  // ========================================
   async findAllList(idUser: number, cliente: number, rol: number) {
     try {
       let rutas;
@@ -677,6 +687,10 @@ ORDER BY ru.Id DESC;
     return await this.usuarioregionesRepository.query(query, [...ids, id]);
   }
 
+
+  // ========================================
+  // 🔹 OBTENER UNA RUTA
+  // ========================================
   async findOne(id: number, idUser: number, cliente: number, rol: number) {
     try {
       let ruta;
@@ -775,6 +789,9 @@ ORDER BY ru.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ACTUALIZAR ESTATUS DE UNA RUTA
+  // ========================================
   async updateEstatus(
     id: number,
     idUser: number,
@@ -797,7 +814,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -820,7 +837,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -834,6 +851,9 @@ ORDER BY ru.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ACTUALIZAR DATOS DE LA RUTA
+  // ========================================
   async update(
     id: number,
     idUser: number,
@@ -855,7 +875,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -878,7 +898,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -892,6 +912,9 @@ ORDER BY ru.Id DESC;
     }
   }
 
+  // ========================================
+  // 🔹 ELIMINADO LOGICO
+  // ========================================
   async remove(id: number, idUser: number, rol: number) {
     try {
       const ruta = await this.rutasRepository.findOne({ where: { id: id } });
@@ -907,7 +930,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -930,7 +953,7 @@ ORDER BY ru.Id DESC;
         'UPDATE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -943,6 +966,10 @@ ORDER BY ru.Id DESC;
       });
     }
   }
+
+  // ========================================
+  // 🔹 ELIMINADO PERMANENTE
+  // ========================================
 
   async removeTotal(id: number, idUser: number, rol: number) {
     try {
@@ -972,7 +999,7 @@ ORDER BY ru.Id DESC;
         'DELETE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -995,7 +1022,7 @@ ORDER BY ru.Id DESC;
         'DELETE',
         querylogger,
         idUser,
-        17,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );

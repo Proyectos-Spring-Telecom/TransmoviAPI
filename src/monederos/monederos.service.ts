@@ -1015,7 +1015,7 @@ ORDER BY m.Id DESC;
 
       //Buscamos monedero asociado al pasajero
       const monedero = await this.monederoRepository.findOne({
-        where: { idPasajero: pasajero.id },
+        where: { idPasajero: pasajero.id, estatus: EstatusEnum.ACTIVO },
       });
       if (!monedero) {
         throw new NotFoundException(
@@ -1056,6 +1056,7 @@ ORDER BY m.Id DESC;
       await this.monederoRepository.update(monedero.id, {
         estatus: EnumEstatusMonederos.EXTRAVIADO,
         idPasajero: null,
+        saldo: 0,
       });
 
       // --- Registro en la bitácora --- SUCCESS

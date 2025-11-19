@@ -8,12 +8,14 @@ import {
   ParseIntPipe,
   Request,
   Query,
+  Patch,
 } from '@nestjs/common';
 import { ConteopasajerosService } from './conteopasajeros.service';
 import { CreateConteoPasajerosDto } from './dto/create-conteopasajero.dto';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { UpdateConteoPasajerosDto } from './dto/update-conteopasajero.dto';
 
 @ApiBearerAuth('bearer-token')
 
@@ -21,13 +23,20 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 export class ConteopasajerosController {
   constructor(
     private readonly conteopasajerosService: ConteopasajerosService,
-  ) {}
+  ) { }
 
   @Post()
   async create(
     @Body() createConteopasajeroDto: CreateConteoPasajerosDto,
   ): Promise<ApiCrudResponse> {
     return this.conteopasajerosService.create(createConteopasajeroDto);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateConteoPasajerosDto: UpdateConteoPasajerosDto): Promise<ApiCrudResponse> {
+    return this.conteopasajerosService.update(+id, updateConteoPasajerosDto)
   }
 
   // RUTAS ESPECÍFICAS PRIMERO (orden correcto)
@@ -50,12 +59,12 @@ export class ConteopasajerosController {
   // GET /conteo-pasajeros/ultima-semana
   @UseGuards(JwtAuthGuard)
   @Get('ultima-semana')
-async findLastWeek(
-  @Query('page') page: number,
-  @Query('limit') limit: number,
-): Promise<ApiResponseCommon> {
-  return await this.conteopasajerosService.findLastWeekPaginated(page, limit);
-}
+  async findLastWeek(
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+  ): Promise<ApiResponseCommon> {
+    return await this.conteopasajerosService.findLastWeekPaginated(page, limit);
+  }
 
   // 🗓️ 1. OBTENER DATOS DE UN DÍA ESPECÍFICO
   @UseGuards(JwtAuthGuard)
