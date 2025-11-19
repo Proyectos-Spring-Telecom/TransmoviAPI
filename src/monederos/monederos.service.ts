@@ -1054,7 +1054,7 @@ ORDER BY m.Id DESC;
       await this.monederoRepository.update(nuevoMonedero.id, nuevoMonedero);
 
       await this.monederoRepository.update(monedero.id, {
-        estatus: EnumEstatusMonederos.EXTRAVIADO,
+        estatus: EnumEstatusMonederos.INACTIVO,
         idPasajero: null,
         saldo: 0,
       });
