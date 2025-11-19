@@ -16,6 +16,7 @@ import { BlueVoxs } from 'src/entities/BlueVoxs';
 import { Usuarios } from 'src/entities/Usuarios';
 import { EnumModulos } from 'src/common/estatus.enum';
 import { Clientes } from 'src/entities/Clientes';
+import { UpdateConteoPasajerosDto } from './dto/update-conteopasajero.dto';
 
 @Injectable()
 export class ConteopasajerosService {
@@ -31,6 +32,9 @@ export class ConteopasajerosService {
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) { }
 
+  // ========================================
+  // 🔹 CREAR DATOS DE CONTEOPASAJEROS
+  // ========================================
   async create(
     createConteopasajeroDto: CreateConteoPasajerosDto,
   ): Promise<ApiCrudResponse> {
@@ -491,6 +495,9 @@ AND c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
     }
   }
 
+  // ========================================
+  // 🔹 OBTENER UN DATO CONTEOPASAJEROS
+  // ========================================
   async findOne(id: number) {
     try {
       const conteopasajero = await this.conteopasajeroRepository.findOne({
@@ -547,7 +554,9 @@ AND c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
     }
   }
 
-  // 🕐 2. OBTENER DATOS DE UN RANGO DE FECHAS
+  // ========================================
+  // 🔹 OBTENER DATOS DE UN RANGO DE FECHAS
+  // ========================================
   async findByDateRangePaginated(
     idUser: number,
     cliente: number,
@@ -883,5 +892,56 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
       .groupBy('DATE(cp.fechaHora)')
       .orderBy('fecha', 'ASC')
       .getRawMany();
+  }
+
+  // ========================================
+  // 🔹 ACTUALIZAR CONTEOPASAJERO
+  // ========================================
+  async update(id: number, updateConteoPasajerosDto: UpdateConteoPasajerosDto) {
+    try {
+      const conteoPasajero = await this.conteopasajeroRepository.findOne({
+        where:
+          { id: id }
+      });
+      if (!conteoPasajero) throw new NotFoundException('Conteo Pasajero no encontrada.');
+
+      //Actualizamos los datos de conteopasajeros
+      await this.conteopasajeroRepository.update(id, updateConteoPasajerosDto);
+
+      const bluevox = await this.bluevoxsRepository.findOne({ where: { numeroSerie: conteoPasajero.numeroSerieBlueVox } });
+      if (bluevox) {
+        const usuario = await this.usuariosRepository.findOne({ where: { idCliente: bluevox.idCliente, idRol: 2 } })
+        // Registro en la bitácora SUCCESS
+        const querylogger = { updateConteoPasajerosDto };
+        await this.bitacoraLogger.logToBitacora(
+          'ConteoPasajeros',
+          `Se actualizo un ConteoPasajeros con ID ${id}, Numero de serie BlueVoxs: ${conteoPasajero.numeroSerieBlueVox}`,
+          'UPDATE',
+          querylogger,
+          usuario?.id || 1,
+          EnumModulos.CONTEOPASAJEROS,
+          EstatusEnumBitcora.SUCCESS,
+        );
+      };
+
+      // API response
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'ConteoPasajero fue actualizada correctamente',
+        data: {
+          id: id,
+          nombre: `ConteoPasajero ${id} `,
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: 'Error al actualizar conteopasajero',
+        error: error.message,
+      });
+    }
   }
 }

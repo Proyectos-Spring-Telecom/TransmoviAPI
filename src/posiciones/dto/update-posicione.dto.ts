@@ -5,11 +5,12 @@ import {
   Length,
   IsInt,
   IsIn,
+  IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class CreatePosicionesDto {
+export class UpdatePosicionesDto {
   @ApiProperty({
     description: 'Exactitud de la posición (1 caracter)',
     example: 'A',
@@ -17,7 +18,8 @@ export class CreatePosicionesDto {
   })
   @IsString()
   @Length(1, 1)
-  exactitud: string;
+  @IsOptional()
+  exactitud?: string;
 
   @ApiProperty({
     description: 'Estado de la posición (0 = inactivo, 1 = activo)',
@@ -27,35 +29,40 @@ export class CreatePosicionesDto {
   })
   @IsInt({ message: 'estatus debe ser un número entero' })
   @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
-  estado: number;
+  @IsOptional()
+  estado?: number;
 
   @ApiProperty({
     description: 'Velocidad en km/h con hasta 2 decimales',
     example: 45.75,
   })
   @IsNumber({ maxDecimalPlaces: 2 })
-  velocidad: number;
+  @IsOptional()
+  velocidad?: number;
 
   @ApiProperty({
     description: 'Dirección en grados (0-360) con hasta 2 decimales',
     example: 180.25,
   })
   @IsNumber({ maxDecimalPlaces: 2 })
-  direccion: number;
+  @IsOptional()
+  direccion?: number;
 
   @ApiProperty({
     description: 'Latitud GPS con hasta 7 decimales',
     example: 19.4326077,
   })
-  @IsNumber({ maxDecimalPlaces: 15 })
-  latitud: number;
+  @IsNumber({ maxDecimalPlaces: 7 })
+  @IsOptional()
+  latitud?: number;
 
   @ApiProperty({
     description: 'Longitud GPS con hasta 7 decimales',
     example: -99.133208,
   })
-  @IsNumber({ maxDecimalPlaces: 15 })
-  longitud: number;
+  @IsNumber({ maxDecimalPlaces: 7 })
+  @IsOptional()
+  longitud?: number;
 
   @ApiProperty({
     description: 'Fecha y hora de la posición (UTC)',
@@ -63,12 +70,7 @@ export class CreatePosicionesDto {
   })
   @Type(() => Date)
   @IsDate()
-  fechaHora: Date;
+  @IsOptional()
+  fechaHora?: Date;
 
-  @ApiProperty({
-    description: 'Número de serie del dispositivo asociado',
-    example: 'DEV-123456',
-  })
-  @IsString()
-  numeroSerieDispositivo: string;
 }
