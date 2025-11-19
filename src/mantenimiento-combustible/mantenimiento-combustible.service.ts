@@ -83,35 +83,44 @@ export class MantenimientoCombustibleService {
   async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
     try {
       const [data, total] = await this.mantenimientoCombustibleRepository.findAndCount({
-        relations: ['tipoCombustible', 'instalacion', 'operador'],
+        relations: ['tipoCombustible', 'instalacion', 'instalacion.vehiculos', 'operador', 'operador.idUsuario2'],
         order: { fhRegistro: 'DESC' },
         skip: (page - 1) * limit,
         take: limit,
       });
 
       // Forzamos ids a number
-      const mantenimientos = data.map((item) => ({
-        id: Number(item.id),
-        idTipoCombustible: item.idTipoCombustible ? Number(item.idTipoCombustible) : null,
-        cantidadCombustible: item.cantidadCombustible ? Number(item.cantidadCombustible) : null,
-        precioCombustible: item.precioCombustible ? Number(item.precioCombustible) : null,
-        idInstalacion: item.idInstalacion ? Number(item.idInstalacion) : null,
-        estatus: item.estatus,
-        fechaHora: item.fechaHora,
-        fhRegistro: item.fhRegistro,
-        kilometraje: item.kilometraje ? Number(item.kilometraje) : null,
-        idOperador: item.idOperador ? Number(item.idOperador) : null,
-        tipoCombustible: item.tipoCombustible ? {
-          id: Number(item.tipoCombustible.id),
-          nombre: item.tipoCombustible.nombre,
-        } : null,
-        instalacion: item.instalacion ? {
-          id: Number(item.instalacion.id),
-        } : null,
-        operador: item.operador ? {
-          id: Number(item.operador.id),
-        } : null,
-      }));
+      const mantenimientos = data.map((item) => {
+        const nombreOperador = item.operador?.idUsuario2 
+          ? `${item.operador.idUsuario2.nombre || ''} ${item.operador.idUsuario2.apellidoPaterno || ''} ${item.operador.idUsuario2.apellidoMaterno || ''}`.trim() || null
+          : null;
+
+        return {
+          id: Number(item.id),
+          idTipoCombustible: item.idTipoCombustible ? Number(item.idTipoCombustible) : null,
+          cantidadCombustible: item.cantidadCombustible ? Number(item.cantidadCombustible) : null,
+          precioCombustible: item.precioCombustible ? Number(item.precioCombustible) : null,
+          idInstalacion: item.idInstalacion ? Number(item.idInstalacion) : null,
+          estatus: item.estatus,
+          fechaHora: item.fechaHora,
+          fhRegistro: item.fhRegistro,
+          kilometraje: item.kilometraje ? Number(item.kilometraje) : null,
+          idOperador: item.idOperador ? Number(item.idOperador) : null,
+          placaVehiculo: item.instalacion?.vehiculos?.placa || null,
+          imagenVehiculo: item.instalacion?.vehiculos?.foto || null,
+          nombreOperador: nombreOperador,
+          tipoCombustible: item.tipoCombustible ? {
+            id: Number(item.tipoCombustible.id),
+            nombre: item.tipoCombustible.nombre,
+          } : null,
+          instalacion: item.instalacion ? {
+            id: Number(item.instalacion.id),
+          } : null,
+          operador: item.operador ? {
+            id: Number(item.operador.id),
+          } : null,
+        };
+      });
 
       const result: ApiResponseCommon = {
         data: mantenimientos,
@@ -136,11 +145,15 @@ export class MantenimientoCombustibleService {
     try {
       const mantenimiento = await this.mantenimientoCombustibleRepository.findOne({
         where: { id: id },
-        relations: ['tipoCombustible', 'instalacion', 'operador'],
+        relations: ['tipoCombustible', 'instalacion', 'instalacion.vehiculos', 'operador', 'operador.idUsuario2'],
       });
       if (!mantenimiento) {
         throw new NotFoundException('Mantenimiento de combustible no encontrado');
       }
+
+      const nombreOperador = mantenimiento.operador?.idUsuario2 
+        ? `${mantenimiento.operador.idUsuario2.nombre || ''} ${mantenimiento.operador.idUsuario2.apellidoPaterno || ''} ${mantenimiento.operador.idUsuario2.apellidoMaterno || ''}`.trim() || null
+        : null;
 
       const result: ApiResponseCommon = {
         data: [
@@ -155,6 +168,9 @@ export class MantenimientoCombustibleService {
             fhRegistro: mantenimiento.fhRegistro,
             kilometraje: mantenimiento.kilometraje ? Number(mantenimiento.kilometraje) : null,
             idOperador: mantenimiento.idOperador ? Number(mantenimiento.idOperador) : null,
+            placaVehiculo: mantenimiento.instalacion?.vehiculos?.placa || null,
+            imagenVehiculo: mantenimiento.instalacion?.vehiculos?.foto || null,
+            nombreOperador: nombreOperador,
             tipoCombustible: mantenimiento.tipoCombustible ? {
               id: Number(mantenimiento.tipoCombustible.id),
               nombre: mantenimiento.tipoCombustible.nombre,
