@@ -40,15 +40,13 @@ export class CreateMantenimientoVehicularDto {
   servicioDescripcion?: string;
 
   @ApiProperty({
-    example: 'Se cambió aceite 5W-30 y filtro de aceite',
-    description: 'Notas adicionales del servicio',
+    type: 'string',
+    format: 'binary',
+    description: 'Imagen de las notas del servicio (archivo)',
     required: false,
-    maxLength: 1000,
   })
-  @IsString({ message: 'La nota del servicio debe ser una cadena de texto.' })
-  @MaxLength(1000, { message: 'La nota no puede exceder los 1000 caracteres.' })
   @IsOptional()
-  notaServicio?: string;
+  notaServicio?: any;
 
   @ApiProperty({
     example: 1,
