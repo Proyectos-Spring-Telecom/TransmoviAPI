@@ -34,7 +34,6 @@ import { ViajestransaccionesModule } from './viajestransacciones/viajestransacci
 import { MailModule } from './mail/mail.module';
 import { HistoricoinstalacionesModule } from './historicoinstalaciones/historicoinstalaciones.module';
 import { MonitoreoModule } from './monitoreo/monitoreo.module';
-import { AdministracionModule } from './administracion/administracion.module';
 import { CatpasajeroModule } from './cattiposasajeros/catpasajero.module';
 import { CatcombustibleModule } from './cattipocombustible/catcombustible.module';
 import { LicenciasModule } from './licencias/licencias.module';
@@ -51,6 +50,7 @@ import { MantenimientoVehicularModule } from './mantenimiento-vehicular/mantenim
 import { MantenimientoCombustibleModule } from './mantenimiento-combustible/mantenimiento-combustible.module';
 import { MantenimientoKilometrajeModule } from './mantenimiento-kilometraje/mantenimiento-kilometraje.module';
 import { ReportesModule } from './reportes/reportes.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import Joi from 'joi';
 
 @Module({
@@ -157,8 +157,6 @@ import Joi from 'joi';
 
     MonitoreoModule,
 
-    AdministracionModule,
-
     CatpasajeroModule,
 
     CatcombustibleModule,
@@ -190,6 +188,8 @@ import Joi from 'joi';
     CattipotransaccionesModule,
 
     ReportesModule,
+
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
