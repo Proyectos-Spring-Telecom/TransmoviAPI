@@ -362,6 +362,7 @@ export class AuthService {
         nombreCliente: `${user.idCliente2?.nombre}`,
         apellidoPaternoCliente: `${user.idCliente2?.apellidoPaterno}`,
         apellidoMaternoCliente: `${user.idCliente2?.apellidoMaterno}`,
+        logotipo: `${user.idCliente2?.logotipo}`,
         telefono: `${user.telefono}`,
         ultimoLogin: `${user.ultimoLogin}`,
         fechaCreacion: `${user.fechaCreacion}`,
