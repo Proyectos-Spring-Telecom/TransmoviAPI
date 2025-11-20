@@ -99,6 +99,8 @@ export class MantenimientoKilometrajeService {
         anio: item.anio,
         fhRegistro: item.fhRegistro,
         estatus: item.estatus,
+        placaVehiculo: item.instalacion?.vehiculos?.placa || null,
+        imagenVehiculo: item.instalacion?.vehiculos?.foto || null,
         instalacion: item.instalacion ? {
           id: Number(item.instalacion.id),
         } : null,
@@ -168,6 +170,8 @@ export class MantenimientoKilometrajeService {
             anio: mantenimiento.anio,
             fhRegistro: mantenimiento.fhRegistro,
             estatus: mantenimiento.estatus,
+            placaVehiculo: mantenimiento.instalacion?.vehiculos?.placa || null,
+            imagenVehiculo: mantenimiento.instalacion?.vehiculos?.foto || null,
             instalacion: mantenimiento.instalacion ? {
               id: Number(mantenimiento.instalacion.id),
             } : null,

@@ -15,6 +15,7 @@ import { Instalaciones } from 'src/entities/Instalaciones';
 import { CatReferenciaServicio } from 'src/entities/CatReferenciaServicio';
 import { Repository } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
+import { S3Service } from 'src/s3/s3.service';
 import {
   ApiCrudResponse,
   ApiResponseCommon,
@@ -35,11 +36,13 @@ export class MantenimientoVehicularService {
     @InjectRepository(CatReferenciaServicio)
     private readonly catReferenciaServicioRepository: Repository<CatReferenciaServicio>,
     private readonly bitacoraLogger: BitacoraLoggerService,
+    private readonly s3Service: S3Service,
   ) {}
 
   async create(
     createMantenimientoVehicularDto: CreateMantenimientoVehicularDto,
     idUser: number,
+    notaServicioFile?: Express.Multer.File,
   ): Promise<ApiCrudResponse> {
     try {
       // Validar claves foráneas si se proporcionan
@@ -87,10 +90,56 @@ export class MantenimientoVehicularService {
         }
       }
 
-      const create = await this.mantenimientoVehicularRepository.create(
-        createMantenimientoVehicularDto,
+      // Subir imagen de notaServicio a S3 si se proporciona
+      let notaServicioUrl: string | null = null;
+      if (notaServicioFile) {
+        const uploadResult = await this.s3Service.uploadFile(
+          notaServicioFile,
+          'NotasServicioMantenimiento',
+          idUser,
+          5, // ID del módulo de mantenimiento vehicular
+        );
+        notaServicioUrl = uploadResult.url;
+      }
+
+      // Parsear campos numéricos desde FormData (vienen como strings)
+      const dataToCreate: any = {
+        ...createMantenimientoVehicularDto,
+        notaServicio: notaServicioUrl,
+      };
+
+      // Convertir strings a números si existen
+      if (dataToCreate.idInstalacion !== undefined && dataToCreate.idInstalacion !== null) {
+        dataToCreate.idInstalacion = typeof dataToCreate.idInstalacion === 'string' 
+          ? parseInt(dataToCreate.idInstalacion, 10) 
+          : dataToCreate.idInstalacion;
+      }
+      if (dataToCreate.idReferencia !== undefined && dataToCreate.idReferencia !== null) {
+        dataToCreate.idReferencia = typeof dataToCreate.idReferencia === 'string' 
+          ? parseInt(dataToCreate.idReferencia, 10) 
+          : dataToCreate.idReferencia;
+      }
+      if (dataToCreate.idEstatus !== undefined && dataToCreate.idEstatus !== null) {
+        dataToCreate.idEstatus = typeof dataToCreate.idEstatus === 'string' 
+          ? parseInt(dataToCreate.idEstatus, 10) 
+          : dataToCreate.idEstatus;
+      }
+      if (dataToCreate.idTaller !== undefined && dataToCreate.idTaller !== null) {
+        dataToCreate.idTaller = typeof dataToCreate.idTaller === 'string' 
+          ? parseInt(dataToCreate.idTaller, 10) 
+          : dataToCreate.idTaller;
+      }
+      if (dataToCreate.costo !== undefined && dataToCreate.costo !== null) {
+        dataToCreate.costo = typeof dataToCreate.costo === 'string' 
+          ? parseFloat(dataToCreate.costo) 
+          : dataToCreate.costo;
+      }
+
+      const create = this.mantenimientoVehicularRepository.create(
+        dataToCreate,
       );
-      const saved = await this.mantenimientoVehicularRepository.save(create);
+      const savedResult = await this.mantenimientoVehicularRepository.save(create);
+      const saved = Array.isArray(savedResult) ? savedResult[0] : savedResult;
 
       //-----Registro en la bitacora----- SUCCESS
       const querylogger = { createMantenimientoVehicularDto };
@@ -141,7 +190,7 @@ export class MantenimientoVehicularService {
   async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
     try {
       const [data, total] = await this.mantenimientoVehicularRepository.findAndCount({
-        relations: ['instalacion', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
+        relations: ['instalacion', 'instalacion.vehiculos', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
         order: { fhRegistro: 'DESC' },
         skip: (page - 1) * limit,
         take: limit,
@@ -162,6 +211,8 @@ export class MantenimientoVehicularService {
         encargado: item.encargado,
         fhRegistro: item.fhRegistro,
         estatus: item.estatus,
+        placaVehiculo: item.instalacion?.vehiculos?.placa || null,
+        imagenVehiculo: item.instalacion?.vehiculos?.foto || null,
         instalacion: item.instalacion ? {
           id: Number(item.instalacion.id),
         } : null,
@@ -202,7 +253,7 @@ export class MantenimientoVehicularService {
     try {
       const mantenimiento = await this.mantenimientoVehicularRepository.findOne({
         where: { id: id },
-        relations: ['instalacion', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
+        relations: ['instalacion', 'instalacion.vehiculos', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
       });
       if (!mantenimiento) {
         throw new NotFoundException('Mantenimiento vehicular no encontrado');
@@ -224,6 +275,8 @@ export class MantenimientoVehicularService {
             encargado: mantenimiento.encargado,
             fhRegistro: mantenimiento.fhRegistro,
             estatus: mantenimiento.estatus,
+            placaVehiculo: mantenimiento.instalacion?.vehiculos?.placa || null,
+            imagenVehiculo: mantenimiento.instalacion?.vehiculos?.foto || null,
             instalacion: mantenimiento.instalacion ? {
               id: Number(mantenimiento.instalacion.id),
             } : null,
