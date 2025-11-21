@@ -14,9 +14,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
-import { VerificacionesService } from './verificaciones.service';
-import { CreateVerificacionesDto } from './dto/create-verificaciones.dto';
-import { UpdateVerificacionesDto } from './dto/update-verificaciones.dto';
+import { IncidentesService } from './incidentes.service';
+import { CreateIncidentesDto } from './dto/create-incidentes.dto';
+import { UpdateIncidentesDto } from './dto/update-incidentes.dto';
 import {
   ApiTags,
   ApiOperation,
@@ -30,18 +30,18 @@ import {
 import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 
-@ApiTags('Verificaciones')
+@ApiTags('Incidentes')
 @ApiBearerAuth('bearer-token')
 @UseGuards(JwtAuthGuard)
-@Controller('verificaciones')
-export class VerificacionesController {
+@Controller('incidentes')
+export class IncidentesController {
   constructor(
-    private readonly verificacionesService: VerificacionesService,
+    private readonly incidentesService: IncidentesService,
   ) {}
 
   @Post()
   @UseInterceptors(
-    FileInterceptor('notaVerificacion', {
+    FileInterceptor('imagen', {
       storage: multer.memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 }, // máximo 10 MB
       fileFilter: (req, file, cb) => {
@@ -58,16 +58,16 @@ export class VerificacionesController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Crear una nueva verificación',
-    description: 'Crea un nuevo registro de verificación con toda la información. El campo notaVerificacion debe ser una imagen (archivo).',
+    summary: 'Crear un nuevo incidente',
+    description: 'Crea un nuevo registro de incidente con toda la información. El campo imagen debe ser una imagen (archivo).',
   })
   @ApiBody({
-    type: CreateVerificacionesDto,
-    description: 'Datos de la verificación a crear (FormData)',
+    type: CreateIncidentesDto,
+    description: 'Datos del incidente a crear (FormData)',
   })
   @ApiResponse({
     status: 201,
-    description: 'Verificación creada exitosamente',
+    description: 'Incidente creado exitosamente',
   })
   @ApiResponse({
     status: 400,
@@ -78,22 +78,22 @@ export class VerificacionesController {
     description: 'No autorizado',
   })
   async create(
-    @Body() createVerificacionesDto: CreateVerificacionesDto,
-    @UploadedFile() notaVerificacionFile: Express.Multer.File,
+    @Body() createIncidentesDto: CreateIncidentesDto,
+    @UploadedFile() imagenFile: Express.Multer.File,
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.verificacionesService.create(
-      createVerificacionesDto,
+    return await this.incidentesService.create(
+      createIncidentesDto,
       idUser,
-      notaVerificacionFile,
+      imagenFile,
     );
   }
 
   @Get()
   @ApiOperation({
-    summary: 'Obtener verificaciones paginadas',
-    description: 'Obtiene un listado paginado de verificaciones con sus relaciones.',
+    summary: 'Obtener incidentes paginados',
+    description: 'Obtiene un listado paginado de incidentes con sus relaciones.',
   })
   @ApiQuery({
     name: 'page',
@@ -111,7 +111,7 @@ export class VerificacionesController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Listado paginado de verificaciones obtenido exitosamente',
+    description: 'Listado paginado de incidentes obtenido exitosamente',
   })
   @ApiResponse({
     status: 401,
@@ -124,27 +124,27 @@ export class VerificacionesController {
   ): Promise<ApiResponseCommon> {
     const idCliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.verificacionesService.findAll(page, limit, Number(idCliente), Number(rol));
+    return this.incidentesService.findAll(page, limit, Number(idCliente), Number(rol));
   }
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Obtener una verificación por ID',
-    description: 'Obtiene los detalles completos de una verificación específica por su ID, incluyendo todas sus relaciones.',
+    summary: 'Obtener un incidente por ID',
+    description: 'Obtiene los detalles completos de un incidente específico por su ID, incluyendo todas sus relaciones.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID de la verificación',
+    description: 'ID del incidente',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Verificación encontrada exitosamente',
+    description: 'Incidente encontrado exitosamente',
   })
   @ApiResponse({
     status: 404,
-    description: 'Verificación no encontrada',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -153,27 +153,27 @@ export class VerificacionesController {
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req): Promise<ApiResponseCommon> {
     const idCliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.verificacionesService.findOne(id, Number(idCliente), Number(rol));
+    return this.incidentesService.findOne(id, Number(idCliente), Number(rol));
   }
 
   @Patch(':id')
   @ApiOperation({
-    summary: 'Actualizar una verificación',
-    description: 'Actualiza los datos de una verificación existente. Solo se actualizan los campos proporcionados.',
+    summary: 'Actualizar un incidente',
+    description: 'Actualiza los datos de un incidente existente. Solo se actualizan los campos proporcionados.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID de la verificación a actualizar',
+    description: 'ID del incidente a actualizar',
     example: 1,
   })
   @ApiBody({
-    type: UpdateVerificacionesDto,
-    description: 'Datos de la verificación a actualizar',
+    type: UpdateIncidentesDto,
+    description: 'Datos del incidente a actualizar',
   })
   @ApiResponse({
     status: 200,
-    description: 'Verificación actualizada exitosamente',
+    description: 'Incidente actualizado exitosamente',
   })
   @ApiResponse({
     status: 400,
@@ -181,7 +181,7 @@ export class VerificacionesController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Verificación no encontrada',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -189,35 +189,35 @@ export class VerificacionesController {
   })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateVerificacionesDto: UpdateVerificacionesDto,
+    @Body() updateIncidentesDto: UpdateIncidentesDto,
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.verificacionesService.update(
+    return await this.incidentesService.update(
       id,
-      updateVerificacionesDto,
+      updateIncidentesDto,
       idUser,
     );
   }
 
   @Patch(':id/desactivar')
   @ApiOperation({
-    summary: 'Desactivar una verificación',
-    description: 'Desactiva una verificación cambiando su estatus a 0.',
+    summary: 'Desactivar un incidente',
+    description: 'Desactiva un incidente cambiando su estatus a 0.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID de la verificación a desactivar',
+    description: 'ID del incidente a desactivar',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Verificación desactivada exitosamente',
+    description: 'Incidente desactivado exitosamente',
   })
   @ApiResponse({
     status: 404,
-    description: 'Verificación no encontrada',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -228,31 +228,31 @@ export class VerificacionesController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.verificacionesService.desactivar(id, idUser);
+    return await this.incidentesService.desactivar(id, idUser);
   }
 
   @Patch(':id/activar')
   @ApiOperation({
-    summary: 'Activar una verificación',
-    description: 'Activa una verificación cambiando su estatus a 1 si estaba previamente en 0.',
+    summary: 'Activar un incidente',
+    description: 'Activa un incidente cambiando su estatus a 1 si estaba previamente en 0.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID de la verificación a activar',
+    description: 'ID del incidente a activar',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Verificación activada exitosamente',
+    description: 'Incidente activado exitosamente',
   })
   @ApiResponse({
     status: 400,
-    description: 'La verificación ya está activa',
+    description: 'El incidente ya está activo',
   })
   @ApiResponse({
     status: 404,
-    description: 'Verificación no encontrada',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -263,7 +263,6 @@ export class VerificacionesController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.verificacionesService.activar(id, idUser);
+    return await this.incidentesService.activar(id, idUser);
   }
 }
-

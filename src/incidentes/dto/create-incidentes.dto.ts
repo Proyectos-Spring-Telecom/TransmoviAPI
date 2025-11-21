@@ -2,7 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   IsOptional,
   IsInt,
+  IsString,
   IsDateString,
+  MaxLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -21,46 +23,41 @@ const toNumber = ({ value }: { value: any }): number | undefined => {
   return undefined;
 };
 
-export class CreateVerificacionesDto {
-  @ApiProperty({
-    example: '2024-01-15',
-    description: 'Fecha de la verificación actual',
-    required: false,
-  })
-  @IsDateString({}, { message: 'La fecha de verificación actual debe ser una fecha válida.' })
-  @IsOptional()
-  verificacionActual?: string;
-
-  @ApiProperty({
-    example: '2025-01-15',
-    description: 'Fecha de la próxima verificación',
-    required: false,
-  })
-  @IsDateString({}, { message: 'La fecha de próxima verificación debe ser una fecha válida.' })
-  @IsOptional()
-  proximaVerificacion?: string;
-
+export class CreateIncidentesDto {
   @ApiProperty({
     example: 1,
     description: 'ID de la instalación relacionada',
-    required: false,
+    required: true,
   })
   @Transform(toNumber)
   @IsInt({ message: 'El ID de instalación debe ser un número entero.' })
-  @IsOptional()
-  idInstalacion?: number;
+  idInstalacion: number;
 
   @ApiProperty({
     example: 1,
     description: 'ID del operador relacionado',
-    required: false,
+    required: true,
   })
   @Transform(toNumber)
   @IsInt({ message: 'El ID de operador debe ser un número entero.' })
-  @IsOptional()
-  idOperador?: number;
+  idOperador: number;
 
- 
+  @ApiProperty({
+    example: 'Accidente en intersección',
+    description: 'Descripción del incidente',
+    required: false,
+    maxLength: 1000,
+  })
+  @IsString({ message: 'El incidente debe ser una cadena de texto.' })
+  @MaxLength(1000, { message: 'El incidente no puede exceder los 1000 caracteres.' })
+  @IsOptional()
+  incidente?: string;
+
+  @ApiProperty({
+    example: 1,
+    description: 'Estatus del incidente',
+    required: false,
+  })
   @Transform(toNumber)
   @IsInt({ message: 'El estatus debe ser un número entero.' })
   @IsOptional()
@@ -69,20 +66,19 @@ export class CreateVerificacionesDto {
   @ApiProperty({
     type: 'string',
     format: 'binary',
-    description: 'Imagen de la nota de verificación (archivo)',
+    description: 'Imagen del incidente (archivo)',
     required: false,
   })
   @IsOptional()
-  notaVerificacion?: any;
+  imagen?: any;
 
   @ApiProperty({
-    example: 1,
-    description: 'ID del tipo de verificación',
+    example: '2025-01-15T10:30:00',
+    description: 'Fecha y hora de registro del incidente',
     required: false,
   })
-  @Transform(toNumber)
-  @IsInt({ message: 'El ID de tipo de verificación debe ser un número entero.' })
+  @IsDateString({}, { message: 'La fecha de registro debe ser una fecha válida.' })
   @IsOptional()
-  idTipoVerificacion?: number;
+  fhRegistro?: string;
 }
 
