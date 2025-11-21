@@ -13,7 +13,7 @@ import { CatEstatusMantenimiento } from 'src/entities/CatEstatusMantenimiento';
 import { Talleres } from 'src/entities/Talleres';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { CatReferenciaServicio } from 'src/entities/CatReferenciaServicio';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { S3Service } from 'src/s3/s3.service';
 import {
@@ -160,10 +160,37 @@ export class MantenimientoVehicularService {
     }
   }
 
-  async findAll(page: number, limit: number): Promise<ApiResponseCommon> {
+  async findAll(page: number, limit: number, idCliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
+      const whereCondition: any = {};
+      
+      // Filtrar por idCliente si el rol no es 1 o 2
+      if (rol !== 1 && rol !== 2) {
+        // Obtener las instalaciones del cliente
+        const instalaciones = await this.instalacionesRepository.find({
+          where: { idCliente: idCliente },
+          select: ['id'],
+        });
+        const idsInstalaciones = instalaciones.map(inst => inst.id);
+        
+        // Si no hay instalaciones, retornar vacío
+        if (idsInstalaciones.length === 0) {
+          return {
+            data: [],
+            paginated: {
+              total: 0,
+              page,
+              lastPage: 0,
+            },
+          };
+        }
+        
+        whereCondition.idInstalacion = In(idsInstalaciones);
+      }
+
       const [data, total] = await this.mantenimientoVehicularRepository.findAndCount({
-        relations: ['instalacion', 'instalacion.vehiculos', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
+        where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
+        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
         order: { fhRegistro: 'DESC' },
         skip: (page - 1) * limit,
         take: limit,
@@ -201,6 +228,14 @@ export class MantenimientoVehicularService {
           id: Number(item.referenciaServicio.id),
           nombre: item.referenciaServicio.nombre,
         } : null,
+        // Incluir datos del cliente cuando el rol es 1 o 2
+        cliente: (rol === 1 || rol === 2) && item.instalacion?.idCliente2 ? {
+          id: Number(item.instalacion.idCliente2.id),
+          nombre: item.instalacion.idCliente2.nombre,
+          apellidoPaterno: item.instalacion.idCliente2.apellidoPaterno,
+          apellidoMaterno: item.instalacion.idCliente2.apellidoMaterno,
+          estatus: item.instalacion.idCliente2.estatus,
+        } : null,
       }));
 
       const result: ApiResponseCommon = {
@@ -222,12 +257,20 @@ export class MantenimientoVehicularService {
     }
   }
 
-  async findOne(id: number): Promise<ApiResponseCommon> {
+  async findOne(id: number, idCliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
       const mantenimiento = await this.mantenimientoVehicularRepository.findOne({
         where: { id: id },
-        relations: ['instalacion', 'instalacion.vehiculos', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
+        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
       });
+
+      // Verificar que el mantenimiento pertenece al cliente si el rol no es 1 o 2
+      if (rol !== 1 && rol !== 2) {
+        if (!mantenimiento || mantenimiento.instalacion?.idCliente !== idCliente) {
+          throw new NotFoundException('Mantenimiento vehicular no encontrado');
+        }
+      }
+
       if (!mantenimiento) {
         throw new NotFoundException('Mantenimiento vehicular no encontrado');
       }
@@ -264,6 +307,14 @@ export class MantenimientoVehicularService {
             referenciaServicio: mantenimiento.referenciaServicio ? {
               id: Number(mantenimiento.referenciaServicio.id),
               nombre: mantenimiento.referenciaServicio.nombre,
+            } : null,
+            // Incluir datos del cliente cuando el rol es 1 o 2
+            cliente: (rol === 1 || rol === 2) && mantenimiento.instalacion?.idCliente2 ? {
+              id: Number(mantenimiento.instalacion.idCliente2.id),
+              nombre: mantenimiento.instalacion.idCliente2.nombre,
+              apellidoPaterno: mantenimiento.instalacion.idCliente2.apellidoPaterno,
+              apellidoMaterno: mantenimiento.instalacion.idCliente2.apellidoMaterno,
+              estatus: mantenimiento.instalacion.idCliente2.estatus,
             } : null,
           },
         ],

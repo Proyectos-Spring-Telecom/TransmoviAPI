@@ -5,6 +5,7 @@ import {
   Body,
   Patch,
   Param,
+  Query,
   Request,
   ParseIntPipe,
   UseGuards,
@@ -13,33 +14,34 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
-import { MantenimientoVehicularService } from './mantenimiento-vehicular.service';
-import { CreateMantenimientoVehicularDto } from './dto/create-mantenimiento-vehicular.dto';
-import { UpdateMantenimientoVehicularDto } from './dto/update-mantenimiento-vehicular.dto';
+import { IncidentesService } from './incidentes.service';
+import { CreateIncidentesDto } from './dto/create-incidentes.dto';
+import { UpdateIncidentesDto } from './dto/update-incidentes.dto';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
   ApiBody,
   ApiConsumes,
 } from '@nestjs/swagger';
 import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 
-@ApiTags('Mantenimiento Vehicular')
+@ApiTags('Incidentes')
 @ApiBearerAuth('bearer-token')
 @UseGuards(JwtAuthGuard)
-@Controller('mantenimiento-vehicular')
-export class MantenimientoVehicularController {
+@Controller('incidentes')
+export class IncidentesController {
   constructor(
-    private readonly mantenimientoVehicularService: MantenimientoVehicularService,
+    private readonly incidentesService: IncidentesService,
   ) {}
 
   @Post()
   @UseInterceptors(
-    FileInterceptor('notaServicio', {
+    FileInterceptor('imagen', {
       storage: multer.memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 }, // máximo 10 MB
       fileFilter: (req, file, cb) => {
@@ -56,16 +58,16 @@ export class MantenimientoVehicularController {
   )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Crear un nuevo mantenimiento vehicular',
-    description: 'Crea un nuevo registro de mantenimiento vehicular con toda la información del servicio realizado. El campo notaServicio debe ser una imagen (archivo).',
+    summary: 'Crear un nuevo incidente',
+    description: 'Crea un nuevo registro de incidente con toda la información. El campo imagen debe ser una imagen (archivo).',
   })
   @ApiBody({
-    type: CreateMantenimientoVehicularDto,
-    description: 'Datos del mantenimiento vehicular a crear (FormData)',
+    type: CreateIncidentesDto,
+    description: 'Datos del incidente a crear (FormData)',
   })
   @ApiResponse({
     status: 201,
-    description: 'Mantenimiento vehicular creado exitosamente',
+    description: 'Incidente creado exitosamente',
   })
   @ApiResponse({
     status: 400,
@@ -76,71 +78,73 @@ export class MantenimientoVehicularController {
     description: 'No autorizado',
   })
   async create(
-    @Body() createMantenimientoVehicularDto: CreateMantenimientoVehicularDto,
-    @UploadedFile() notaServicioFile: Express.Multer.File,
+    @Body() createIncidentesDto: CreateIncidentesDto,
+    @UploadedFile() imagenFile: Express.Multer.File,
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.mantenimientoVehicularService.create(
-      createMantenimientoVehicularDto,
+    return await this.incidentesService.create(
+      createIncidentesDto,
       idUser,
-      notaServicioFile,
+      imagenFile,
     );
   }
 
-  @Get(':page/:limit')
+  @Get()
   @ApiOperation({
-    summary: 'Obtener mantenimientos vehiculares paginados',
-    description: 'Obtiene un listado paginado de mantenimientos vehiculares con sus relaciones.',
+    summary: 'Obtener incidentes paginados',
+    description: 'Obtiene un listado paginado de incidentes con sus relaciones.',
   })
-  @ApiParam({
+  @ApiQuery({
     name: 'page',
     type: Number,
     description: 'Número de página',
     example: 1,
+    required: true,
   })
-  @ApiParam({
+  @ApiQuery({
     name: 'limit',
     type: Number,
     description: 'Cantidad de registros por página',
     example: 10,
+    required: true,
   })
   @ApiResponse({
     status: 200,
-    description: 'Listado paginado de mantenimientos vehiculares obtenido exitosamente',
+    description: 'Listado paginado de incidentes obtenido exitosamente',
   })
   @ApiResponse({
     status: 401,
     description: 'No autorizado',
   })
   findAll(
-    @Param('page', ParseIntPipe) page: number,
-    @Param('limit', ParseIntPipe) limit: number,
+    @Query('page', ParseIntPipe) page: number,
+    @Query('limit', ParseIntPipe) limit: number,
     @Request() req,
   ): Promise<ApiResponseCommon> {
     const idCliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.mantenimientoVehicularService.findAll(page, limit, Number(idCliente), Number(rol));
+    return this.incidentesService.findAll(page, limit, Number(idCliente), Number(rol));
   }
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Obtener un mantenimiento vehicular por ID',
-    description: 'Obtiene los detalles completos de un mantenimiento vehicular específico por su ID, incluyendo todas sus relaciones.',
+    summary: 'Obtener un incidente por ID',
+    description: 'Obtiene los detalles completos de un incidente específico por su ID, incluyendo todas sus relaciones.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID del mantenimiento vehicular',
+    description: 'ID del incidente',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Mantenimiento vehicular encontrado exitosamente',
+    description: 'Incidente encontrado exitosamente',
   })
   @ApiResponse({
     status: 404,
-    description: 'Mantenimiento vehicular no encontrado',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -149,27 +153,27 @@ export class MantenimientoVehicularController {
   findOne(@Param('id', ParseIntPipe) id: number, @Request() req): Promise<ApiResponseCommon> {
     const idCliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.mantenimientoVehicularService.findOne(id, Number(idCliente), Number(rol));
+    return this.incidentesService.findOne(id, Number(idCliente), Number(rol));
   }
 
   @Patch(':id')
   @ApiOperation({
-    summary: 'Actualizar un mantenimiento vehicular',
-    description: 'Actualiza los datos de un mantenimiento vehicular existente. Solo se actualizan los campos proporcionados.',
+    summary: 'Actualizar un incidente',
+    description: 'Actualiza los datos de un incidente existente. Solo se actualizan los campos proporcionados.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID del mantenimiento vehicular a actualizar',
+    description: 'ID del incidente a actualizar',
     example: 1,
   })
   @ApiBody({
-    type: UpdateMantenimientoVehicularDto,
-    description: 'Datos del mantenimiento vehicular a actualizar',
+    type: UpdateIncidentesDto,
+    description: 'Datos del incidente a actualizar',
   })
   @ApiResponse({
     status: 200,
-    description: 'Mantenimiento vehicular actualizado exitosamente',
+    description: 'Incidente actualizado exitosamente',
   })
   @ApiResponse({
     status: 400,
@@ -177,7 +181,7 @@ export class MantenimientoVehicularController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Mantenimiento vehicular no encontrado',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -185,35 +189,35 @@ export class MantenimientoVehicularController {
   })
   async update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateMantenimientoVehicularDto: UpdateMantenimientoVehicularDto,
+    @Body() updateIncidentesDto: UpdateIncidentesDto,
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.mantenimientoVehicularService.update(
+    return await this.incidentesService.update(
       id,
-      updateMantenimientoVehicularDto,
+      updateIncidentesDto,
       idUser,
     );
   }
 
   @Patch(':id/desactivar')
   @ApiOperation({
-    summary: 'Desactivar un mantenimiento vehicular',
-    description: 'Desactiva un mantenimiento vehicular cambiando su estatus a 0.',
+    summary: 'Desactivar un incidente',
+    description: 'Desactiva un incidente cambiando su estatus a 0.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID del mantenimiento vehicular a desactivar',
+    description: 'ID del incidente a desactivar',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Mantenimiento vehicular desactivado exitosamente',
+    description: 'Incidente desactivado exitosamente',
   })
   @ApiResponse({
     status: 404,
-    description: 'Mantenimiento vehicular no encontrado',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -224,31 +228,31 @@ export class MantenimientoVehicularController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.mantenimientoVehicularService.desactivar(id, idUser);
+    return await this.incidentesService.desactivar(id, idUser);
   }
 
   @Patch(':id/activar')
   @ApiOperation({
-    summary: 'Activar un mantenimiento vehicular',
-    description: 'Activa un mantenimiento vehicular cambiando su estatus a 1 si estaba previamente en 0.',
+    summary: 'Activar un incidente',
+    description: 'Activa un incidente cambiando su estatus a 1 si estaba previamente en 0.',
   })
   @ApiParam({
     name: 'id',
     type: Number,
-    description: 'ID del mantenimiento vehicular a activar',
+    description: 'ID del incidente a activar',
     example: 1,
   })
   @ApiResponse({
     status: 200,
-    description: 'Mantenimiento vehicular activado exitosamente',
+    description: 'Incidente activado exitosamente',
   })
   @ApiResponse({
     status: 400,
-    description: 'El mantenimiento vehicular ya está activo',
+    description: 'El incidente ya está activo',
   })
   @ApiResponse({
     status: 404,
-    description: 'Mantenimiento vehicular no encontrado',
+    description: 'Incidente no encontrado',
   })
   @ApiResponse({
     status: 401,
@@ -259,6 +263,6 @@ export class MantenimientoVehicularController {
     @Request() req,
   ): Promise<ApiCrudResponse> {
     const idUser = req.user.userId;
-    return await this.mantenimientoVehicularService.activar(id, idUser);
+    return await this.incidentesService.activar(id, idUser);
   }
 }

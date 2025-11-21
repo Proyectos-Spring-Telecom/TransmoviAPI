@@ -49,8 +49,10 @@ import { CatTipoVerificacionesModule } from './cat-tipo-verificaciones/cat-tipo-
 import { MantenimientoVehicularModule } from './mantenimiento-vehicular/mantenimiento-vehicular.module';
 import { MantenimientoCombustibleModule } from './mantenimiento-combustible/mantenimiento-combustible.module';
 import { MantenimientoKilometrajeModule } from './mantenimiento-kilometraje/mantenimiento-kilometraje.module';
+import { VerificacionesModule } from './verificaciones/verificaciones.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { IncidentesModule } from './incidentes/incidentes.module';
 import Joi from 'joi';
 
 @Module({
@@ -177,6 +179,10 @@ import Joi from 'joi';
 
     MantenimientoKilometrajeModule,
 
+    VerificacionesModule,
+
+    IncidentesModule,
+
     LicenciasModule,
 
     CatcategorialicenciaModule,
@@ -190,6 +196,8 @@ import Joi from 'joi';
     ReportesModule,
 
     DashboardModule,
+
+    IncidentesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
