@@ -13,7 +13,7 @@ import { CatEstatusMantenimiento } from 'src/entities/CatEstatusMantenimiento';
 import { Talleres } from 'src/entities/Talleres';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { CatReferenciaServicio } from 'src/entities/CatReferenciaServicio';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { S3Service } from 'src/s3/s3.service';
 import {
@@ -166,7 +166,26 @@ export class MantenimientoVehicularService {
       
       // Filtrar por idCliente si el rol no es 1 o 2
       if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
+        // Obtener las instalaciones del cliente
+        const instalaciones = await this.instalacionesRepository.find({
+          where: { idCliente: idCliente },
+          select: ['id'],
+        });
+        const idsInstalaciones = instalaciones.map(inst => inst.id);
+        
+        // Si no hay instalaciones, retornar vacío
+        if (idsInstalaciones.length === 0) {
+          return {
+            data: [],
+            paginated: {
+              total: 0,
+              page,
+              lastPage: 0,
+            },
+          };
+        }
+        
+        whereCondition.idInstalacion = In(idsInstalaciones);
       }
 
       const [data, total] = await this.mantenimientoVehicularRepository.findAndCount({
@@ -240,17 +259,17 @@ export class MantenimientoVehicularService {
 
   async findOne(id: number, idCliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
-      const whereCondition: any = { id: id };
-      
-      // Filtrar por idCliente si el rol no es 1 o 2
-      if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
-      }
-
       const mantenimiento = await this.mantenimientoVehicularRepository.findOne({
-        where: whereCondition,
+        where: { id: id },
         relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'idEstatusRelacion', 'taller', 'referenciaServicio'],
       });
+
+      // Verificar que el mantenimiento pertenece al cliente si el rol no es 1 o 2
+      if (rol !== 1 && rol !== 2) {
+        if (!mantenimiento || mantenimiento.instalacion?.idCliente !== idCliente) {
+          throw new NotFoundException('Mantenimiento vehicular no encontrado');
+        }
+      }
 
       if (!mantenimiento) {
         throw new NotFoundException('Mantenimiento vehicular no encontrado');

@@ -9,7 +9,8 @@ import { CreateMantenimientoCombustibleDto } from './dto/create-mantenimiento-co
 import { UpdateMantenimientoCombustibleDto } from './dto/update-mantenimiento-combustible.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MantenimientoCombustible } from 'src/entities/MantenimientoCombustible';
-import { Repository } from 'typeorm';
+import { Instalaciones } from 'src/entities/Instalaciones';
+import { Repository, In } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import {
   ApiCrudResponse,
@@ -22,6 +23,8 @@ export class MantenimientoCombustibleService {
   constructor(
     @InjectRepository(MantenimientoCombustible)
     private readonly mantenimientoCombustibleRepository: Repository<MantenimientoCombustible>,
+    @InjectRepository(Instalaciones)
+    private readonly instalacionesRepository: Repository<Instalaciones>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -86,7 +89,26 @@ export class MantenimientoCombustibleService {
       
       // Filtrar por idCliente si el rol no es 1 o 2
       if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
+        // Obtener las instalaciones del cliente
+        const instalaciones = await this.instalacionesRepository.find({
+          where: { idCliente: idCliente },
+          select: ['id'],
+        });
+        const idsInstalaciones = instalaciones.map(inst => inst.id);
+        
+        // Si no hay instalaciones, retornar vacío
+        if (idsInstalaciones.length === 0) {
+          return {
+            data: [],
+            paginated: {
+              total: 0,
+              page,
+              lastPage: 0,
+            },
+          };
+        }
+        
+        whereCondition.idInstalacion = In(idsInstalaciones);
       }
 
       const [data, total] = await this.mantenimientoCombustibleRepository.findAndCount({
@@ -159,20 +181,20 @@ export class MantenimientoCombustibleService {
 
   async findOne(id: number, idCliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
-      const whereCondition: any = { id: id };
-      
-      // Filtrar por idCliente si el rol no es 1 o 2
-      if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
-      }
-
       const mantenimiento = await this.mantenimientoCombustibleRepository.findOne({
-        where: whereCondition,
+        where: { id: id },
         relations: ['tipoCombustible', 'instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'operador', 'operador.idUsuario2'],
       });
 
       if (!mantenimiento) {
         throw new NotFoundException('Mantenimiento de combustible no encontrado');
+      }
+
+      // Verificar que el mantenimiento pertenece al cliente si el rol no es 1 o 2
+      if (rol !== 1 && rol !== 2) {
+        if (mantenimiento.instalacion?.idCliente !== idCliente) {
+          throw new NotFoundException('Mantenimiento de combustible no encontrado');
+        }
       }
 
       const nombreOperador = mantenimiento.operador?.idUsuario2 

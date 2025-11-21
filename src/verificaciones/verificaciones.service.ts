@@ -12,7 +12,7 @@ import { Verificaciones } from 'src/entities/Verificaciones';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Operadores } from 'src/entities/Operadores';
 import { CatTipoVerificaciones } from 'src/entities/CatTipoVerificaciones';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { S3Service } from 'src/s3/s3.service';
 import {
@@ -152,49 +152,63 @@ export class VerificacionesService {
       
       // Filtrar por idCliente si el rol no es 1 o 2
       if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
+        // Obtener las instalaciones del cliente
+        const instalaciones = await this.instalacionesRepository.find({
+          where: { idCliente: idCliente },
+          select: ['id'],
+        });
+        const idsInstalaciones = instalaciones.map(inst => inst.id);
+        
+        // Si no hay instalaciones, retornar vacío
+        if (idsInstalaciones.length === 0) {
+          return {
+            data: [],
+            paginated: {
+              total: 0,
+              page,
+              lastPage: 0,
+            },
+          };
+        }
+        
+        whereCondition.idInstalacion = In(idsInstalaciones);
       }
 
       const [data, total] = await this.verificacionesRepository.findAndCount({
         where: Object.keys(whereCondition).length > 0 ? whereCondition : undefined,
-        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'operador', 'tipoVerificacion'],
+        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'operador', 'operador.idUsuario2', 'tipoVerificacion'],
         order: { fhRegistro: 'DESC' },
         skip: (page - 1) * limit,
         take: limit,
       });
 
       // Forzamos ids a number
-      const verificaciones = data.map((item) => ({
-        id: Number(item.id),
-        verificacionActual: item.verificacionActual,
-        proximaVerificacion: item.proximaVerificacion,
-        idInstalacion: item.idInstalacion ? Number(item.idInstalacion) : null,
-        idOperador: item.idOperador ? Number(item.idOperador) : null,
-        estatus: item.estatus,
-        notaVerificacion: item.notaVerificacion,
-        fhRegistro: item.fhRegistro,
-        idTipoVerificacion: item.idTipoVerificacion ? Number(item.idTipoVerificacion) : null,
-        placaVehiculo: item.instalacion?.vehiculos?.placa || null,
-        imagenVehiculo: item.instalacion?.vehiculos?.foto || null,
-        instalacion: item.instalacion ? {
-          id: Number(item.instalacion.id),
-        } : null,
-        operador: item.operador ? {
-          id: Number(item.operador.id),
-        } : null,
-        tipoVerificacion: item.tipoVerificacion ? {
-          id: Number(item.tipoVerificacion.id),
-          nombre: item.tipoVerificacion.nombre,
-        } : null,
-        // Incluir datos del cliente cuando el rol es 1 o 2
-        cliente: (rol === 1 || rol === 2) && item.instalacion?.idCliente2 ? {
-          id: Number(item.instalacion.idCliente2.id),
-          nombre: item.instalacion.idCliente2.nombre,
-          apellidoPaterno: item.instalacion.idCliente2.apellidoPaterno,
-          apellidoMaterno: item.instalacion.idCliente2.apellidoMaterno,
-          estatus: item.instalacion.idCliente2.estatus,
-        } : null,
-      }));
+      const verificaciones = data.map((item) => {
+        const nombreOperador = item.operador?.idUsuario2 
+          ? `${item.operador.idUsuario2.nombre || ''} ${item.operador.idUsuario2.apellidoPaterno || ''} ${item.operador.idUsuario2.apellidoMaterno || ''}`.trim() || null
+          : null;
+
+        const nombreCliente = item.instalacion?.idCliente2
+          ? `${item.instalacion.idCliente2.nombre || ''} ${item.instalacion.idCliente2.apellidoPaterno || ''} ${item.instalacion.idCliente2.apellidoMaterno || ''}`.trim() || null
+          : null;
+
+        return {
+          id: Number(item.id),
+          verificacionActual: item.verificacionActual,
+          proximaVerificacion: item.proximaVerificacion,
+          idInstalacion: item.idInstalacion ? Number(item.idInstalacion) : null,
+          idOperador: item.idOperador ? Number(item.idOperador) : null,
+          estatus: item.estatus,
+          notaVerificacion: item.notaVerificacion,
+          fhRegistro: item.fhRegistro,
+          idTipoVerificacion: item.idTipoVerificacion ? Number(item.idTipoVerificacion) : null,
+          nombreTipoVerificacion: item.tipoVerificacion?.nombre || null,
+          placaVehiculo: item.instalacion?.vehiculos?.placa || null,
+          imagenVehiculo: item.instalacion?.vehiculos?.foto || null,
+          nombreOperador: nombreOperador,
+          nombreCliente: nombreCliente,
+        };
+      });
 
       const result: ApiResponseCommon = {
         data: verificaciones,
@@ -217,21 +231,29 @@ export class VerificacionesService {
 
   async findOne(id: number, idCliente: number, rol: number): Promise<ApiResponseCommon> {
     try {
-      const whereCondition: any = { id: id };
-      
-      // Filtrar por idCliente si el rol no es 1 o 2
-      if (rol !== 1 && rol !== 2) {
-        whereCondition.instalacion = { idCliente: idCliente };
-      }
-
       const verificacion = await this.verificacionesRepository.findOne({
-        where: whereCondition,
-        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'operador', 'tipoVerificacion'],
+        where: { id: id },
+        relations: ['instalacion', 'instalacion.vehiculos', 'instalacion.idCliente2', 'operador', 'operador.idUsuario2', 'tipoVerificacion'],
       });
+
+      // Verificar que la verificación pertenece al cliente si el rol no es 1 o 2
+      if (rol !== 1 && rol !== 2) {
+        if (!verificacion || verificacion.instalacion?.idCliente !== idCliente) {
+          throw new NotFoundException('Verificación no encontrada');
+        }
+      }
 
       if (!verificacion) {
         throw new NotFoundException('Verificación no encontrada');
       }
+
+      const nombreOperador = verificacion.operador?.idUsuario2 
+        ? `${verificacion.operador.idUsuario2.nombre || ''} ${verificacion.operador.idUsuario2.apellidoPaterno || ''} ${verificacion.operador.idUsuario2.apellidoMaterno || ''}`.trim() || null
+        : null;
+
+      const nombreCliente = verificacion.instalacion?.idCliente2
+        ? `${verificacion.instalacion.idCliente2.nombre || ''} ${verificacion.instalacion.idCliente2.apellidoPaterno || ''} ${verificacion.instalacion.idCliente2.apellidoMaterno || ''}`.trim() || null
+        : null;
 
       const result: ApiResponseCommon = {
         data: [
@@ -245,26 +267,11 @@ export class VerificacionesService {
             notaVerificacion: verificacion.notaVerificacion,
             fhRegistro: verificacion.fhRegistro,
             idTipoVerificacion: verificacion.idTipoVerificacion ? Number(verificacion.idTipoVerificacion) : null,
+            nombreTipoVerificacion: verificacion.tipoVerificacion?.nombre || null,
             placaVehiculo: verificacion.instalacion?.vehiculos?.placa || null,
             imagenVehiculo: verificacion.instalacion?.vehiculos?.foto || null,
-            instalacion: verificacion.instalacion ? {
-              id: Number(verificacion.instalacion.id),
-            } : null,
-            operador: verificacion.operador ? {
-              id: Number(verificacion.operador.id),
-            } : null,
-            tipoVerificacion: verificacion.tipoVerificacion ? {
-              id: Number(verificacion.tipoVerificacion.id),
-              nombre: verificacion.tipoVerificacion.nombre,
-            } : null,
-            // Incluir datos del cliente cuando el rol es 1 o 2
-            cliente: (rol === 1 || rol === 2) && verificacion.instalacion?.idCliente2 ? {
-              id: Number(verificacion.instalacion.idCliente2.id),
-              nombre: verificacion.instalacion.idCliente2.nombre,
-              apellidoPaterno: verificacion.instalacion.idCliente2.apellidoPaterno,
-              apellidoMaterno: verificacion.instalacion.idCliente2.apellidoMaterno,
-              estatus: verificacion.instalacion.idCliente2.estatus,
-            } : null,
+            nombreOperador: nombreOperador,
+            nombreCliente: nombreCliente,
           },
         ],
       };

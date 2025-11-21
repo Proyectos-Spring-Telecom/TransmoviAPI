@@ -52,6 +52,7 @@ import { MantenimientoKilometrajeModule } from './mantenimiento-kilometraje/mant
 import { VerificacionesModule } from './verificaciones/verificaciones.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { IncidentesModule } from './incidentes/incidentes.module';
 import Joi from 'joi';
 
 @Module({
@@ -180,6 +181,8 @@ import Joi from 'joi';
 
     VerificacionesModule,
 
+    IncidentesModule,
+
     LicenciasModule,
 
     CatcategorialicenciaModule,
@@ -193,6 +196,8 @@ import Joi from 'joi';
     ReportesModule,
 
     DashboardModule,
+
+    IncidentesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
