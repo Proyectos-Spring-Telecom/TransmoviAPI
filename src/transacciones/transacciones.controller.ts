@@ -51,6 +51,7 @@ export class TransaccionesController {
   // ========================================
 
   @Get('list')
+  @UseGuards(JwtAuthGuard)
   async findAllListTransacciones(@Request() req): Promise<ApiResponseCommon> {
     const cliente = req.user.cliente;
     const rol = req.user.rol;
@@ -58,6 +59,7 @@ export class TransaccionesController {
   }
 
   @Get('RECARGA/:id')
+  
   findOneTransaccioneRecarga(@Param('id', ParseIntPipe) id: number) {
     return this.transaccionesService.findOneTransaccionRecarga(id);
   }
@@ -68,6 +70,7 @@ export class TransaccionesController {
   }
 
   @Get(':page/:limit')
+  @UseGuards(JwtAuthGuard)
   async findAllTransacciones(
     @Param('page', ParseIntPipe) page: number,
     @Param('limit', ParseIntPipe) limit: number,
