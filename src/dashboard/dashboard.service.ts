@@ -271,15 +271,22 @@ ORDER BY porcentajeEnServicio DESC;`
       let data;
       if (fechaInicio && fechaFin) {
         data = await this.resolverPorFecha(fechaInicio, fechaFin, idCliente, cliente, rol)
-        console.log('Entro a consulta por fechas');
-        console.log('INICIO:', fechaInicio, 'FINAL:', fechaFin);
       } else {
         const { fechaIni, fechaFinal } = await this.resolverPorFiltro(filtro || 1);
         data = await this.resolverPorRol(fechaIni, fechaFinal, idCliente, cliente, rol)
-        console.log('INI:', fechaIni, 'FINAL:', fechaFinal);
-        console.log('Entro a consulta por filtro')
       }
-      return {ingresosAlDia:data.kpi1};
+      return {
+        ingresosAlDia: data.kpi1[0].ingresosDelDia,
+        pasajerosValidados: Number(data.kpi1[0].pasajerosValidados) || 0,
+        ticketPromedio: Number(data.kpi1[0].ticketPromedio),
+        validacionesExitosas: Number(data.kpi1[0].validacionesExitosas),
+        validacionesFallidas: Number(data.kpi1[0].validacionesFallidas),
+        unidadesEnServicio: Number(data.kpi2[0].unidadesEnServicio),
+        totalUnidades: Number(data.kpi2[0].totalUnidades),
+        cumplimientoTurnos: data.kpi2[0].cumplimientoTurnosPorcentaje,
+        ocupacionPromedio: data.kpi2[0].ocupacionPromedio || 0,
+      };
+
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -426,7 +433,6 @@ ORDER BY porcentajeEnServicio DESC;`
     idCliente: number
   ) {
     const { ids, placeholders } = await this.clienteHijos(idCliente);
-    console.log(...ids)
     const query = `
 SELECT
     IFNULL(SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN td.Monto ELSE 0 END), 0) AS ingresosDelDia,
