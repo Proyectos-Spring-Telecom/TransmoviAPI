@@ -42,6 +42,16 @@ export class DashboardService {
         const { fechaIni, fechaFinal } = await this.resolverPorFiltro(filtro || 1);
         data = await this.resolverPorRol(fechaIni, fechaFinal, idCliente, cliente, rol)
       }
+      const { grafica1 } = data
+      
+      //Forzamos a cambiar el id a number
+      const g1 = grafica1.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        validaciones_exitosas: Number(item.validaciones_exitosas),
+        validaciones_fallidas: Number(item.validaciones_fallidas),
+      }));
+
       return {
         ingresosAlDia: data.kpi1[0].ingresosDelDia,
         pasajerosValidados: Number(data.kpi1[0].pasajerosValidados) || 0,
@@ -52,9 +62,11 @@ export class DashboardService {
         totalUnidades: Number(data.kpi2[0].totalUnidades),
         cumplimientoTurnos: data.kpi2[0].cumplimientoTurnosPorcentaje,
         ocupacionPromedio: data.kpi2[0].ocupacionPromedio || 0,
+        g1,
       };
 
     } catch (error) {
+      console.log(error)
       if (error instanceof HttpException) {
         throw error;
       }
@@ -154,14 +166,17 @@ export class DashboardService {
     try {
       let kpi1;
       let kpi2;
+      let grafica1;
       switch (rol) {
         case 1:
           if (idCliente === cliente) {
             kpi1 = await this.kpiSA(fechaInicio, fechaFin, idCliente);
             kpi2 = await this.kpi2SA(fechaInicio, fechaFin, idCliente);
+            grafica1 = await this.grafica1SA(fechaInicio, fechaFin, idCliente);
           } else {
             kpi1 = await this.kpiDef(fechaInicio, fechaFin, idCliente);
             kpi2 = await this.kpi2Def(fechaInicio, fechaFin, idCliente);
+            grafica1 = await this.grafica1(fechaInicio, fechaFin, idCliente);
           }
 
           break;
@@ -169,20 +184,24 @@ export class DashboardService {
           if (idCliente === cliente) {
             kpi1 = await this.kpiSA(fechaInicio, fechaFin, idCliente);
             kpi2 = await this.kpi2SA(fechaInicio, fechaFin, idCliente);
+            grafica1 = await this.grafica1SA(fechaInicio, fechaFin, idCliente);
           } else {
             kpi1 = await this.kpiDef(fechaInicio, fechaFin, idCliente);
             kpi2 = await this.kpi2Def(fechaInicio, fechaFin, idCliente);
+            grafica1 = await this.grafica1(fechaInicio, fechaFin, idCliente);
           }
           break;
 
         default:
           kpi1 = await this.kpiDef(fechaInicio, fechaFin, idCliente);
           kpi2 = await this.kpi2Def(fechaInicio, fechaFin, idCliente);
+          grafica1 = await this.grafica1(fechaInicio, fechaFin, idCliente);
           break;
       }
-      return { kpi1, kpi2 }
+      return { kpi1, kpi2, grafica1 }
 
     } catch (error) {
+      console.log(error)
       if (error instanceof HttpException) {
         throw error;
       }
@@ -392,5 +411,156 @@ LEFT JOIN Ocupacion o ON o.IdCliente = v.IdCliente AND o.idVehiculo = v.Id
 WHERE v.Estatus = 1
   AND v.IdCliente IN (${idCliente});`
     return this.clienteRepository.query(query);
+  }
+
+  /////////*/*/*/*/*/*//*//////////////////////////////////////////******/////*/*/*/*/*/*/*/*/*/*/*/*/*/*/*//*/*/**/***/*/****
+
+  private async grafica1(
+    fechaInicio: string,
+    fechaFin: string,
+    idCliente: number
+  ) {
+    const query = `
+WITH rango AS (
+    SELECT DATEDIFF('${fechaFin}T23:59:59Z', '${fechaInicio}T00:00:00Z') AS dias
+),
+datos AS (
+    SELECT 
+        /* PERIODO PRINCIPAL */
+        CASE 
+            WHEN dias = 0 THEN DATE(td.FechaHora)                                -- Por hora
+            WHEN dias <= 15 THEN DATE(td.FechaHora)                              -- Por día
+            WHEN dias <= 60 THEN CONCAT(DATE_FORMAT(td.FechaHora, '%Y-%m'), ' + Semana ', WEEK(td.FechaHora, 1)) -- Por semana
+            ELSE DATE_FORMAT(td.FechaHora, '%Y-%m')                              -- Por mes
+        END AS periodo,
+
+        /* SUBPERIODO (solo aplica para hora) */
+        CASE 
+            WHEN dias = 0 THEN HOUR(td.FechaHora)
+            ELSE NULL
+        END AS subperiodo,
+
+        SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN td.Monto ELSE 0 END) AS ingresos,
+        COUNT(CASE WHEN td.IdTipoTransaccion = 2 THEN 1 END) AS validaciones_exitosas,
+        COUNT(CASE WHEN td.IdTipoTransaccion = 3 THEN 1 END) AS validaciones_fallidas,
+        ROUND(
+            IFNULL(
+                SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN td.Monto ELSE 0 END) /
+                NULLIF(COUNT(DISTINCT CASE WHEN td.IdTipoTransaccion = 2 THEN td.NumeroSerieMonedero END),0)
+            ,0),2
+        ) AS ticket_promedio,
+        ROUND(
+            SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2
+        ) AS porcentaje_exitosas,
+        ROUND(
+            SUM(CASE WHEN td.IdTipoTransaccion = 3 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2
+        ) AS porcentaje_fallidas
+    FROM TransaccionesDebito td
+    INNER JOIN Dispositivos d ON td.NumeroSerieDispositivo = d.NumeroSerie
+    INNER JOIN Clientes c ON d.IdCliente = c.Id
+    CROSS JOIN rango
+    WHERE td.FechaHora BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+      AND c.Id IN (1,7,9,8,10,12,13,14,11)
+    GROUP BY 
+        CASE 
+            WHEN dias = 0 THEN DATE(td.FechaHora)
+            WHEN dias <= 15 THEN DATE(td.FechaHora)
+            WHEN dias <= 60 THEN CONCAT(DATE_FORMAT(td.FechaHora, '%Y-%m'), ' + Semana ', WEEK(td.FechaHora, 1))
+            ELSE DATE_FORMAT(td.FechaHora, '%Y-%m')
+        END,
+        CASE 
+            WHEN dias = 0 THEN HOUR(td.FechaHora)
+            ELSE NULL
+        END
+)
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY periodo, subperiodo) AS id,
+    periodo,
+    subperiodo,
+    ingresos,
+    validaciones_exitosas,
+    validaciones_fallidas,
+    ticket_promedio,
+    porcentaje_exitosas,
+    porcentaje_fallidas
+FROM datos
+ORDER BY periodo, subperiodo;
+`
+    return this.clienteRepository.query(query);
+  }
+
+  private async grafica1SA(
+    fechaInicio: string,
+    fechaFin: string,
+    idCliente: number
+  ) {
+    const { ids, placeholders } = await this.clienteHijos(idCliente);
+    const query = `
+WITH rango AS (
+    SELECT DATEDIFF('${fechaFin}T23:59:59Z', '${fechaInicio}T00:00:00Z') AS dias
+),
+datos AS (
+    SELECT 
+        /* PERIODO PRINCIPAL */
+        CASE 
+            WHEN dias = 0 THEN DATE(td.FechaHora)                                -- Por hora
+            WHEN dias <= 15 THEN DATE(td.FechaHora)                              -- Por día
+            WHEN dias <= 60 THEN CONCAT(DATE_FORMAT(td.FechaHora, '%Y-%m'), ' + Semana ', WEEK(td.FechaHora, 1)) -- Por semana
+            ELSE DATE_FORMAT(td.FechaHora, '%Y-%m')                              -- Por mes
+        END AS periodo,
+
+        /* SUBPERIODO (solo aplica para hora) */
+        CASE 
+            WHEN dias = 0 THEN HOUR(td.FechaHora)
+            ELSE NULL
+        END AS subperiodo,
+
+        SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN td.Monto ELSE 0 END) AS ingresos,
+        COUNT(CASE WHEN td.IdTipoTransaccion = 2 THEN 1 END) AS validaciones_exitosas,
+        COUNT(CASE WHEN td.IdTipoTransaccion = 3 THEN 1 END) AS validaciones_fallidas,
+        ROUND(
+            IFNULL(
+                SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN td.Monto ELSE 0 END) /
+                NULLIF(COUNT(DISTINCT CASE WHEN td.IdTipoTransaccion = 2 THEN td.NumeroSerieMonedero END),0)
+            ,0),2
+        ) AS ticket_promedio,
+        ROUND(
+            SUM(CASE WHEN td.IdTipoTransaccion = 2 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2
+        ) AS porcentaje_exitosas,
+        ROUND(
+            SUM(CASE WHEN td.IdTipoTransaccion = 3 THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2
+        ) AS porcentaje_fallidas
+    FROM TransaccionesDebito td
+    INNER JOIN Dispositivos d ON td.NumeroSerieDispositivo = d.NumeroSerie
+    INNER JOIN Clientes c ON d.IdCliente = c.Id
+    CROSS JOIN rango
+    WHERE td.FechaHora BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+      AND c.Id IN (${placeholders})
+    GROUP BY 
+        CASE 
+            WHEN dias = 0 THEN DATE(td.FechaHora)
+            WHEN dias <= 15 THEN DATE(td.FechaHora)
+            WHEN dias <= 60 THEN CONCAT(DATE_FORMAT(td.FechaHora, '%Y-%m'), ' + Semana ', WEEK(td.FechaHora, 1))
+            ELSE DATE_FORMAT(td.FechaHora, '%Y-%m')
+        END,
+        CASE 
+            WHEN dias = 0 THEN HOUR(td.FechaHora)
+            ELSE NULL
+        END
+)
+SELECT 
+    ROW_NUMBER() OVER (ORDER BY periodo, subperiodo) AS id,
+    periodo,
+    subperiodo,
+    ingresos,
+    validaciones_exitosas,
+    validaciones_fallidas,
+    ticket_promedio,
+    porcentaje_exitosas,
+    porcentaje_fallidas
+FROM datos
+ORDER BY periodo, subperiodo;
+`
+    return this.clienteRepository.query(query, [...ids]);
   }
 }
