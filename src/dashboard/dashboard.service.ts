@@ -241,7 +241,7 @@ INNER JOIN Dispositivos d ON td.NumeroSerieDispositivo = d.NumeroSerie
 INNER JOIN Clientes c ON d.IdCliente = c.Id
 WHERE td.FechaHora >= '${fechaInicio}T00:00:00Z'
   AND td.FechaHora < '${fechaFin}T23:59:59Z'
-  AND c.Id IN (${placeholders});;`
+  AND c.Id IN (${placeholders});`
 
     return this.clienteRepository.query(query, [...ids]);
   }

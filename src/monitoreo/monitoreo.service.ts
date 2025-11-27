@@ -216,16 +216,16 @@ SELECT
         IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
     ) AS nombreCompletoCliente
 
-FROM UltimaPosicion up
-INNER JOIN Dispositivos d
-    ON up.NumeroSerieDispositivo = d.NumeroSerie
-INNER JOIN Clientes c
-    ON d.IdCliente = c.Id
-LEFT JOIN Instalaciones i ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-LEFT JOIN BlueVoxs b ON b.Id = i.IdBlueVox 
-LEFT JOIN Vehiculos v ON v.Id = i.IdVehiculo 
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+INNER JOIN UltimaPosicion up ON d.NumeroSerie = up.NumeroSerieDispositivo
     
 WHERE c.Id IN (${cliente})   -- 🔹 aquí colocas el/los ID(s) del cliente que quieres consultar
+AND i.Estatus = 1  -- Solo instalaciones activas
+AND c.Estatus = 1
 
 ORDER BY up.Id DESC;
 
@@ -252,7 +252,7 @@ ORDER BY up.Id DESC;
       recorridoMonitoreo = await this.usuariosregionesRepository.query(
         `
 SELECT
-    up.Id AS id,
+  up.Id AS id,
     up.Exactitud AS exactitud,
     up.Estado AS estado,
     up.Velocidad AS velocidad,
@@ -289,21 +289,20 @@ SELECT
         IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
     ) AS nombreCompletoCliente
 
-FROM Posiciones up
-INNER JOIN Dispositivos d
-    ON up.NumeroSerieDispositivo = d.NumeroSerie
-INNER JOIN Clientes c
-    ON d.IdCliente = c.Id
-LEFT JOIN Instalaciones i ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-LEFT JOIN BlueVoxs b ON b.Id = i.IdBlueVox 
-LEFT JOIN Vehiculos v ON v.Id = i.IdVehiculo 
-    
+FROM Instalaciones i
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+INNER JOIN Clientes c ON i.IdCliente = c.Id
+INNER JOIN Posiciones up ON d.NumeroSerie = up.NumeroSerieDispositivo
+
 WHERE c.Id IN (${idCliente})   -- 🔹 aquí colocas el/los ID(s) del cliente que quieres consultar
 AND up.FechaHora >= '${fechaActual}T00:00:00Z'
 AND up.FechaHora < '${fechaActual}T23:59:59Z'
 AND up.NumeroSerieDispositivo = '${NumeroSerieDispositivo}'
+  
 
-ORDER BY up.Id DESC;
+ORDER BY i.Id DESC
       `,
       );
 
