@@ -80,7 +80,7 @@ export class OperadoresService {
         licencia: createOperadoreDto.licencia,
         numeroLicencia: createOperadoreDto.numeroLicencia,
         fechaExpedicion: createOperadoreDto.fechaExpedicion,
-        fechaVencimineto: createOperadoreDto.fechaVencimiento,
+        FechaVencimiento: createOperadoreDto.fechaVencimiento,
         idTipoLicencia: createOperadoreDto.idTipoLicencia,
         idCategoriaLicencia: createOperadoreDto.idCategoriaLicencia,
         idOperador: operador.id,
@@ -210,7 +210,7 @@ SELECT
       'licencia', l.Licencia,
       'numeroLicencia', l.NumeroLicencia,
       'fechaExpedicion', l.FechaExpedicion,
-      'fechaVencimiento', l.FechaVencimineto,
+      'fechaVencimiento', l.FechaVencimiento,
       'idTipoLicencia', l.IdTipoLicencia,
       'nombreTipoLicencia', ctl.Nombre,
       'idCategoriaLicencia', l.IdCategoriaLicencia,
@@ -305,7 +305,7 @@ SELECT
       'licencia', l.Licencia,
       'numeroLicencia', l.NumeroLicencia,
       'fechaExpedicion', l.FechaExpedicion,
-      'fechaVencimiento', l.FechaVencimineto,
+      'fechaVencimiento', l.FechaVencimiento,
       'idTipoLicencia', l.IdTipoLicencia,
       'nombreTipoLicencia', ctl.Nombre,
       'idCategoriaLicencia', l.IdCategoriaLicencia,
@@ -384,6 +384,7 @@ AND u.Estatus = 1
       };
       return result;
     } catch (error) {
+      console.log(error)
       if (error instanceof HttpException) {
         throw error;
       }
@@ -649,7 +650,7 @@ SELECT
       'licencia', l.Licencia,
       'numeroLicencia', l.NumeroLicencia,
       'fechaExpedicion', l.FechaExpedicion,
-      'fechaVencimiento', l.FechaVencimineto,
+      'fechaVencimiento', l.FechaVencimiento,
       'idTipoLicencia', l.IdTipoLicencia,
       'nombreTipoLicencia', ctl.Nombre,
       'idCategoriaLicencia', l.IdCategoriaLicencia,
@@ -727,7 +728,7 @@ SELECT
       'licencia', l.Licencia,
       'numeroLicencia', l.NumeroLicencia,
       'fechaExpedicion', l.FechaExpedicion,
-      'fechaVencimiento', l.FechaVencimineto,
+      'fechaVencimiento', l.FechaVencimiento,
       'idTipoLicencia', l.IdTipoLicencia,
       'nombreTipoLicencia', ctl.Nombre,
       'idCategoriaLicencia', l.IdCategoriaLicencia,
