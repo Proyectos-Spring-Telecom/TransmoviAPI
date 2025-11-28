@@ -105,7 +105,8 @@ export class DashboardService {
     rol: number
   ) {
     try {
-      console.log('Entro por fecha', fechaInicio, fechaFin)
+      fechaInicio = fechaInicio.split("T")[0];
+      fechaFin = fechaFin.split("T")[0];
       return await this.resolverPorRol(fechaInicio, fechaFin, idCliente, cliente, rol)
     } catch (error) {
       console.log(error)
