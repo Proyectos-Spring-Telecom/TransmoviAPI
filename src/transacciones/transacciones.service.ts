@@ -40,6 +40,7 @@ import { DetalleTransbordos } from 'src/entities/DetalleTransbordos';
 import { HistoricoTransaccionesDebito } from 'src/entities/HistoricoTransaccionesDebito';
 
 import { UpdateTransaccioneDebitoDto } from './dto/update-transaccione-debito.dto';
+import { GetTransaccioneDto } from './dto/get-transacciones.dto';
 
 @Injectable()
 export class TransaccionesService {
@@ -602,6 +603,728 @@ export class TransaccionesService {
     return { ids, placeholders };
   }
 
+  async paginado(
+    idUser: number,
+    email: string,
+    cliente: number,
+    rol: number,
+    getTransaccioneDto: GetTransaccioneDto
+  ) {
+    try {
+      //Declaramos las variables para el consumo del api
+      let { fechaInicio, fechaFin } = getTransaccioneDto
+      const { page, limit } = getTransaccioneDto
+      let entidadRecarga;
+      let entidadDebito;
+      let transacciones;
+
+      //Generamos la fecha actual
+      function pad(n: number) {
+        return n < 10 ? '0' + n : n;
+      }
+      const ahora = new Date();
+      const desfaseMs = -6 * 60 * 60 * 1000; // -6 horas
+      const fechaDesfasada = new Date(ahora.getTime() + desfaseMs);
+      // Solo la fecha del momento
+      const fechaActual = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
+
+      //Si fechaInicio y fechaFin son null arroja las transacciones del dia de la tabla TransaccionesRecarga y TransaccionesDebito
+      if (!fechaInicio && !fechaFin) {
+        fechaInicio = fechaActual
+        fechaFin = fechaActual
+        entidadRecarga = 'TransaccionesRecarga';
+        entidadDebito = 'TransaccionesDebito';
+        console.log(fechaInicio, fechaFin, fechaActual, entidadDebito, entidadRecarga, rol);
+        transacciones = await this.resolverPorRolDefault(fechaInicio, fechaFin, email, cliente, rol, page, limit, entidadDebito, entidadRecarga);
+      } else {
+        //Si fechaInicio y fechaFin no son null arroja las transacciones del dia de la tabla HistoricoTransaccionesRecarga y HistoricoTransaccionesDebito
+        //asigna fechaActual solo si el valor de la izquierda es null o undefined
+        fechaInicio = fechaInicio?.split("T")[0] ?? fechaActual;
+        fechaFin = fechaFin?.split("T")[0] ?? fechaActual;
+        entidadRecarga = 'HistoricoTransaccionesRecarga';
+        entidadDebito = 'HistoricoTransaccionesDebito';
+        console.log(fechaInicio, fechaFin, fechaActual, entidadDebito, entidadRecarga, rol);
+        transacciones = await this.resolverPorRolDefault(fechaInicio, fechaFin, email, cliente, rol, page, limit, entidadDebito, entidadRecarga);
+      }
+
+      const { data, total } = transacciones
+
+      //API Response
+      const result: ApiResponseCommon = {
+        data: data,
+        paginated: {
+          total: total,
+          page,
+          lastPage: Math.ceil(total / limit),
+        },
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException({
+        message: 'Error al obtener transacciones paginado.',
+      });
+    }
+  }
+
+  async resolverPorRolDefault(
+    fechaInicio: string,
+    fechaFin: string,
+    email: string,
+    cliente: number,
+    rol: number,
+    page: number,
+    limit: number,
+    entidadDebito: string,
+    entidadRecarga: string
+  ) {
+    try {
+      let totalResult;
+      let transacciones;
+      const offset = (page - 1) * limit;
+      switch (rol) {
+        case 1:
+          transacciones = await this.transaccionesrecargaRepository.query(
+            `
+SELECT 
+    'DEBITO' AS origenTabla,        -- 👈 de qué tabla viene
+    td.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
+    td.Monto AS monto,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
+    td.FHRegistro AS fhRegistro,
+    td.NumeroSerieMonedero AS numeroSerieMonedero,
+    td.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadDebito} td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+
+
+UNION ALL
+
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadRecarga} tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+
+ORDER BY FechaHoraFinal DESC
+  LIMIT ? OFFSET ?;
+        `,
+            [limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.transaccionesrecargaRepository.query(
+            `
+SELECT COUNT(*) AS total
+FROM (
+    SELECT td.Id
+    FROM TransaccionesDebito td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+
+    UNION ALL
+
+    SELECT tr.Id
+    FROM TransaccionesRecarga tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+) AS todas;
+		
+  `,
+          );
+          break;
+
+        case 3:
+        default:
+          //Usuarios Operador
+          transacciones = await this.transaccionesrecargaRepository.query(
+            `
+SELECT 
+    'DEBITO' AS origenTabla,        -- 👈 de qué tabla viene
+    td.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
+    td.Monto AS monto,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
+    td.FHRegistro AS fhRegistro,
+    td.NumeroSerieMonedero AS numeroSerieMonedero,
+    td.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadDebito} td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
+
+
+UNION ALL
+
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadRecarga} tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
+
+ORDER BY FechaHoraFinal DESC
+LIMIT ? OFFSET ?;
+
+        `,
+            [cliente, cliente, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.transaccionesrecargaRepository.query(
+            `
+SELECT COUNT(*) AS total
+FROM (
+    SELECT td.Id
+    FROM TransaccionesDebito td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
+
+    UNION ALL
+
+    SELECT tr.Id
+    FROM TransaccionesRecarga tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
+
+
+) AS todas;
+
+  `,
+            [cliente, cliente],
+          );
+          break;
+
+        case 9:
+          //Datos por usuario
+          const pasajero =
+            await this.pasajeroService.findOnePasajeroCorreo(email);
+          transacciones = await this.transaccionesrecargaRepository.query(
+            `
+SELECT 
+    'DEBITO' AS origenTabla,        -- 👈 de qué tabla viene
+    td.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
+    td.Monto AS monto,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
+    td.FHRegistro AS fhRegistro,
+    td.NumeroSerieMonedero AS numeroSerieMonedero,
+    td.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadDebito} td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.Estatus = 1
+AND p.Id = ?
+
+
+UNION ALL
+
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadRecarga} tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.Estatus = 1
+AND p.Id = ?
+
+ORDER BY FechaHoraFinal DESC
+LIMIT ? OFFSET ?;
+
+        `,
+            [Number(pasajero.id), Number(pasajero.id), limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.transaccionesrecargaRepository.query(
+            `
+SELECT COUNT(*) AS total
+FROM (
+    SELECT td.Id
+    FROM TransaccionesDebito td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.Estatus = 1
+AND p.Id = ?
+
+    UNION ALL
+
+    SELECT tr.Id
+    FROM TransaccionesRecarga tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.Estatus = 1
+AND p.Id = ?
+
+) AS todas;
+
+  `,
+            [Number(pasajero.id), Number(pasajero.id)], // <-- Aquí debe ir como segundo argumento de query()
+          );
+
+          break;
+
+        case 2:
+        case 8:
+        case 10:
+          //resto usuarios
+          const { ids, placeholders } = await this.clienteHijos(cliente);
+          transacciones = await this.transaccionesrecargaRepository.query(
+            `
+SELECT 
+    'DEBITO' AS origenTabla,        -- 👈 de qué tabla viene
+    td.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
+    td.Monto AS monto,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
+    td.FHRegistro AS fhRegistro,
+    td.NumeroSerieMonedero AS numeroSerieMonedero,
+    td.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadDebito} td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+
+UNION ALL
+
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadRecarga} tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+ORDER BY FechaHoraFinal DESC
+LIMIT ? OFFSET ?;
+
+        `,
+            [...ids, ...ids, limit, offset],
+          );
+
+          // Query para total (sin paginación)
+          totalResult = await this.transaccionesrecargaRepository.query(
+            `
+SELECT COUNT(*) AS total
+FROM (
+    SELECT td.Id
+    FROM TransaccionesDebito td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+    UNION ALL
+
+    SELECT tr.Id
+    FROM TransaccionesRecarga tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+
+) AS todas;
+
+  `,
+            [...ids, ...ids],
+          );
+          break;
+      }
+
+      const total = Number(totalResult[0]?.total || 0);
+
+      // 🔥 Transformación de datos (ids → number, nombreCompleto)
+      const data = transacciones.map((item) => ({
+        ...item,
+        id: Number(item.id),
+        monto: Number(item.monto),
+        latitudFinal: Number(item.latitudFinal),
+        longitudFinal: Number(item.longitudFinal),
+        idCliente: Number(item.idCliente),
+        idPasajero: Number(item.idPasajero),
+      }));
+
+      //API Response
+      const result: ApiResponseCommon = {
+        data: data,
+        paginated: {
+          total: total,
+          page,
+          lastPage: Math.ceil(total / limit),
+        },
+      };
+      return { data, total };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new BadRequestException({
+        message: 'Error al obtener transacciones paginadas por rol',
+      });
+    }
+
+  }
+
   async findAllTransacciones(
     idUser: number,
     email: string,
@@ -1135,7 +1858,24 @@ FROM (
     rol: number,
   ): Promise<ApiResponseCommon> {
     try {
+      let fechaInicio, fechaFin;
       let transacciones;
+      let entidadRecarga;
+      let entidadDebito;
+      //Generamos la fecha actual
+      function pad(n: number) {
+        return n < 10 ? '0' + n : n;
+      }
+      const ahora = new Date();
+      const desfaseMs = -6 * 60 * 60 * 1000; // -6 horas
+      const fechaDesfasada = new Date(ahora.getTime() + desfaseMs);
+      // Solo la fecha del momento
+      const fechaActual = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
+      
+      fechaInicio = fechaActual
+        fechaFin = fechaActual
+        entidadRecarga = 'TransaccionesRecarga';
+        entidadDebito = 'TransaccionesDebito';
       switch (rol) {
         case 1:
           transacciones = await this.transaccionesrecargaRepository.query(
@@ -1145,13 +1885,20 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
-    td.Latitud AS latitud,
-    td.Longitud AS longitud,
-    td.FechaHora AS fechaHora,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
     td.NumeroSerieValidador AS numeroSerieValidador,
     td.ControlTransaccion AS controlTransaccion,
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
     -- Datos del validador
     d.Marca AS marcaValidador,
@@ -1163,7 +1910,7 @@ SELECT
     p.ApellidoPaterno AS apellidoPaternoPasajero,
     p.ApellidoMaterno AS apellidoMaternoPasajero
 
-FROM TransaccionesDebito td
+FROM ${entidadDebito} td
 INNER JOIN CatTiposTransacciones ctt 
     ON td.IdTipoTransaccion = ctt.Id
 LEFT JOIN Validadores d 
@@ -1172,6 +1919,12 @@ INNER JOIN Monederos m
     ON td.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+
 
 UNION ALL
 
@@ -1180,13 +1933,21 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
-    tr.Latitud AS latitud,
-    tr.Longitud AS longitud,
-    tr.FechaHora AS fechaHora,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
     tr.NumeroSerieValidador AS numeroSerieValidador,
     tr.ControlTransaccion AS controlTransaccion,
+
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
     d.Marca AS marcaValidador,
     d.Modelo AS modeloValidador,
@@ -1196,7 +1957,7 @@ SELECT
     p.ApellidoPaterno AS apellidoPaternoPasajero,
     p.ApellidoMaterno AS apellidoMaternoPasajero
 
-FROM TransaccionesRecarga tr
+FROM ${entidadRecarga} tr
 INNER JOIN CatTiposTransacciones ctt 
     ON tr.IdTipoTransaccion = ctt.Id
 LEFT JOIN Validadores d 
@@ -1205,8 +1966,13 @@ INNER JOIN Monederos m
     ON tr.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
 
-ORDER BY FHRegistro DESC
+ORDER BY FechaHoraFinal DESC
         `,
           );
           break;
@@ -1234,57 +2000,79 @@ ORDER BY FHRegistro DESC
       d.Marca AS marcaValidador,
       d.Modelo AS modeloValidador,
 
-      p.Id AS idPasajero,
-      p.Nombre AS nombrePasajero,
-      p.ApellidoPaterno AS apellidoPaternoPasajero,
-      p.ApellidoMaterno AS apellidoMaternoPasajero
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
 
-  FROM TransaccionesDebito td
-  INNER JOIN CatTiposTransacciones ctt 
-      ON td.IdTipoTransaccion = ctt.Id
-  LEFT JOIN Validadores d 
-      ON td.NumeroSerieValidador = d.NumeroSerie
-  INNER JOIN Monederos m 
-      ON td.NumeroSerieMonedero = m.NumeroSerie
-  LEFT JOIN Pasajeros p 
-      ON m.IdPasajero = p.Id
-  WHERE m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
 
-  UNION ALL
+FROM ${entidadDebito} td
+INNER JOIN CatTiposTransacciones ctt 
+    ON td.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON td.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON td.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
-  SELECT 
-      'RECARGA' AS origenTabla,
-      tr.Id AS id,
-      ctt.Nombre AS tipoTransaccion,
-      tr.Monto AS monto,
-      tr.Latitud AS latitud,
-      tr.Longitud AS longitud,
-      tr.FechaHora AS fechaHora,
-      tr.FHRegistro AS fhRegistro,
-      tr.NumeroSerieMonedero AS numeroSerieMonedero,
-      tr.NumeroSerieValidador AS numeroSerieValidador,
-      tr.ControlTransaccion AS controlTransaccion,
 
-      d.Marca AS marcaValidador,
-      d.Modelo AS modeloValidador,
+UNION ALL
 
-      p.Id AS idPasajero,
-      p.Nombre AS nombrePasajero,
-      p.ApellidoPaterno AS apellidoPaternoPasajero,
-      p.ApellidoMaterno AS apellidoMaternoPasajero
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
 
-  FROM TransaccionesRecarga tr
-  INNER JOIN CatTiposTransacciones ctt 
-      ON tr.IdTipoTransaccion = ctt.Id
-  LEFT JOIN Validadores d 
-      ON tr.NumeroSerieValidador = d.NumeroSerie
-  INNER JOIN Monederos m 
-      ON tr.NumeroSerieMonedero = m.NumeroSerie
-  LEFT JOIN Pasajeros p 
-      ON m.IdPasajero = p.Id
-  WHERE m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-)
-ORDER BY FHRegistro DESC
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
+
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+FROM ${entidadRecarga} tr
+INNER JOIN CatTiposTransacciones ctt 
+    ON tr.IdTipoTransaccion = ctt.Id
+LEFT JOIN Dispositivos d 
+    ON tr.NumeroSerieDispositivo = d.NumeroSerie
+INNER JOIN Monederos m 
+    ON tr.NumeroSerieMonedero = m.NumeroSerie
+LEFT JOIN Pasajeros p 
+    ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+ORDER BY FechaHoraFinal DESC
 
         `,
             [...ids, ...ids],
@@ -1295,29 +2083,36 @@ ORDER BY FHRegistro DESC
         default:
           transacciones = await this.transaccionesrecargaRepository.query(
             `
-(
-  SELECT 
-      'DEBITO' AS origenTabla,
-      td.Id AS id,
-      ctt.Nombre AS tipoTransaccion,
-      td.Monto AS monto,
-      td.Latitud AS latitud,
-      td.Longitud AS longitud,
-      td.FechaHora AS fechaHora,
-      td.FHRegistro AS fhRegistro,
-      td.NumeroSerieMonedero AS numeroSerieMonedero,
-      td.NumeroSerieValidador AS numeroSerieValidador,
-      td.ControlTransaccion AS controlTransaccion,
+SELECT 
+    'DEBITO' AS origenTabla,        -- 👈 de qué tabla viene
+    td.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
+    td.Monto AS monto,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
+    td.FHRegistro AS fhRegistro,
+    td.NumeroSerieMonedero AS numeroSerieMonedero,
+    td.NumeroSerieDispositivo AS numeroSerieDispositivo,
 
-      d.Marca AS marcaDispositivo,
-      d.Modelo AS modeloDispositivo,
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
-      p.Id AS idPasajero,
-      p.Nombre AS nombrePasajero,
-      p.ApellidoPaterno AS apellidoPaternoPasajero,
-      p.ApellidoMaterno AS apellidoMaternoPasajero
+    -- Datos del dispositivo
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
 
-  FROM TransaccionesDebito td
+    -- Pasajero (vía Monedero)
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+ FROM ${entidadDebito} td
   INNER JOIN CatTiposTransacciones ctt 
       ON td.IdTipoTransaccion = ctt.Id
   LEFT JOIN Validadores d 
@@ -1326,32 +2121,42 @@ ORDER BY FHRegistro DESC
       ON td.NumeroSerieMonedero = m.NumeroSerie
   LEFT JOIN Pasajeros p 
       ON m.IdPasajero = p.Id
-  WHERE m.IdCliente = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+    
+-- condiciones
+WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
 
-  UNION ALL
 
-  SELECT 
-      'RECARGA' AS origenTabla,
-      tr.Id AS id,
-      ctt.Nombre AS tipoTransaccion,
-      tr.Monto AS monto,
-      tr.Latitud AS latitud,
-      tr.Longitud AS longitud,
-      tr.FechaHora AS fechaHora,
-      tr.FHRegistro AS fhRegistro,
-      tr.NumeroSerieMonedero AS numeroSerieMonedero,
-      tr.NumeroSerieValidador AS numeroSerieValidador,
-      tr.ControlTransaccion AS controlTransaccion,
+UNION ALL
 
-      d.Marca AS marcaDispositivo,
-      d.Modelo AS modeloDispositivo,
+SELECT 
+    'RECARGA' AS origenTabla,       -- 👈 solo indica de qué tabla proviene
+    tr.Id AS id,
+    ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
+    tr.Monto AS monto,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
+    tr.FHRegistro AS fhRegistro,
+    tr.NumeroSerieMonedero AS numeroSerieMonedero,
+    tr.NumeroSerieDispositivo AS numeroSerieDispositivo,
 
-      p.Id AS idPasajero,
-      p.Nombre AS nombrePasajero,
-      p.ApellidoPaterno AS apellidoPaternoPasajero,
-      p.ApellidoMaterno AS apellidoMaternoPasajero
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
+    
 
-  FROM TransaccionesRecarga tr
+    d.Marca AS marcaDispositivo,
+    d.Modelo AS modeloDispositivo,
+
+    p.Id AS idPasajero,
+    p.Nombre AS nombrePasajero,
+    p.ApellidoPaterno AS apellidoPaternoPasajero,
+    p.ApellidoMaterno AS apellidoMaternoPasajero
+
+ FROM ${entidadRecarga} tr
   INNER JOIN CatTiposTransacciones ctt 
       ON tr.IdTipoTransaccion = ctt.Id
   LEFT JOIN Validadores d 
@@ -1360,10 +2165,14 @@ ORDER BY FHRegistro DESC
       ON tr.NumeroSerieMonedero = m.NumeroSerie
   LEFT JOIN Pasajeros p 
       ON m.IdPasajero = p.Id
-  WHERE m.IdCliente = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-)
-ORDER BY FHRegistro DESC
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
+    
+-- condiciones
+WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+AND m.IdCliente = ?
 
+ORDER BY FechaHoraFinal DESC
         `,
             [cliente, cliente],
           );
@@ -1375,11 +2184,10 @@ ORDER BY FHRegistro DESC
         ...item,
         id: Number(item.id),
         monto: Number(item.monto),
-        latitud: Number(item.latitud),
-        longitud: Number(item.longitud),
-        idPasajero: Number(item.idPasajero),
-        idMonedero: Number(item.idMonedero),
+        latitudFinal: Number(item.latitudFinal),
+        longitudFinal: Number(item.longitudFinal),
         idCliente: Number(item.idCliente),
+        idPasajero: Number(item.idPasajero),
       }));
 
       //API Response
@@ -1408,13 +2216,20 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
-    tr.Latitud AS latitud,
-    tr.Longitud AS longitud,
-    tr.FechaHora AS fechaHora,
+    tr.LatitudFinal AS latitudFinal,
+    tr.LongitudFinal AS longitudFinal,
+    tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
     tr.NumeroSerieValidador AS numeroSerieValidador,
     tr.ControlTransaccion AS controlTransaccion,
+
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
 
     d.Marca AS marcaValidador,
     d.Modelo AS modeloValidador,
@@ -1433,6 +2248,8 @@ INNER JOIN Monederos m
     ON tr.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
     WHERE tr.Id = ?
 
         `,
@@ -1447,8 +2264,9 @@ LEFT JOIN Pasajeros p
         ...item,
         id: Number(item.id),
         monto: Number(item.monto),
-        latitud: Number(item.latitud),
-        longitud: Number(item.longitud),
+        latitudFinal: Number(item.latitudFinal),
+        longitudFinal: Number(item.longitudFinal),
+        idCliente: Number(item.idCliente),
         idPasajero: Number(item.idPasajero),
       }));
       return { data: data };
@@ -1473,13 +2291,20 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
-    td.Latitud AS latitud,
-    td.Longitud AS longitud,
-    td.FechaHora AS fechaHora,
+    td.LatitudFinal AS latitudFinal,
+    td.LongitudFinal AS longitudFinal,
+    td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
     td.NumeroSerieValidador AS numeroSerieValidador,
     td.ControlTransaccion AS controlTransaccion,
+
+
+    -- Datos del cliente
+    c.Id AS idCliente,
+    c.Nombre AS nombreCliente,
+    c.ApellidoPaterno AS apellidoPaternoCliente,
+    c.ApellidoMaterno AS apellidoMaternoCliente,
 
     -- Datos del validador
     d.Marca AS marcaValidador,
@@ -1500,6 +2325,8 @@ INNER JOIN Monederos m
     ON td.NumeroSerieMonedero = m.NumeroSerie
 LEFT JOIN Pasajeros p 
     ON m.IdPasajero = p.Id
+INNER JOIN Clientes c
+	ON m.IdCliente = c.Id
     WHERE td.Id = ?
 
         `,
@@ -1513,8 +2340,9 @@ LEFT JOIN Pasajeros p
         ...item,
         id: Number(item.id),
         monto: Number(item.monto),
-        latitud: Number(item.latitud),
-        longitud: Number(item.longitud),
+        latitudFinal: Number(item.latitudFinal),
+        longitudFinal: Number(item.longitudFinal),
+        idCliente: Number(item.idCliente),
         idPasajero: Number(item.idPasajero),
       }));
       return { data: data };
