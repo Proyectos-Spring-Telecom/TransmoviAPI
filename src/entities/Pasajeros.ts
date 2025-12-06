@@ -1,5 +1,7 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 import { Monederos } from "./Monederos";
+import { Usuarios } from "./Usuarios";
+import { QRCodes } from "./QRCodes";
 import { applySchema } from "src/common/apply-schema.decorator";
 
 @applySchema
@@ -50,6 +52,19 @@ export class Pasajeros {
   @Column("varchar", { name: "Curp", nullable: true, length: 18 })
   curp: string | null;
 
+  @Column("bigint", { name: "IdUsuario", nullable: true })
+  idUsuario: number | null;
+
   @OneToMany(() => Monederos, (monederos) => monederos.idPasajero2)
   monederos: Monederos[];
+
+  @OneToMany(() => QRCodes, (qrCodes) => qrCodes.idPasajero2)
+  qrCodes: QRCodes[];
+
+  @ManyToOne(() => Usuarios, (usuarios) => usuarios, {
+    onDelete: "NO ACTION",
+    onUpdate: "NO ACTION",
+  })
+  @JoinColumn([{ name: "IdUsuario", referencedColumnName: "id" }])
+  idUsuario2: Usuarios | null;
 }

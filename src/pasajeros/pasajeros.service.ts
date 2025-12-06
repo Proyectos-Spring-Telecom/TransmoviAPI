@@ -142,6 +142,7 @@ export class PasajerosService {
         estadoSolicitud: createPasajeroDto.estadoSolicitud,
         documentacion: createPasajeroDto.documentacion,
         curp: createPasajeroDto.curp,
+        idUsuario: userSave.id,
       });
       const pasajeroSave = await this.pasajeroRepository.save(newPasajero);
 

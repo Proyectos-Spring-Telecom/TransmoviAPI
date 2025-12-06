@@ -48,6 +48,12 @@ export class MonederosController {
   // 🔹 GET ROUTES - Rutas específicas primero
   // ========================================
 
+  @Get('qr/saldo')
+  generarQRConSaldo(@Request() req) {
+    const idUsuario = req.user.userId;
+    return this.monederosService.generarQRConSaldo(idUsuario);
+  }
+
   @Get('list')
   findAllListMonederos(@Request() req): Promise<ApiResponseCommon> {
     const idUser = req.user.userId;

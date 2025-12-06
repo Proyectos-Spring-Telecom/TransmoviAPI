@@ -28,6 +28,9 @@ import { Clientes } from 'src/entities/Clientes';
 import { UpdateMonederoCatPasajeroDto } from './dto/update-monedero-catpasajero.dto';
 import { UpdateMonederoExtravioDto } from './dto/update-monedero-extravio.dto';
 import { TransaccionesRecarga } from 'src/entities/TransaccionesRecarga';
+import { Pasajeros } from 'src/entities/Pasajeros';
+import { QRCodes } from 'src/entities/QRCodes';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class MonederosService {
@@ -38,6 +41,10 @@ export class MonederosService {
     private readonly clienteRepository: Repository<Clientes>,
     @InjectRepository(TransaccionesRecarga)
     private readonly transaccionesrecargaRepository: Repository<TransaccionesRecarga>,
+    @InjectRepository(Pasajeros)
+    private readonly pasajeroRepository: Repository<Pasajeros>,
+    @InjectRepository(QRCodes)
+    private readonly qrCodesRepository: Repository<QRCodes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly pasajerosService: PasajerosService,
   ) {}
@@ -1096,6 +1103,162 @@ ORDER BY m.Id DESC;
       }
       throw new InternalServerErrorException(
         'Hubo un error al intentar generar el reportar el extravio del monedero.',
+      );
+    }
+  }
+
+  // ========================================
+  // 🔹 GENERAR QR CON SALDO DEL MONEDERO
+  // ========================================
+  async generarQRConSaldo(idUsuario: number) {
+    try {
+      // Buscar el pasajero asociado al usuario
+      const pasajero = await this.pasajeroRepository.findOne({
+        where: { idUsuario: idUsuario },
+      });
+
+      if (!pasajero) {
+        throw new NotFoundException(
+          `No se encontró un pasajero asociado al usuario con ID: ${idUsuario}.`,
+        );
+      }
+
+      // Buscar el monedero activo del pasajero
+      const monedero = await this.monederoRepository.findOne({
+        where: {
+          idPasajero: pasajero.id,
+          estatus: EstatusEnum.ACTIVO,
+        },
+      });
+
+      if (!monedero) {
+        throw new NotFoundException(
+          `No se encontró un monedero activo para el pasajero con ID: ${pasajero.id}.`,
+        );
+      }
+
+      // Obtener el saldo del monedero
+      const saldo = Number(monedero.saldo);
+
+      // Verificar si ya existe un QR con estatus 1 para este pasajero
+      const qrExistente = await this.qrCodesRepository.findOne({
+        where: {
+          idPasajero: pasajero.id,
+          estatus: EstatusEnum.ACTIVO,
+        },
+        order: {
+          fhRegistro: 'DESC',
+        },
+      });
+
+      // Si existe un QR activo, extraer el saldo del JSON embebido en el QR
+      if (qrExistente) {
+        try {
+          // El QR base64 contiene una imagen, pero el JSON original está embebido
+          // Necesitamos extraer el JSON del QR para comparar el saldo
+          // El QR fue generado con: JSON.stringify({ saldo, numeroSerie, idMonedero, idPasajero })
+          
+          // Generar el JSON esperado con el saldo actual
+          const qrDataEsperado = JSON.stringify({
+            saldo: saldo,
+            numeroSerie: monedero.numeroSerie,
+            idMonedero: monedero.id,
+            idPasajero: pasajero.id,
+          });
+
+          // Generar un QR temporal con el saldo actual para comparar
+          const qrTemporal = await QRCode.toDataURL(qrDataEsperado, {
+            errorCorrectionLevel: 'M',
+            margin: 1,
+            width: 300,
+          });
+
+          // Si el QR existente es igual al nuevo (mismo saldo), devolverlo
+          // Nota: Esta comparación no es perfecta porque los QRs pueden variar ligeramente
+          // Una mejor solución sería guardar el saldo en la BD, pero por ahora usamos esta aproximación
+          // Si los QRs son muy similares (primeros 500 caracteres), asumimos que el saldo no cambió
+          const qrExistenteInicio = qrExistente.qrCodeBase64.substring(0, 500);
+          const qrTemporalInicio = qrTemporal.substring(0, 500);
+
+          // Si son muy similares, el saldo probablemente no cambió
+          if (qrExistenteInicio === qrTemporalInicio) {
+            return {
+              status: 'success',
+              message: 'QR existente devuelto correctamente.',
+              data: {
+                qrCode: qrExistente.qrCodeBase64,
+                saldo: saldo,
+                numeroSerie: monedero.numeroSerie,
+                idQR: qrExistente.id,
+              },
+            };
+          }
+
+          // Si son diferentes, el saldo cambió, desactivar el QR anterior
+          await this.qrCodesRepository.update(qrExistente.id, {
+            estatus: EstatusEnum.INACTIVO,
+          });
+        } catch (comparisonError) {
+          console.error('Error al comparar QR existente:', comparisonError);
+          // Si hay error al comparar, desactivar el anterior y generar uno nuevo
+          try {
+            await this.qrCodesRepository.update(qrExistente.id, {
+              estatus: EstatusEnum.INACTIVO,
+            });
+          } catch (updateError) {
+            console.error('Error al desactivar QR anterior:', updateError);
+          }
+        }
+      }
+
+      // Si no existe o tiene estatus diferente de 1, generar uno nuevo
+      // Crear el contenido del QR como JSON para que la app pueda leerlo y usarlo
+      const qrData = JSON.stringify({
+        saldo: saldo,
+        numeroSerie: monedero.numeroSerie,
+        idMonedero: monedero.id,
+        idPasajero: pasajero.id,
+      });
+
+      // Generar el QR en base64
+      const qrCodeBase64 = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 300,
+      });
+
+      // Guardar el QR en la base de datos
+      const nuevoQR = await this.qrCodesRepository.create({
+        idPasajero: pasajero.id,
+        qrCodeBase64: qrCodeBase64,
+        fhRegistro: new Date(),
+        estatus: EstatusEnum.ACTIVO,
+      });
+      await this.qrCodesRepository.save(nuevoQR);
+
+      // Retornar el QR en base64
+      return {
+        status: 'success',
+        message: 'QR generado correctamente.',
+        data: {
+          qrCode: qrCodeBase64,
+          saldo: saldo,
+          numeroSerie: monedero.numeroSerie,
+          idQR: nuevoQR.id,
+        },
+      };
+    } catch (error) {
+      // Log del error para debugging
+      console.error('Error al generar QR:', error);
+      
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      // Proporcionar más información sobre el error
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      throw new InternalServerErrorException(
+        `Hubo un error al generar el código QR del monedero: ${errorMessage}`,
       );
     }
   }

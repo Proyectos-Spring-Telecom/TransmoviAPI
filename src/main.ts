@@ -19,7 +19,7 @@ async function bootstrap() {
     .setTitle('Transmovi API')
     .setDescription('Documentación de la API de Transmovi') 
     .setVersion('2.0') 
-    .addServer('http://localhost:3010', 'Servidor Local')
+    .addServer('http://localhost:3000', 'Servidor Local')
     .addServer('https://transmovi.mx/apidev/', 'Servidor de Desarrollo')
     .addServer('https://transmovi.mx/api/api', 'Servidor de Producción')
     .addBearerAuth(

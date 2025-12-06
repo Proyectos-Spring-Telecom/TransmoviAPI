@@ -379,6 +379,7 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
   // ========================================
   async signIn(loginAuthDto: LoginAuthDto) {
     try {
+      console.log("HOLA")
       const user = await this.usuariosRepository.findOne({
         relations: ['idRol2', 'idCliente2'],
         where: {
@@ -390,6 +391,7 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
           },
         },
       });
+      console.log(user);
       if (!user) {
         throw new NotFoundException('No se encontró al usuario.');
       }
