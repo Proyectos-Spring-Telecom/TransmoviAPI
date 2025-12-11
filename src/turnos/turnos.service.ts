@@ -18,6 +18,8 @@ import {
 } from 'src/common/ApiResponse';
 import { UpdateTurnosEstatusDto } from './dto/update-turno-estatus.dto';
 import { Clientes } from 'src/entities/Clientes';
+import { Operadores } from 'src/entities/Operadores';
+import { Instalaciones } from 'src/entities/Instalaciones';
 
 @Injectable()
 export class TurnosService {
@@ -26,6 +28,10 @@ export class TurnosService {
     private readonly turnosRepository: Repository<Turnos>,
     @InjectRepository(Clientes)
     private readonly clienteRepository: Repository<Clientes>,
+    @InjectRepository(Operadores)
+    private readonly operadoresRepository: Repository<Operadores>,
+    @InjectRepository(Instalaciones)
+    private readonly instalacionesRepository: Repository<Instalaciones>,
     private readonly bitacoraLogger: BitacoraLoggerService,
   ) {}
 
@@ -34,6 +40,36 @@ export class TurnosService {
     createTurnoDto: CreateTurnoDto,
   ): Promise<ApiCrudResponse> {
     try {
+      // Validar que el operador existe
+      const operador = await this.operadoresRepository.findOne({
+        where: { id: createTurnoDto.idOperador },
+      });
+      if (!operador) {
+        throw new NotFoundException(
+          `El operador con ID: ${createTurnoDto.idOperador} no fue encontrado.`,
+        );
+      }
+
+      // Validar que el cliente existe
+      const cliente = await this.clienteRepository.findOne({
+        where: { id: createTurnoDto.idCliente },
+      });
+      if (!cliente) {
+        throw new NotFoundException(
+          `El cliente con ID: ${createTurnoDto.idCliente} no fue encontrado.`,
+        );
+      }
+
+      // Validar que la instalación existe
+      const instalacion = await this.instalacionesRepository.findOne({
+        where: { id: createTurnoDto.idInstalacion },
+      });
+      if (!instalacion) {
+        throw new NotFoundException(
+          `La instalación con ID: ${createTurnoDto.idInstalacion} no fue encontrada.`,
+        );
+      }
+
       //Creamos el turno
       const newTurno = await this.turnosRepository.create(createTurnoDto);
       const turnoSave = await this.turnosRepository.save(newTurno);

@@ -216,11 +216,14 @@ SELECT
     c.Nombre AS clienteNombre,
     c.ApellidoPaterno AS clienteApellidoPaterno,
     c.ApellidoMaterno AS clienteApellidoMaterno,
-    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente,
+
+    ct.Nombre AS nombreTipoPasajero
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
+LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
 
 
@@ -270,11 +273,14 @@ SELECT
     c.Nombre AS clienteNombre,
     c.ApellidoPaterno AS clienteApellidoPaterno,
     c.ApellidoMaterno AS clienteApellidoMaterno,
-    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente,
+
+    ct.Nombre AS nombreTipoPasajero
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
+LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
 WHERE p.Id = ?
 AND m.Estatus = 1
@@ -326,11 +332,14 @@ SELECT
     c.Nombre AS clienteNombre,
     c.ApellidoPaterno AS clienteApellidoPaterno,
     c.ApellidoMaterno AS clienteApellidoMaterno,
-    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
+    CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente,
+
+    ct.Nombre AS nombreTipoPasajero
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
+LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
 WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 

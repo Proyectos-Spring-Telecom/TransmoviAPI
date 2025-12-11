@@ -167,7 +167,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -235,7 +235,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -313,7 +313,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -416,7 +416,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -445,7 +445,7 @@ ORDER BY t.Id DESC
 
 SELECT COUNT(*) AS total
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -518,7 +518,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -539,7 +539,7 @@ ORDER BY t.Id DESC
             `
 SELECT COUNT(*) AS total
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -620,7 +620,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -645,7 +645,7 @@ ORDER BY t.Id DESC
             `
 SELECT COUNT(*) AS total
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 INNER JOIN UsuariosZonas ur ON ur.IdZona = r.Id
@@ -748,7 +748,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -814,7 +814,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
@@ -890,7 +890,7 @@ SELECT
   CONCAT(c.Nombre, ' ', c.ApellidoPaterno, ' ', c.ApellidoMaterno) AS nombreCompletoCliente
 
 FROM Tarifas t
-INNER JOIN Variantes d ON t.IdDerrotero = d.Id
+INNER JOIN Variantes d ON t.IdVariante = d.Id
 INNER JOIN Rutas ru ON d.IdRuta = ru.Id
 INNER JOIN Zonas r ON ru.IdZona = r.Id
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id

@@ -140,7 +140,7 @@ FROM Viajes v
 INNER JOIN Clientes c ON v.IdCliente = c.Id
 INNER JOIN Operadores o ON v.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
-INNER JOIN Derrote  ros d ON v.IdDerrotero = d.Id
+INNER JOIN Variantes d ON v.IdVariante = d.Id
 INNER JOIN Rutas r ON d.IdRuta = r.Id
 INNER JOIN Zonas reg ON r.IdZona = reg.Id
 

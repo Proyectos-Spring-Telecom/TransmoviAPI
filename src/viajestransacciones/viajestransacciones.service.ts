@@ -965,7 +965,7 @@ SELECT
   v.IdCliente AS idCliente,
   v.IdOperador AS idOperador,
   v.IdTurno AS idTurno,
-  v.IdDerrotero AS idVariante,
+  v.IdVariante AS idVariante,
 
   t.Id AS IdTransaccion,
   t.TipoTransaccion AS tipoTransaccion,

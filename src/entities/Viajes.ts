@@ -57,7 +57,7 @@ export class Viajes {
   @Column('bigint', { name: 'IdOperador' })
   idOperador: number;
 
-  @Column('bigint', { name: 'IdDerrotero' })
+  @Column('bigint', { name: 'IdVariante' })
   idVariante: number;
 
   @ManyToOne(() => Clientes, (clientes) => clientes.viajes, {
@@ -71,7 +71,7 @@ export class Viajes {
     onDelete: 'NO ACTION',
     onUpdate: 'NO ACTION',
   })
-  @JoinColumn([{ name: 'IdDerrotero', referencedColumnName: 'id' }])
+  @JoinColumn([{ name: 'IdVariante', referencedColumnName: 'id' }])
   idVariante2: Variantes;
 
   @ManyToOne(() => Operadores, (operadores) => operadores.viajes, {

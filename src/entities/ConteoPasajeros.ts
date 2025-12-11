@@ -60,7 +60,7 @@ export class ConteoPasajeros {
     name: "ViajesConteos",
     joinColumns: [{ name: "IdConteo", referencedColumnName: "id" }],
     inverseJoinColumns: [{ name: "IdViaje", referencedColumnName: "id" }],
-    schema: "TransmoviDev",
+    schema: "DashCamDev",
   })
   viajes: Viajes[];
 }

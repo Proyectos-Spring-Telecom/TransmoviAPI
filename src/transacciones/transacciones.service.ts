@@ -163,6 +163,11 @@ export class TransaccionesService {
     let estado: EstadoTransaccion = EstadoTransaccion.INICIADA;
 
     try {
+      // Establecer idTipoTransaccion por defecto a DEBITO (2) si no está especificado
+      if (!createTransaccioneDebitoDto.idTipoTransaccion) {
+        createTransaccioneDebitoDto.idTipoTransaccion = EnumTipoTransaccion.DEBITO;
+      }
+
       // 1️⃣ Cambiamos estado a VALIDANDO_SALDO
       estado = transicionarEstado(estado, EventoTransaccion.CREAR);
 
@@ -173,19 +178,49 @@ export class TransaccionesService {
           estatus: 1,
         },
       });
-
       if (!monedero) {
         estado = EstadoTransaccion.ERROR;
         throw new BadRequestException('Monedero no encontrado');
       }
 
+      // 2.3️⃣ Consulta de información de instalación, validador, turno, viaje, variante y tarifa
+      const infoValidadorViaje = await this.transaccionesdebitoRepository.query(
+        `
+        SELECT 
+          i.Id AS id,
+          v.NumeroSerie,
+          t.Estatus,
+          t.Id AS turno,
+          t.Inicio AS inicioTurno,
+          vi.Id AS idViaje,
+          va.Nombre AS nombreVariante,
+          ta.TarifaBase,
+          ta.CostoAdicional,
+          ta.TipoTarifa
+        FROM DashCamDev.Instalaciones i
+        JOIN DashCamDev.Validadores v ON i.IdValidador = v.Id
+        JOIN DashCamDev.Turnos t ON t.IdInstalacion = i.Id
+        JOIN DashCamDev.Viajes vi ON vi.IdTurno = t.Id
+        JOIN DashCamDev.Variantes va ON va.Id = vi.IdVariante
+        JOIN DashCamDev.Tarifas ta ON ta.IdVariante = va.Id
+        WHERE v.NumeroSerie = ?
+          AND DATE(vi.Inicio) = CURDATE()
+          AND vi.Inicio <= NOW()
+          AND t.Estatus = 1
+          AND vi.EstadoActual = 1
+        LIMIT 1
+        `,
+        [createTransaccioneDebitoDto.numeroSerieValidador],
+      );
+
+      console.log({ infoValidadorViaje });
+
       // 2.5️⃣ Calculamos el numeroTransbordo y reemplazamos el monto con el costo del transbordo (opcional)
       // Si no existe un transbordo para el cliente, continuamos con la lógica normal
       let numeroTransbordo: number | null = null;
       const transbordoPermitido = await this.transbordosPermitidosRepository.findOne({
-        where: { idCliente: monedero.idCliente },
+        where: { idCliente: Number(monedero.idCliente) },
       });
-
       // Solo aplicamos la lógica de transbordos si existe configuración para el cliente
       if (transbordoPermitido && transbordoPermitido.tiempo && transbordoPermitido.numeroTransbordos) {
         // Calculamos la fecha límite hacia atrás (tiempo en minutos)
@@ -201,46 +236,54 @@ export class TransaccionesService {
           .where('td.numeroSerieMonedero = :numeroSerieMonedero', {
             numeroSerieMonedero: createTransaccioneDebitoDto.numeroSerieMonedero,
           })
-          .andWhere('td.fechaHora >= :fechaLimite', { fechaLimite })
-          .andWhere('td.fechaHora <= :fechaHoraTransaccion', { fechaHoraTransaccion })
-          .orderBy('td.fechaHora', 'ASC')
+          .andWhere('COALESCE(td.fechaHoraFinal, td.fechaHoraInicio, td.fhRegistro) >= :fechaLimite', { fechaLimite })
+          .andWhere('COALESCE(td.fechaHoraFinal, td.fechaHoraInicio, td.fhRegistro) <= :fechaHoraTransaccion', { fechaHoraTransaccion })
+          .orderBy('COALESCE(td.fechaHoraFinal, td.fechaHoraInicio, td.fhRegistro)', 'ASC')
           .getMany();
 
         if (transaccionesEnRango.length === 0) {
-          // Es la primera transacción en ese rango de tiempo
-          numeroTransbordo = 1;
+          // Es la primera transacción en ese rango de tiempo (cobro inicial)
+          numeroTransbordo = 0;
         } else {
-          // Buscamos la primera transacción con numeroTransbordo = 1 (el primer transbordo)
-          const primerTransbordo = transaccionesEnRango.find((t) => t.numeroTransbordo === 1);
+          // Buscamos la transacción con numeroTransbordo = 0 (el cobro inicial)
+          const cobroInicial = transaccionesEnRango.find((t) => t.numeroTransbordo === 0);
           
-          if (primerTransbordo) {
-            // Calculamos si el tiempo desde el primer transbordo ya pasó
-            const fechaPrimerTransbordo = new Date(
-              createTransaccioneDebitoDto.fechaHoraInicio || createTransaccioneDebitoDto.fechaHoraFinal
+          if (cobroInicial) {
+            // Calculamos si el tiempo desde el cobro inicial ya pasó
+            const fechaCobroInicial = new Date(
+              cobroInicial.fechaHoraFinal || cobroInicial.fechaHoraInicio || cobroInicial.fhRegistro
             );
-            const fechaExpiracionPrimerTransbordo = new Date(
-              fechaPrimerTransbordo.getTime() + tiempoEnMs,
+            const fechaExpiracionCobroInicial = new Date(
+              fechaCobroInicial.getTime() + tiempoEnMs,
             );
 
-            // Si el tiempo desde el primer transbordo ya pasó, reiniciamos el contador a 1
-            if (fechaHoraTransaccion > fechaExpiracionPrimerTransbordo) {
-              numeroTransbordo = 1;
+            // Si el tiempo desde el cobro inicial ya pasó, reiniciamos el contador a 0
+            if (fechaHoraTransaccion > fechaExpiracionCobroInicial) {
+              numeroTransbordo = 0;
             } else {
-              // El primer transbordo todavía está vigente, continuamos con el consecutivo
+              // El cobro inicial todavía está vigente, continuamos con el consecutivo (1, 2, 3, etc.)
               const numerosTransbordo = transaccionesEnRango
                 .map((t) => t.numeroTransbordo)
                 .filter((n) => n !== null && n !== undefined) as number[];
 
               if (numerosTransbordo.length > 0) {
                 const maxNumeroTransbordo = Math.max(...numerosTransbordo);
-                numeroTransbordo = maxNumeroTransbordo + 1;
+                const siguienteTransbordo = maxNumeroTransbordo + 1;
+                
+                // Validar si se alcanzó el número máximo de transbordos permitidos
+                // Si se alcanzó o superó el máximo, reiniciamos el contador a 0
+                if (siguienteTransbordo > transbordoPermitido.numeroTransbordos) {
+                  numeroTransbordo = 0;
+                } else {
+                  numeroTransbordo = siguienteTransbordo;
+                }
               } else {
                 numeroTransbordo = 1;
               }
             }
           } else {
-            // No hay primer transbordo (numeroTransbordo = 1) en el rango, empezamos en 1
-            numeroTransbordo = 1;
+            // No hay cobro inicial (numeroTransbordo = 0) en el rango, empezamos en 0
+            numeroTransbordo = 0;
           }
         }
 

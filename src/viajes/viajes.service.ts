@@ -243,7 +243,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id
@@ -429,7 +429,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id
@@ -687,7 +687,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id
@@ -721,7 +721,7 @@ JOIN Contadores bv ON ins.IdCliente = bv.IdCliente AND ins.IdContador = bv.Id
 JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 JOIN Rutas r ON der.IdRuta = r.Id
 LEFT JOIN Zonas regInicio ON r.IdZona = regInicio.Id
 LEFT JOIN Zonas regFin ON r.IdZonaFin = regFin.Id
@@ -822,7 +822,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id
@@ -998,7 +998,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id
@@ -1095,7 +1095,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
 -- Derrotero
-JOIN Variantes der ON v.IdDerrotero = der.Id
+JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
 JOIN Rutas r ON der.IdRuta = r.Id

@@ -46,13 +46,13 @@ export class Tarifas {
   @Column("tinyint", { name: "Estatus", default: () => "'1'" })
   estatus: number;
 
-  @Column("bigint", { name: "IdDerrotero" })
+  @Column("bigint", { name: "IdVariante" })
   idVariante: number;
 
   @ManyToOne(() => Variantes, (variantes) => variantes.tarifas, {
     onDelete: "CASCADE",
     onUpdate: "NO ACTION",
   })
-  @JoinColumn([{ name: "IdDerrotero", referencedColumnName: "id" }])
+  @JoinColumn([{ name: "IdVariante", referencedColumnName: "id" }])
   idVariante2: Variantes;
 }

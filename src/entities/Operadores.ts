@@ -28,8 +28,11 @@ export class Operadores {
   @Column("varchar", { name: "Identificacion", nullable: true, length: 500 })
   identificacion: string | null;
 
-  @Column("varchar", { name: "Foto", nullable: true, length: 500 })
-  foto: string | null;
+  @Column("varchar", { name: "Licencia", nullable: true, length: 500 })
+  licencia: string | null;
+
+  @Column("varchar", { name: "NumeroLicencia", nullable: true, length: 20 })
+  numeroLicencia: string | null;
 
   @Column("varchar", {
     name: "ComprobanteDomicilio",
