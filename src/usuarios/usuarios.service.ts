@@ -640,7 +640,7 @@ ORDER BY u.Id DESC
 
       const usuariosOperadorDevice = await this.usuarioRepository.find({
         where: {
-          deviceId: 'DSP-TR-001',
+          deviceId: updateUsuarioDispositivoDto.deviceId,
         },
       });
 
