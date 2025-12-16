@@ -107,3 +107,13 @@ export enum EnumControlTransacciones {
   PAGADO = 0,
   ABIERTA = 1,
 }
+
+export enum EnumTipoTarifa {
+  FIJA = 1,
+  ABIERTA = 2,
+}
+
+export enum EnumTipoDescuentoTransbordo {
+  MONETARIO = 1,
+  PORCENTAJE = 2,
+}

@@ -9,10 +9,12 @@ import {
 } from "typeorm";
 import { Clientes } from "./Clientes";
 import { DetalleTransbordos } from "./DetalleTransbordos";
+import { CatTipoDescuentoTransbordo } from "./CatTipoDescuentoTransbordo";
 import { applySchema } from "src/common/apply-schema.decorator";
 
 @applySchema
 @Index("FK_Transbordo_Cliente", ["idCliente"], {})
+@Index("FK_Transbordo_TipoDescuento_idx", ["idTipoDescuento"], {})
 @Entity("TransbordosPermitidos")
 export class TransbordosPermitidos {
   @PrimaryGeneratedColumn({ type: "bigint", name: "Id" })
@@ -20,6 +22,9 @@ export class TransbordosPermitidos {
 
   @Column("bigint", { name: "IdCliente" })
   idCliente: number;
+
+  @Column("bigint", { name: "IdTipoDescuento", nullable: true })
+  idTipoDescuento: number | null;
 
   @Column("varchar", { name: "Nombre", nullable: true, length: 100 })
   nombre: string | null;
@@ -36,6 +41,17 @@ export class TransbordosPermitidos {
   })
   @JoinColumn([{ name: "IdCliente", referencedColumnName: "id" }])
   idClienteTransbordo: Clientes;
+
+  @ManyToOne(
+    () => CatTipoDescuentoTransbordo,
+    (tipoDescuento) => tipoDescuento.transbordosPermitidos,
+    {
+      onDelete: "NO ACTION",
+      onUpdate: "NO ACTION",
+    }
+  )
+  @JoinColumn([{ name: "IdTipoDescuento", referencedColumnName: "id" }])
+  tipoDescuento: CatTipoDescuentoTransbordo | null;
 
   @OneToMany(
     () => DetalleTransbordos,

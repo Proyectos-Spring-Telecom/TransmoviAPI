@@ -25,13 +25,13 @@ export class UpdateTransaccioneDebitoDto {
     @IsOptional()
     idTipoTransaccion?: EnumTipoTransaccion;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         example: 150.75,
         description: 'Monto de la transacción (2 decimales)',
     })
     @IsNumber({ maxDecimalPlaces: 2 })
-    @IsNotEmpty()
-    monto: number;
+    @IsOptional()
+    monto?: number;
 
     @ApiProperty({
         description: 'Control de la transacción',
@@ -60,12 +60,13 @@ export class UpdateTransaccioneDebitoDto {
     @IsOptional()
     longitudFinal?: number;
 
-    @ApiProperty({
+    @ApiPropertyOptional({
         example: '2025-09-10T12:30:00Z',
         description: 'Fecha y hora de la transacción en formato ISO8601',
     })
     @IsDateString()
-    fechaHoraFinal: string;
+    @IsOptional()
+    fechaHoraFinal?: string;
 
     @ApiProperty({
         example: 'MON-0001',

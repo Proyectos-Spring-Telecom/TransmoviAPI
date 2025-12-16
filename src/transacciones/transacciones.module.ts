@@ -14,11 +14,16 @@ import { CatTiposPasajeros } from 'src/entities/CatTiposPasajeros';
 import { TransbordosPermitidos } from 'src/entities/TransbordosPermitidos';
 import { DetalleTransbordos } from 'src/entities/DetalleTransbordos';
 import { HistoricoTransaccionesDebito } from 'src/entities/HistoricoTransaccionesDebito';
+import { Viajes } from 'src/entities/Viajes';
+import { Tarifas } from 'src/entities/Tarifas';
+import { Variantes } from 'src/entities/Variantes';
+import { Turnos } from 'src/entities/Turnos';
+import { Instalaciones } from 'src/entities/Instalaciones';
 
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TransaccionesRecarga, TransaccionesDebito, HistoricoTransaccionesDebito, Validadores, Clientes, Monederos, CatTiposPasajeros,TransbordosPermitidos,DetalleTransbordos]),
+    TypeOrmModule.forFeature([TransaccionesRecarga, TransaccionesDebito, HistoricoTransaccionesDebito, Validadores, Clientes, Monederos, CatTiposPasajeros, TransbordosPermitidos, DetalleTransbordos, Viajes, Tarifas, Variantes, Turnos, Instalaciones]),
     MonederosModule,
     BitacoraModule,
     PasajerosModule,
