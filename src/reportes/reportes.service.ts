@@ -79,10 +79,10 @@ export class ReportesService {
         parametros.push(filtros.idRuta);
       }
 
-      // Filtro de derrotero
-      if (filtros.idDerrotero) {
+      // Filtro de variante
+      if (filtros.idVariante) {
         condiciones.push(`d.Id = ?`);
-        parametros.push(filtros.idDerrotero);
+        parametros.push(filtros.idVariante);
       }
 
       const whereClause = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
@@ -94,8 +94,8 @@ SELECT
     reg.Nombre AS nombreRegion,
     r.Id AS idRuta,
     r.Nombre AS nombreRuta,
-    d.Id AS idDerrotero,
-    d.Nombre AS nombreDerrotero,
+    d.Id AS idVariante,
+    d.Nombre AS nombreVariante,
     COUNT(DISTINCT v.Id) AS viajes,
     COUNT(DISTINCT td.Id) AS validaciones,
     COALESCE(SUM(td.Monto), 0) AS ingresos,
@@ -149,8 +149,8 @@ ORDER BY DATE(td.FHRegistro) DESC, reg.Nombre, r.Nombre, d.Nombre;
         nombreRegion: row.nombreRegion || null,
         idRuta: row.idRuta ? Number(row.idRuta) : null,
         nombreRuta: row.nombreRuta || null,
-        idDerrotero: row.idDerrotero ? Number(row.idDerrotero) : null,
-        nombreDerrotero: row.nombreDerrotero || null,
+        idVariante: row.idVariante ? Number(row.idVariante) : null,
+        nombreVariante: row.nombreVariante || null,
         viajes: row.viajes ? Number(row.viajes) : 0,
         validaciones: row.validaciones ? Number(row.validaciones) : 0,
         ingresos: row.ingresos ? Number(parseFloat(String(row.ingresos)).toFixed(2)) : 0,

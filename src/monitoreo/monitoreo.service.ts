@@ -42,18 +42,18 @@ export class MonitoreoService {
     return { ids, placeholders };
   }
 
-  private async consultarDerroteroListado(cliente: number) {
+  private async consultarVarianteListado(cliente: number) {
     const query = `
   SELECT 
-    -- Datos del derrotero (datos principales)
+    -- Datos del variante (datos principales)
     d.Id AS id,
-    d.Nombre AS nombreDerrotero,
+    d.Nombre AS nombreVariante,
     d.PuntoInicio AS puntoInicio,
     d.PuntoFin AS puntoFin,
     d.RecorridoDetallado AS recorridoDetallado,
     d.DistanciaKm AS distanciaKm,
-    d.FechaCreacion AS fechaCreacionDerrotero,
-    d.Estatus AS estatusDerrotero,
+    d.FechaCreacion AS fechaCreacionVariante,
+    d.Estatus AS estatusVariante,
 
     -- Cliente relacionado
     c.Id AS idCliente,
@@ -92,14 +92,14 @@ ORDER BY d.Id DESC;
           data = await this.usuarioszonasRepository.query(
             `
   SELECT 
-    -- Datos del derrotero (datos principales)
+    -- Datos del variante (datos principales)
     d.Id AS id,
-    d.Nombre AS nombreDerrotero,
+    d.Nombre AS nombreVariante,
     d.PuntoInicio AS puntoInicio,
     d.PuntoFin AS puntoFin,
     d.RecorridoInterpolar AS recorridoInterpolar,
     d.DistanciaKm AS distanciaKm,
-    d.Estatus AS estatusDerrotero,
+    d.Estatus AS estatusVariante,
 
     -- Cliente relacionado
     c.Id AS idCliente,
@@ -132,7 +132,7 @@ ORDER BY d.Id DESC;
         case 11:
         case 13:
           // Consulta de datos Usuarios 
-          data = await this.consultarDerroteroListado(cliente);
+          data = await this.consultarVarianteListado(cliente);
           ultimaPosicion = await this.ultimaPosicion(cliente)
           break;
 
@@ -142,14 +142,14 @@ ORDER BY d.Id DESC;
           data = await this.usuarioszonasRepository.query(
             `
       SELECT 
-  -- Datos del derrotero (datos principales)
+  -- Datos del variante (datos principales)
   d.Id AS id,
-  d.Nombre AS nombreDerrotero,
+  d.Nombre AS nombreVariante,
   d.PuntoInicio AS puntoInicio,
   d.PuntoFin AS puntoFin,
   d.RecorridoDetallado AS recorridoDetallado,
   d.DistanciaKm AS distanciaKm,
-  d.Estatus AS estatusDerrotero,
+  d.Estatus AS estatusVariante,
 
   -- Cliente relacionado
   c.Id AS idCliente,

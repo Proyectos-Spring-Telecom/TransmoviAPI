@@ -48,12 +48,12 @@ export class RecaudacionDiariaRutaDto {
   idRuta?: number;
 
   @ApiProperty({
-    description: 'ID del derrotero para filtrar',
+    description: 'ID del variante para filtrar',
     example: 1,
     required: false,
   })
-  @IsInt({ message: 'El ID del derrotero debe ser un número entero.' })
+  @IsInt({ message: 'El ID del variante debe ser un número entero.' })
   @IsOptional()
-  idDerrotero?: number;
+  idVariante?: number;
 }
 

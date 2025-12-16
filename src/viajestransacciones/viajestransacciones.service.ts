@@ -130,8 +130,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -221,8 +221,8 @@ ORDER BY v.Id DESC;
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -316,8 +316,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -449,8 +449,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -570,8 +570,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -699,8 +699,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 
@@ -860,8 +860,8 @@ SELECT
     u.ApellidoPaterno AS apellidoPaternoOperador,
     u.ApellidoMaterno AS apellidoMaternoOperador,
 
-    -- Información del derrotero, ruta y región
-    d.Nombre AS nombreDerrotero,
+    -- Información del variante, ruta y región
+    d.Nombre AS nombreVariante,
     r.Nombre AS nombreRuta,
     reg.Nombre AS nombreRegion,
 

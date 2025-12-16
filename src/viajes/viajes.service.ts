@@ -253,12 +253,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -286,7 +286,7 @@ JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -349,12 +349,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
-  der.Id AS idDerrotero,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  -- Variante
+  der.Id AS idVariante,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -438,12 +438,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -472,7 +472,7 @@ JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -513,9 +513,9 @@ ORDER BY v.Id DESC;
         idOperador: Number(item.idOperador),
         idUsuario: Number(item.idUsuario),
         idVariante: Number(item.idVariante),
-        distanciaKmDerrotero:
-          item.distanciaKmDerrotero !== null
-            ? Number(item.distanciaKmDerrotero)
+        distanciaKmVariante:
+          item.distanciaKmVariante !== null
+            ? Number(item.distanciaKmVariante)
             : null,
         idRuta: Number(item.idRuta),
         idZona: Number(item.idZona),
@@ -585,12 +585,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
-  der.Id AS idDerrotero,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  -- Variante
+  der.Id AS idVariante,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -697,12 +697,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -730,7 +730,7 @@ JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -832,12 +832,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -865,7 +865,7 @@ JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -924,9 +924,9 @@ LIMIT ? OFFSET ?;
         idOperador: Number(item.idOperador),
         idUsuario: Number(item.idUsuario),
         idVariante: Number(item.idVariante),
-        distanciaKmDerrotero:
-          item.distanciaKmDerrotero !== null
-            ? Number(item.distanciaKmDerrotero)
+        distanciaKmVariante:
+          item.distanciaKmVariante !== null
+            ? Number(item.distanciaKmVariante)
             : null,
         idRuta: Number(item.idRuta),
         idZona: Number(item.idZona),
@@ -999,12 +999,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -1041,7 +1041,7 @@ JOIN Operadores o ON v.IdOperador = o.Id
 -- Usuario del operador
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -1104,12 +1104,12 @@ SELECT
   u.ApellidoPaterno AS apellidoPaternoOperador,
   u.ApellidoMaterno AS apellidoMaternoOperador,
 
-  -- Derrotero
+  -- Variante
   der.Id AS idVariante,
-  der.Nombre AS nombreDerrotero,
-  der.PuntoInicio AS puntoInicioDerrotero,
-  der.PuntoFin AS puntoFinDerrotero,
-  der.DistanciaKm AS distanciaKmDerrotero,
+  der.Nombre AS nombreVariante,
+  der.PuntoInicio AS puntoInicioVariante,
+  der.PuntoFin AS puntoFinVariante,
+  der.DistanciaKm AS distanciaKmVariante,
 
   -- Ruta
   r.Id AS idRuta,
@@ -1138,7 +1138,7 @@ JOIN Vehiculos vhl ON ins.IdCliente = vhl.IdCliente AND ins.IdVehiculo = vhl.Id
 JOIN Operadores o ON v.IdOperador = o.Id
 JOIN Usuarios u ON o.IdUsuario = u.Id
 
--- Derrotero
+-- Variante
 JOIN Variantes der ON v.IdVariante = der.Id
 
 -- Ruta
@@ -1175,9 +1175,9 @@ ORDER BY v.Id DESC
         idOperador: Number(viaje.idOperador),
         idUsuario: Number(viaje.idUsuario),
         idVariante: Number(viaje.idVariante),
-        distanciaKmDerrotero:
-          viaje.distanciaKmDerrotero !== null
-            ? Number(viaje.distanciaKmDerrotero)
+        distanciaKmVariante:
+          viaje.distanciaKmVariante !== null
+            ? Number(viaje.distanciaKmVariante)
             : null,
         idRuta: Number(viaje.idRuta),
         idZona: Number(viaje.idZona),
