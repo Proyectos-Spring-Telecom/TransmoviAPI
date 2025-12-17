@@ -47,14 +47,13 @@ export class CreateTarifaDto {
   costoAdicional?: number;
 
   @ApiProperty({
-    example: `0 ó 1`,
-    description:
-      'Tipo de tarifa que vamos a manejar si es incrementable o plana',
+    description: 'ID del tipo de tarifa. Debe ser un ID válido del catálogo de tipos de tarifa (obtener desde /cat-tipo-tarifa)',
+    required: true,
   })
   @IsNotEmpty({ message: 'El tipo de tarifa es obligatorio' })
-  @IsInt({ message: 'El tipoTarifa debe ser un número entero' })
-  @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
-  tipoTarifa: number;
+  @IsInt({ message: 'El idTipoTarifa debe ser un número entero' })
+  @Min(1, { message: 'El idTipoTarifa debe ser un número entero positivo' })
+  idTipoTarifa: number;
 
   @ApiProperty({
     example: 1,

@@ -100,7 +100,6 @@ export class TransaccionesService {
       );
 
       //Declaramos transaccion y creamos la variable montoFinal
-      let transaccion = createTransaccioneRecargaDto.idTipoTransaccion;
       let montoFinal: number = 0;
 
       //Checamos el tipo transaccion
@@ -118,10 +117,19 @@ export class TransaccionesService {
       );
 
       //Creamos la transaccion en la BD
-      const newTransaccion = await this.transaccionesrecargaRepository.create(
-        createTransaccioneRecargaDto,
-      );
-      newTransaccion.idTipoTransaccion = EnumTipoTransaccion.RECARGA
+      // Mapear latitudInicial/longitudInicial del DTO a latitudFinal/longitudFinal de la entidad
+      const newTransaccion = await this.transaccionesrecargaRepository.create({
+        monto: createTransaccioneRecargaDto.monto,
+        latitudFinal: createTransaccioneRecargaDto.latitudInicial,
+        longitudFinal: createTransaccioneRecargaDto.longitudInicial,
+        numeroSerieMonedero: createTransaccioneRecargaDto.numeroSerieMonedero,
+        numeroSerieValidador: createTransaccioneRecargaDto.numeroSerieValidador,
+      });
+      newTransaccion.idTipoTransaccion = EnumTipoTransaccion.RECARGA;
+      newTransaccion.controlTransaccion = EnumControlTransacciones.PAGADO;
+      
+
+    
       const transaccionSave =
         await this.transaccionesrecargaRepository.save(newTransaccion);
 
@@ -129,7 +137,7 @@ export class TransaccionesService {
       const querylogger = { createTransaccioneRecargaDto };
       await this.bitacoraLogger.logToBitacora(
         'Transacciones',
-        `Se realizo una transaccion de tipo ${transaccion}`,
+        `Se realizo una transaccion de tipo RECARGA`,
         'CREATE',
         querylogger,
         idUser,
@@ -151,10 +159,11 @@ export class TransaccionesService {
       return result;
     } catch (error) {
       // --- Registro en la bitácora --- ERROR
+      console.log(JSON.stringify(error)); 
       const querylogger = { createTransaccioneRecargaDto };
       await this.bitacoraLogger.logToBitacora(
         'Transacciones',
-        `Se realizo una transaccion de tipo ${createTransaccioneRecargaDto.idTipoTransaccion}`,
+        `Error al realizar una transaccion de tipo RECARGA`,
         'CREATE',
         querylogger,
         idUser,
@@ -167,7 +176,7 @@ export class TransaccionesService {
         throw error;
       }
       throw new InternalServerErrorException(
-        `Error generar la transaccion de tipo ${createTransaccioneRecargaDto.idTipoTransaccion}`,
+        `Error generar la transaccion de tipo RECARGA`,
       );
     }
   }
@@ -841,12 +850,13 @@ export class TransaccionesService {
     email: string,
     cliente: number,
     rol: number,
-    getTransaccioneDto: GetTransaccioneDto
+    page: number,
+    limit: number,
+    fechaInicio?: string,
+    fechaFin?: string
   ) {
     try {
       //Declaramos las variables para el consumo del api
-      let { fechaInicio, fechaFin } = getTransaccioneDto
-      const { page, limit } = getTransaccioneDto
       let entidadRecarga;
       let entidadDebito;
       let transacciones;
@@ -926,8 +936,11 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
+    td.LatitudInicial AS latitudInicial,
+    td.LongitudInicial AS longitudInicial,
     td.LatitudFinal AS latitudFinal,
     td.LongitudFinal AS longitudFinal,
+    td.FechaHoraInicio AS fechaHoraInicio,
     td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -973,8 +986,11 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
+    NULL AS latitudInicial,
+    NULL AS longitudInicial,
     tr.LatitudFinal AS latitudFinal,
     tr.LongitudFinal AS longitudFinal,
+    NULL AS fechaHoraInicio,
     tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1070,8 +1086,11 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
+    td.LatitudInicial AS latitudInicial,
+    td.LongitudInicial AS longitudInicial,
     td.LatitudFinal AS latitudFinal,
     td.LongitudFinal AS longitudFinal,
+    td.FechaHoraInicio AS fechaHoraInicio,
     td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1118,8 +1137,11 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
+    NULL AS latitudInicial,
+    NULL AS longitudInicial,
     tr.LatitudFinal AS latitudFinal,
     tr.LongitudFinal AS longitudFinal,
+    NULL AS fechaHoraInicio,
     tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1223,8 +1245,11 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
+    td.LatitudInicial AS latitudInicial,
+    td.LongitudInicial AS longitudInicial,
     td.LatitudFinal AS latitudFinal,
     td.LongitudFinal AS longitudFinal,
+    td.FechaHoraInicio AS fechaHoraInicio,
     td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1272,8 +1297,11 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
+    NULL AS latitudInicial,
+    NULL AS longitudInicial,
     tr.LatitudFinal AS latitudFinal,
     tr.LongitudFinal AS longitudFinal,
+    NULL AS fechaHoraInicio,
     tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1381,8 +1409,11 @@ SELECT
     td.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 tipo según el catálogo (RECARGA, DEBITO o RECHAZADO)
     td.Monto AS monto,
+    td.LatitudInicial AS latitudInicial,
+    td.LongitudInicial AS longitudInicial,
     td.LatitudFinal AS latitudFinal,
     td.LongitudFinal AS longitudFinal,
+    td.FechaHoraInicio AS fechaHoraInicio,
     td.FechaHoraFinal AS fechaHoraFinal,
     td.FHRegistro AS fhRegistro,
     td.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1429,8 +1460,11 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
+    NULL AS latitudInicial,
+    NULL AS longitudInicial,
     tr.LatitudFinal AS latitudFinal,
     tr.LongitudFinal AS longitudFinal,
+    NULL AS fechaHoraInicio,
     tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,
@@ -1531,6 +1565,8 @@ AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente q
         ...item,
         id: Number(item.id),
         monto: Number(item.monto),
+        latitudInicial: item.latitudInicial ? Number(item.latitudInicial) : null,
+        longitudInicial: item.longitudInicial ? Number(item.longitudInicial) : null,
         latitudFinal: Number(item.latitudFinal),
         longitudFinal: Number(item.longitudFinal),
         idCliente: Number(item.idCliente),
@@ -2267,8 +2303,11 @@ SELECT
     tr.Id AS id,
     ctt.Nombre AS tipoTransaccion,  -- 👈 valor real del tipo
     tr.Monto AS monto,
+    NULL AS latitudInicial,
+    NULL AS longitudInicial,
     tr.LatitudFinal AS latitudFinal,
     tr.LongitudFinal AS longitudFinal,
+    NULL AS fechaHoraInicio,
     tr.FechaHoraFinal AS fechaHoraFinal,
     tr.FHRegistro AS fhRegistro,
     tr.NumeroSerieMonedero AS numeroSerieMonedero,

@@ -29,6 +29,7 @@ import {
 } from 'src/common/estatus.enum';
 import { Monederos } from 'src/entities/Monederos';
 import { UpdatePasajeroEstadoSolicitudDto } from './dto/update-pasajeros-estado-solicitud.dto';
+import { S3Service } from 'src/s3/s3.service';
 
 @Injectable()
 export class PasajerosService {
@@ -44,6 +45,7 @@ export class PasajerosService {
     @InjectRepository(Monederos)
     private monederosRepository: Repository<Monederos>,
     private readonly bitacoraLogger: BitacoraLoggerService,
+    private readonly s3Service: S3Service,
   ) {}
 
   // ========================================
@@ -52,8 +54,20 @@ export class PasajerosService {
   async createPasajeros(
     createPasajeroDto: CreatePasajeroDto,
     idUser: number,
+    documentacionFile?: Express.Multer.File,
   ): Promise<ApiCrudResponse> {
     try {
+      // Subir imagen/documento a S3 si se proporciona
+      let documentacionUrl: string | null = null;
+      if (documentacionFile) {
+        const uploadResult = await this.s3Service.uploadFile(
+          documentacionFile,
+          'Pasajeros',
+          idUser,
+          EnumModulos.PASAJEROS,
+        );
+        documentacionUrl = uploadResult.url;
+      }
       const pasajero = await this.pasajeroRepository.findOne({
         where: {
           correo: createPasajeroDto.correo,
@@ -108,8 +122,7 @@ export class PasajerosService {
         apellidoPaterno: createPasajeroDto.apellidoPaterno,
         apellidoMaterno: createPasajeroDto.apellidoMaterno,
         telefono: createPasajeroDto.telefono,
-        fotoPerfil:
-          'https://transmovi.s3.us-east-2.amazonaws.com/imagenes/user_default.png',
+        fotoPerfil: documentacionUrl || 'https://transmovi.s3.us-east-2.amazonaws.com/imagenes/user_default.png',
         estatus: EstatusEnum.ACTIVO,
         idRol: 9,
         idCliente: monederos.idCliente,
@@ -140,7 +153,7 @@ export class PasajerosService {
         correo: createPasajeroDto.correo,
         estatus: EstatusEnum.ACTIVO,
         estadoSolicitud: createPasajeroDto.estadoSolicitud,
-        documentacion: createPasajeroDto.documentacion,
+        documentacion: documentacionUrl || null,
         curp: createPasajeroDto.curp,
         idUsuario: userSave.id,
       });

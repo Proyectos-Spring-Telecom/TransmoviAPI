@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
   ParseIntPipe,
   Request,
@@ -84,7 +85,10 @@ export class TransaccionesController {
       email,
       +cliente,
       +rol,
-      getTransaccioneDto
+      getTransaccioneDto.page,
+      getTransaccioneDto.limit,
+      getTransaccioneDto.fechaInicio,
+      getTransaccioneDto.fechaFin
     );
   }
 

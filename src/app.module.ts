@@ -54,6 +54,7 @@ import { VerificacionesModule } from './verificaciones/verificaciones.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IncidentesModule } from './incidentes/incidentes.module';
+import { CatTipoTarifaModule } from './cat-tipo-tarifa/cat-tipo-tarifa.module';
 import Joi from 'joi';
 
 @Module({
@@ -73,6 +74,11 @@ import Joi from 'joi';
         AWS_SECRET_ACCESS_KEY: Joi.string().required(),
         AWS_S3_BUCKET: Joi.string().required(),
         UPLOAD_MAX_SIZE: Joi.string().required(),
+        HOST: Joi.string().optional(),
+        SMTP: Joi.string().optional(),
+        E_MAIL: Joi.string().optional(),
+        E_MAIL_PASSWORD: Joi.string().optional(),
+        SMTP_PASSWORD: Joi.string().optional(),
       }),
     }),
 
@@ -200,6 +206,8 @@ import Joi from 'joi';
     DashboardModule,
 
     IncidentesModule,
+
+    CatTipoTarifaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

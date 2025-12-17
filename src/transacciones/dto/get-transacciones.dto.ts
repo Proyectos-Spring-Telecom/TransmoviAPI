@@ -4,19 +4,19 @@ import { IsDateString, IsInt, IsNotEmpty, IsOptional } from "class-validator";
 
 export class GetTransaccioneDto {
     @IsInt()
-    @IsNotEmpty({ message: 'El IdCliente es obligatorio' })
+    @IsNotEmpty({ message: 'La página es obligatoria' })
     @ApiProperty({
-        description: 'ID del cliente al que pertenece la región',
-        example: 5,
+        description: 'Número de página',
+        example: 1,
         required: true,
     })
     page: number;
 
     @IsInt()
-    @IsNotEmpty({ message: 'El IdCliente es obligatorio' })
+    @IsNotEmpty({ message: 'El límite es obligatorio' })
     @ApiProperty({
-        description: 'ID del cliente al que pertenece la región',
-        example: 5,
+        description: 'Cantidad de registros por página',
+        example: 20,
         required: true,
     })
     limit: number;

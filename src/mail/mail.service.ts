@@ -8,13 +8,22 @@ export class MailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
+    const port = process.env.SMTP ? parseInt(process.env.SMTP, 10) : 465;
+    const secure = port === 465; // Puerto 465 usa SSL, 587 usa TLS
+    
+    // Obtener contraseña de variables de entorno o usar fallback
+    const password = process.env.E_MAIL_PASSWORD || process.env.SMTP_PASSWORD || 'p323+p2%16#^';
+    
     this.transporter = nodemailer.createTransport({
-      host: process.env.HOST, // o tu proveedor SMTP
-      port: process.env.SMTP,
-      secure: true,
+      host: process.env.HOST,
+      port: port,
+      secure: secure,
       auth: {
         user: process.env.E_MAIL,
-        pass: 'p323+p2%16#^',
+        pass: password,
+      },
+      tls: {
+        rejectUnauthorized: false, // Para desarrollo, en producción debería ser true
       },
     });
   }

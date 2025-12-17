@@ -13,23 +13,21 @@ import {
 import { EnumSolicitudPasajero } from 'src/common/estatus.enum';
 
 export class CreateAltaPasajaroDto {
-  @IsNotEmpty({
-    message: 'El nombre no puede exceder los 100 caracteres',
-  })
-  @IsString()
-  @MaxLength(100)
+  @IsNotEmpty({ message: 'El nombre es obligatorio' })
+  @IsString({ message: 'El nombre debe ser una cadena de texto' })
+  @MinLength(1, { message: 'El nombre debe tener al menos 1 carácter' })
+  @MaxLength(100, { message: 'El nombre no puede exceder los 100 caracteres' })
   @ApiProperty({
     description: 'Nombre del usuario',
     example: 'Juan',
-    required: false,
+    required: true,
   })
   nombre: string;
 
-  @IsNotEmpty({
-    message: 'El apellido paterno es necesarios.',
-  })
-  @IsString()
-  @MaxLength(100)
+  @IsNotEmpty({ message: 'El apellido paterno es obligatorio' })
+  @IsString({ message: 'El apellido paterno debe ser una cadena de texto' })
+  @MinLength(1, { message: 'El apellido paterno debe tener al menos 1 carácter' })
+  @MaxLength(100, { message: 'El apellido paterno no puede exceder los 100 caracteres' })
   @ApiProperty({
     description: 'Apellido paterno',
     example: 'Pérez',
@@ -47,11 +45,13 @@ export class CreateAltaPasajaroDto {
   })
   apellidoMaterno?: string;
 
+  @IsNotEmpty({ message: 'La fecha de nacimiento es obligatoria' })
+  @IsDateString({}, { message: 'La fecha de nacimiento debe ser una fecha válida en formato ISO 8601' })
   @ApiProperty({
     example: '1995-08-15',
     description: 'Fecha de nacimiento (YYYY-MM-DD)',
+    required: true,
   })
-  @IsDateString()
   fechaNacimiento: string;
 
   @IsString()

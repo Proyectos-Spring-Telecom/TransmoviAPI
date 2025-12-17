@@ -53,7 +53,12 @@ export class TarifasService {
       if (!variante)
         throw new NotFoundException(`La variante no fue encontrada.`);
 
-      const newTarifas = this.tarifasRepository.create(createTarifaDto);
+      // Mapear idTipoTarifa del DTO a tipoTarifa de la entidad
+      const { idTipoTarifa, ...restDto } = createTarifaDto;
+      const newTarifas = this.tarifasRepository.create({
+        ...restDto,
+        tipoTarifa: idTipoTarifa,
+      });
       const tarifaSave = await this.tarifasRepository.save(newTarifas);
 
       // Registro en la bitácora SUCCESS
@@ -1024,8 +1029,15 @@ ORDER BY t.Id DESC
       });
       if (!tarifa) throw new NotFoundException(`Tarifa no encontrada.`);
 
+      // Mapear idTipoTarifa del DTO a tipoTarifa de la entidad si viene en el DTO
+      const updateData: any = { ...updateTarifaDto };
+      if (updateData.idTipoTarifa !== undefined) {
+        updateData.tipoTarifa = updateData.idTipoTarifa;
+        delete updateData.idTipoTarifa;
+      }
+
       //actualizacion de tarifa
-      await this.tarifasRepository.update(id, updateTarifaDto);
+      await this.tarifasRepository.update(id, updateData);
 
       // Registro en la bitácora SUCCESS
       const querylogger = { updateTarifaDto };

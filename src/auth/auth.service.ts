@@ -84,7 +84,7 @@ export class AuthService {
         apellidoMaterno: createAltaPasajaroDto.apellidoMaterno,
         telefono: createAltaPasajaroDto.telefono,
         fotoPerfil:
-          'https://transmovi.s3.us-east-2.amazonaws.com/imagenes/user_default.png',
+          'https://dashcamsys.s3.us-east-2.amazonaws.com/imagenes/2c369ac0-c489-4384-8d35-3ba482f7ccaa.jpeg',
         estatus: 1,
         idRol: 9,
         idCliente: monederos.data.idCliente,
@@ -144,12 +144,17 @@ export class AuthService {
       );
       //Enviar correo de confirmacion
       const name = `${userSave.nombre} ${userSave.apellidoPaterno} ${userSave.apellidoMaterno ?? ''}`;
-      await this.emailService.sendConfirmationEmail(
-        userSave.userName,
-        name,
-        token,
-        codigo,
-      );
+      try {
+        await this.emailService.sendConfirmationEmail(
+          userSave.userName,
+          name,
+          token,
+          codigo,
+        );
+      } catch (emailError) {
+        // Log del error pero no fallar la creación del pasajero
+        console.error('Error al enviar correo de confirmación:', emailError);
+      }
 
       //afiliamos el monedero al pasajero y cambiamos estatus activo
       function pad(n: number) {
@@ -199,6 +204,7 @@ export class AuthService {
       };
       return result;
     } catch (error) {
+      console.log(JSON.stringify(error));
       if (error instanceof HttpException) {
         throw error;
       }

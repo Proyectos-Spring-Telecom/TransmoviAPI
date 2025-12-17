@@ -392,16 +392,34 @@ WHERE
     const total = Number(totalResult[0]?.total || 0);
 
     // Mapeo de resultados con conversión de tipos y manejo de idZonaFin
-    const rutas = data.map((item) => ({
-      ...item,
-      id: item.id ? Number(item.id) : null,
-      idZona: item.idZona ? Number(item.idZona) : null,
-      idZonaFin: item.idZonaFin ? Number(item.idZonaFin) : null,
-      idZonaFinDetalle: item.idZonaFinDetalle
-        ? Number(item.idZonaFinDetalle)
-        : null,
-      idCliente: item.idCliente ? Number(item.idCliente) : null,
-    }));
+    const rutas = data.map((item) => {
+      const ruta = {
+        ...item,
+        id: item.id ? Number(item.id) : null,
+        idZona: item.idZona ? Number(item.idZona) : null,
+        idZonaFin: item.idZonaFin ? Number(item.idZonaFin) : null,
+        idZonaFinDetalle: item.idZonaFinDetalle
+          ? Number(item.idZonaFinDetalle)
+          : null,
+        idCliente: item.idCliente ? Number(item.idCliente) : null,
+      };
+
+      // Agregar objeto zonaFin completo si existe
+      if (item.idZonaFinDetalle) {
+        ruta.zonaFin = {
+          id: Number(item.idZonaFinDetalle),
+          nombre: item.nombreZonaFinDetalle || null,
+          descripcion: item.descripcionZonaFin || null,
+          fechaCreacion: item.fechaCreacionZonaFin || null,
+          fechaActualizacion: item.fechaActualizacionZonaFin || null,
+          estatus: item.estatusZonaFin ? Number(item.estatusZonaFin) : null,
+        };
+      } else {
+        ruta.zonaFin = null;
+      }
+
+      return ruta;
+    });
 
     return {
       data: rutas,

@@ -9,11 +9,13 @@ import { UsuariosModule } from 'src/usuarios/usuarios.module';
 import { Usuarios } from 'src/entities/Usuarios';
 import { UsuariosPermisos } from 'src/entities/UsuariosPermisos';
 import { Monederos } from 'src/entities/Monederos';
+import { S3Module } from 'src/s3/s3.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Pasajeros, Clientes, Usuarios, UsuariosPermisos, Monederos]),
     BitacoraModule,
+    S3Module,
   ],
   controllers: [PasajerosController],
   providers: [PasajerosService],
