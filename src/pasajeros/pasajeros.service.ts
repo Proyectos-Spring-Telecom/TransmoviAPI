@@ -680,6 +680,7 @@ SELECT
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', IFNULL(p.ApellidoMaterno, '')) AS NombreCompleto,
     GROUP_CONCAT(DISTINCT m.NumeroSerie ORDER BY m.NumeroSerie SEPARATOR ', ') AS Monederos,
     SUM(m.Saldo) AS SaldoTotal,
+    GROUP_CONCAT(DISTINCT ctp.Nombre ORDER BY ctp.Nombre SEPARATOR ', ') AS NombreTipoPasajero,
 
     -- Última recarga (monto)
     (
@@ -705,12 +706,24 @@ SELECT
 
     -- Total de débitos del último mes
     (
-        SELECT SUM(td.Monto)
-        FROM TransaccionesDebito td
-        INNER JOIN Monederos m3 ON td.NumeroSerieMonedero = m3.NumeroSerie
-        WHERE m3.IdPasajero = p.Id
-          AND m3.Estatus = 1
-          AND td.FechaHoraFinal >= DATE_SUB(NOW(), INTERVAL 1 MONTH)
+        SELECT COALESCE(SUM(td.Monto), 0)
+        FROM (
+            SELECT td.Monto, td.FHRegistro, m3.IdPasajero, m3.Estatus
+            FROM TransaccionesDebito td
+            INNER JOIN Monederos m3 ON td.NumeroSerieMonedero = m3.NumeroSerie
+            WHERE m3.IdPasajero = p.Id
+              AND m3.Estatus = 1
+              AND DATE(td.FHRegistro) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+            
+            UNION ALL
+            
+            SELECT htd.Monto, htd.FHRegistro, m3b.IdPasajero, m3b.Estatus
+            FROM HistoricoTransaccionesDebito htd
+            INNER JOIN Monederos m3b ON htd.NumeroSerieMonedero = m3b.NumeroSerie
+            WHERE m3b.IdPasajero = p.Id
+              AND m3b.Estatus = 1
+              AND DATE(htd.FHRegistro) >= DATE_SUB(CURDATE(), INTERVAL 1 MONTH)
+        ) AS td
     ) AS TotalDebitosUltimoMes,
 
     -- Último débito (monto)
@@ -738,9 +751,10 @@ SELECT
 FROM Pasajeros p
 INNER JOIN Usuarios u ON u.UserName = p.Correo
 LEFT JOIN Monederos m ON p.Id = m.IdPasajero
+LEFT JOIN CatTiposPasajeros ctp ON m.IdTipoPasajero = ctp.Id
 WHERE u.Id = ?
   AND m.Estatus = 1
-GROUP BY p.Id, u.Id, u.UserName, NombreCompleto;
+GROUP BY p.Id, u.Id, u.UserName, p.Nombre, p.ApellidoPaterno, p.ApellidoMaterno;
         `,
         [id],
       );
