@@ -251,6 +251,7 @@ export class TransaccionesService {
           turno: turno.id,
           inicioTurno: turno.inicio,
           idViaje: viaje.id,
+          idVariante: viaje.idVariante,
           nombreVariante: viaje.idVariante2?.nombre || null,
           TarifaBase: tarifa?.tarifaBase || null,
           CostoAdicional: tarifa?.costoAdicional || null,
@@ -267,6 +268,7 @@ export class TransaccionesService {
             t.Id AS turno,
             t.Inicio AS inicioTurno,
             vi.Id AS idViaje,
+            vi.IdVariante AS idVariante,
             va.Nombre AS nombreVariante,
             ta.TarifaBase,
             ta.CostoAdicional,
@@ -323,13 +325,30 @@ export class TransaccionesService {
       }
 
       // 2.6️⃣ Calculamos el numeroTransbordo y aplicamos el descuento del transbordo (opcional)
-      // Si no existe un transbordo para el cliente, continuamos con la lógica normal
+      // Si no existe un transbordo para el cliente y la variante, continuamos con la lógica normal
       let numeroTransbordo: number | null = null;
-      const transbordoPermitido = await this.transbordosPermitidosRepository.findOne({
-        where: { idCliente: Number(monedero.idCliente) },
-        relations: ['tipoDescuento'],
-      });
-      // Solo aplicamos la lógica de transbordos si existe configuración para el cliente
+      
+      // Obtener el idVariante del viaje
+      const idVarianteViaje = infoValidadorViaje[0]?.idVariante || null;
+      
+      // Buscar el transbordo que pertenezca al cliente Y a la variante del viaje
+      const transbordoPermitido = idVarianteViaje
+        ? await this.transbordosPermitidosRepository.findOne({
+            where: { 
+              idCliente: Number(monedero.idCliente),
+              idVariante: Number(idVarianteViaje),
+            },
+            relations: ['tipoDescuento'],
+          })
+        : null;
+      
+      if (idVarianteViaje && !transbordoPermitido) {
+        console.log(`No se encontró transbordo para el cliente ${monedero.idCliente} y la variante ${idVarianteViaje} - No se aplicará descuento de transbordo`);
+      } else if (transbordoPermitido) {
+        console.log(`Transbordo encontrado para cliente ${monedero.idCliente} y variante ${idVarianteViaje} - ID: ${transbordoPermitido.id}`);
+      }
+      
+      // Solo aplicamos la lógica de transbordos si existe configuración para el cliente y la variante coincide
       if (transbordoPermitido && transbordoPermitido.tiempo && transbordoPermitido.numeroTransbordos) {
         // Calculamos la fecha límite hacia atrás (tiempo en minutos)
         // Aplicar desfase de -6 horas para la zona horaria
@@ -976,7 +995,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 
 
 UNION ALL
@@ -1024,7 +1043,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 
 ORDER BY FechaHoraFinal DESC
   LIMIT ? OFFSET ?;
@@ -1051,7 +1070,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 
     UNION ALL
 
@@ -1069,7 +1088,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 ) AS todas;
 		
   `,
@@ -1126,7 +1145,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
 
@@ -1175,7 +1194,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
 ORDER BY FechaHoraFinal DESC
@@ -1204,7 +1223,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
     UNION ALL
@@ -1223,7 +1242,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
 
@@ -1285,7 +1304,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.Estatus = 1
 AND p.Id = ?
 
@@ -1335,7 +1354,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.Estatus = 1
 AND p.Id = ?
 
@@ -1365,7 +1384,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.Estatus = 1
 AND p.Id = ?
 
@@ -1385,7 +1404,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.Estatus = 1
 AND p.Id = ?
 
@@ -1449,7 +1468,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 
@@ -1498,7 +1517,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY FechaHoraFinal DESC
@@ -1527,7 +1546,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
     UNION ALL
@@ -1546,7 +1565,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 
@@ -2192,7 +2211,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 
 
 UNION ALL
@@ -2239,7 +2258,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 
 ORDER BY FechaHoraFinal DESC
         `,
@@ -2292,7 +2311,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 
@@ -2341,7 +2360,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
 ORDER BY FechaHoraFinal DESC
@@ -2395,7 +2414,7 @@ SELECT
       ON m.IdPasajero = p.Id
     
 -- condiciones
-WHERE td.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(td.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
 
@@ -2441,7 +2460,7 @@ INNER JOIN Clientes c
 	ON m.IdCliente = c.Id
     
 -- condiciones
-WHERE tr.FechaHoraFinal BETWEEN '${fechaInicio}T00:00:00Z' AND '${fechaFin}T23:59:59Z'
+WHERE DATE(tr.FHRegistro) BETWEEN '${fechaInicio}' AND '${fechaFin}'
 AND m.IdCliente = ?
 
 ORDER BY FechaHoraFinal DESC

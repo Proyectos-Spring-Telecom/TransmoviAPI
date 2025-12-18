@@ -12,6 +12,7 @@ import { UpdateTransbordoDto } from './dto/update-transbordo.dto';
 import { TransbordosPermitidos } from 'src/entities/TransbordosPermitidos';
 import { DetalleTransbordos } from 'src/entities/DetalleTransbordos';
 import { Clientes } from 'src/entities/Clientes';
+import { Variantes } from 'src/entities/Variantes';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import {
   ApiCrudResponse,
@@ -28,6 +29,8 @@ export class TransbordosService {
     private readonly detalleTransbordosRepository: Repository<DetalleTransbordos>,
     @InjectRepository(Clientes)
     private readonly clientesRepository: Repository<Clientes>,
+    @InjectRepository(Variantes)
+    private readonly variantesRepository: Repository<Variantes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly dataSource: DataSource,
   ) {}
@@ -53,6 +56,17 @@ export class TransbordosService {
       if (!cliente) {
         throw new NotFoundException(
           `Cliente con ID ${createTransbordoDto.idCliente} no encontrado`,
+        );
+      }
+
+      // Validar que la variante existe
+      const variante = await this.variantesRepository.findOne({
+        where: { id: createTransbordoDto.idVariante },
+      });
+
+      if (!variante) {
+        throw new NotFoundException(
+          `Variante con ID ${createTransbordoDto.idVariante} no encontrada`,
         );
       }
 
@@ -88,6 +102,7 @@ export class TransbordosService {
         tiempo: createTransbordoDto.tiempo,
         numeroTransbordos: createTransbordoDto.numeroTransbordos,
         idCliente: createTransbordoDto.idCliente,
+        idVariante: createTransbordoDto.idVariante,
       });
 
       const transbordoGuardado = await queryRunner.manager.save(nuevoTransbordo);
@@ -187,6 +202,7 @@ export class TransbordosService {
         SELECT 
           tp.Id,
           tp.IdCliente,
+          tp.IdVariante,
           tp.Nombre,
           tp.Tiempo,
           tp.NumeroTransbordos,
@@ -201,7 +217,7 @@ export class TransbordosService {
         INNER JOIN Clientes c ON tp.IdCliente = c.Id
         LEFT JOIN DetalleTransbordos dt ON tp.Id = dt.IdTransbordo
         WHERE tp.IdCliente IN (${placeholders})
-        GROUP BY tp.Id, tp.IdCliente, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, c.Nombre
+        GROUP BY tp.Id, tp.IdCliente, tp.IdVariante, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, c.Nombre
         ORDER BY tp.Id DESC
         LIMIT ? OFFSET ?
       `;
@@ -220,6 +236,7 @@ export class TransbordosService {
       const formattedData = data.map((item: any) => ({
         id: Number(item.Id),
         idCliente: Number(item.IdCliente),
+        idVariante: Number(item.IdVariante),
         nombreCliente: item.NombreCliente,
         nombre: item.Nombre,
         tiempo: item.Tiempo ? Number(item.Tiempo) : null,
@@ -309,6 +326,7 @@ export class TransbordosService {
           tiempo: transbordo.tiempo,
           numeroTransbordos: transbordo.numeroTransbordos,
           idCliente: transbordo.idCliente,
+          idVariante: transbordo.idVariante,
           nombreCliente: transbordo.idClienteTransbordo?.nombre,
           detalles: transbordo.detalleTransbordos.map(detalle => ({
             id: Number(detalle.id),
@@ -380,6 +398,19 @@ export class TransbordosService {
         }
       }
 
+      // Si se está actualizando la variante, validar que existe
+      if (updateTransbordoDto.idVariante) {
+        const variante = await this.variantesRepository.findOne({
+          where: { id: updateTransbordoDto.idVariante },
+        });
+
+        if (!variante) {
+          throw new NotFoundException(
+            `Variante con ID ${updateTransbordoDto.idVariante} no encontrada`,
+          );
+        }
+      }
+
       // Determinar el número de transbordos a usar para validación
       const numeroTransbordos = updateTransbordoDto.numeroTransbordos !== undefined
         ? updateTransbordoDto.numeroTransbordos
@@ -442,6 +473,9 @@ export class TransbordosService {
       }
       if (updateTransbordoDto.idCliente !== undefined) {
         datosActualizacion.idCliente = updateTransbordoDto.idCliente;
+      }
+      if (updateTransbordoDto.idVariante !== undefined) {
+        datosActualizacion.idVariante = updateTransbordoDto.idVariante;
       }
 
       if (Object.keys(datosActualizacion).length > 0) {
