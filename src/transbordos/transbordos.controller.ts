@@ -73,6 +73,28 @@ export class TransbordosController {
     return this.transbordosService.create(idUser, createTransbordoDto);
   }
 
+  @Get('tipos-descuento')
+  @ApiOperation({
+    summary: 'Obtener listado de tipos de descuento',
+    description: 'Retorna todos los tipos de descuento disponibles para transbordos.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de tipos de descuento obtenida exitosamente',
+    schema: {
+      example: {
+        data: [
+          { id: 1, nombre: 'Descuento por tiempo' },
+          { id: 2, nombre: 'Descuento por cantidad' },
+        ],
+      },
+    },
+  })
+  getTiposDescuento(@Request() req) {
+    const idUser = req.user.userId;
+    return this.transbordosService.getTiposDescuento(idUser);
+  }
+
   @Get(':page/:limit')
   @ApiOperation({
     summary: 'Obtener listado de transbordos con paginación',

@@ -5,6 +5,7 @@ import { TransbordosController } from './transbordos.controller';
 import { TransbordosPermitidos } from 'src/entities/TransbordosPermitidos';
 import { DetalleTransbordos } from 'src/entities/DetalleTransbordos';
 import { Clientes } from 'src/entities/Clientes';
+import { CatTipoDescuentoTransbordo } from 'src/entities/CatTipoDescuentoTransbordo';
 import { BitacoraModule } from 'src/bitacora/bitacora.module';
 
 @Module({
@@ -13,6 +14,7 @@ import { BitacoraModule } from 'src/bitacora/bitacora.module';
       TransbordosPermitidos,
       DetalleTransbordos,
       Clientes,
+      CatTipoDescuentoTransbordo,
     ]),
     BitacoraModule,
   ],

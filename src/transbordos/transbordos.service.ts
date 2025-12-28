@@ -12,6 +12,7 @@ import { UpdateTransbordoDto } from './dto/update-transbordo.dto';
 import { TransbordosPermitidos } from 'src/entities/TransbordosPermitidos';
 import { DetalleTransbordos } from 'src/entities/DetalleTransbordos';
 import { Clientes } from 'src/entities/Clientes';
+import { CatTipoDescuentoTransbordo } from 'src/entities/CatTipoDescuentoTransbordo';
 import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import {
   ApiCrudResponse,
@@ -28,6 +29,8 @@ export class TransbordosService {
     private readonly detalleTransbordosRepository: Repository<DetalleTransbordos>,
     @InjectRepository(Clientes)
     private readonly clientesRepository: Repository<Clientes>,
+    @InjectRepository(CatTipoDescuentoTransbordo)
+    private readonly tipoDescuentoRepository: Repository<CatTipoDescuentoTransbordo>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly dataSource: DataSource,
   ) {}
@@ -193,6 +196,7 @@ export class TransbordosService {
           tp.Tiempo,
           tp.NumeroTransbordos,
           c.Nombre as NombreCliente,
+          tdt.Nombre as NombreTipoDescuento,
           COUNT(dt.Id) as CantidadDetalles,
           GROUP_CONCAT(
             CONCAT('{"nroTransbordo":', dt.NroTransbordo, ',"costo":', dt.Costo, '}')
@@ -201,9 +205,10 @@ export class TransbordosService {
           ) as Detalles
         FROM TransbordosPermitidos tp
         INNER JOIN Clientes c ON tp.IdCliente = c.Id
+        LEFT JOIN CatTipoDescuentoTransbordo tdt ON tp.IdTipoDescuento = tdt.Id
         LEFT JOIN DetalleTransbordos dt ON tp.Id = dt.IdTransbordo
         WHERE tp.IdCliente IN (${placeholders})
-        GROUP BY tp.Id, tp.IdCliente, tp.IdTipoDescuento, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, c.Nombre
+        GROUP BY tp.Id, tp.IdCliente, tp.IdTipoDescuento, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, c.Nombre, tdt.Nombre
         ORDER BY tp.Id DESC
         LIMIT ? OFFSET ?
       `;
@@ -223,6 +228,7 @@ export class TransbordosService {
         id: Number(item.Id),
         idCliente: Number(item.IdCliente),
         idTipoDescuento: item.IdTipoDescuento ? Number(item.IdTipoDescuento) : null,
+        nombreTipoDescuento: item.NombreTipoDescuento || null,
         nombreCliente: item.NombreCliente,
         nombre: item.Nombre,
         tiempo: item.Tiempo ? Number(item.Tiempo) : null,
@@ -287,7 +293,7 @@ export class TransbordosService {
     try {
       const transbordo = await this.transbordosRepository.findOne({
         where: { id },
-        relations: ['detalleTransbordos', 'idClienteTransbordo'],
+        relations: ['detalleTransbordos', 'idClienteTransbordo', 'tipoDescuento'],
       });
 
       if (!transbordo) {
@@ -313,6 +319,7 @@ export class TransbordosService {
           numeroTransbordos: transbordo.numeroTransbordos,
           idCliente: transbordo.idCliente,
           idTipoDescuento: transbordo.idTipoDescuento,
+          nombreTipoDescuento: transbordo.tipoDescuento?.nombre || null,
           nombreCliente: transbordo.idClienteTransbordo?.nombre,
           detalles: transbordo.detalleTransbordos.map(detalle => ({
             id: Number(detalle.id),
@@ -580,6 +587,58 @@ export class TransbordosService {
 
       throw new InternalServerErrorException({
         message: `Error al eliminar Transbordo con ID ${id}`,
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Obtener todos los tipos de descuento disponibles
+   */
+  async getTiposDescuento(idUser: number): Promise<ApiResponseCommon> {
+    try {
+      const tiposDescuento = await this.tipoDescuentoRepository.find({
+        order: { nombre: 'ASC' },
+      });
+
+      // Registro en la bitácora SUCCESS
+      await this.bitacoraLogger.logToBitacora(
+        'TransbordosPermitidos',
+        'Se consultó el listado de tipos de descuento',
+        'READ',
+        {},
+        idUser,
+        19,
+        EstatusEnumBitcora.SUCCESS,
+      );
+
+      const result: ApiResponseCommon = {
+        data: tiposDescuento.map(tipo => ({
+          id: Number(tipo.id),
+          nombre: tipo.nombre,
+        })),
+      };
+
+      return result;
+    } catch (error) {
+      // Registro en la bitácora ERROR
+      await this.bitacoraLogger.logToBitacora(
+        'TransbordosPermitidos',
+        'Error al consultar listado de tipos de descuento',
+        'READ',
+        {},
+        idUser,
+        19,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException({
+        message: 'Error al obtener listado de tipos de descuento',
         error: error.message,
       });
     }
