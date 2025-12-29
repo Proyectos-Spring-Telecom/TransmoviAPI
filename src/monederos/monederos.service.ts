@@ -215,6 +215,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idClienteMonederos,
     c.Nombre AS clienteNombre,
@@ -226,6 +228,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
@@ -242,6 +245,7 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 
@@ -274,6 +278,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idClienteMonederos,
     c.Nombre AS clienteNombre,
@@ -285,6 +291,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
@@ -303,6 +310,7 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 WHERE p.Id = ?
@@ -335,6 +343,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idClienteMonederos,
     c.Nombre AS clienteNombre,
@@ -346,6 +356,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 LEFT JOIN CatTiposPasajeros ct ON m.IdTipoPasajero = ct.Id
 
@@ -363,6 +374,7 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(*) AS total
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
@@ -484,6 +496,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idCliente,
     c.Nombre AS clienteNombre,
@@ -493,6 +507,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 WHERE m.Estatus = 1 -- estatus activo
@@ -525,6 +540,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idCliente,
     c.Nombre AS clienteNombre,
@@ -534,6 +551,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 WHERE m.Estatus = 1 -- estatus activo
@@ -567,6 +585,8 @@ SELECT
     p.ApellidoMaterno AS pasajeroApellidoMaterno,
     CONCAT(p.Nombre, ' ', p.ApellidoPaterno, ' ', p.ApellidoMaterno) AS nombreCompletoPasajero,
     p.CustomerIdNetPay AS customerId,
+    u.Telefono AS telefonoUsuario,
+    u.UserName AS correoUsuario,
 
     c.Id AS idCliente,
     c.Nombre AS clienteNombre,
@@ -576,6 +596,7 @@ SELECT
 
 FROM Monederos m
 LEFT JOIN Pasajeros p ON m.IdPasajero = p.Id
+LEFT JOIN Usuarios u ON p.IdUsuario = u.Id
 INNER JOIN Clientes c ON m.IdCliente = c.Id
 
 WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
@@ -621,7 +642,7 @@ ORDER BY m.Id DESC;
     try {
       const monedero = await this.monederoRepository.findOne({
         where: { id: id },
-        relations: ['idPasajero2'],
+        relations: ['idPasajero2', 'idPasajero2.idUsuario2'],
       });
       if (!monedero) {
         throw new NotFoundException(
@@ -638,6 +659,8 @@ ORDER BY m.Id DESC;
         idCliente: Number(monedero.idCliente),
         tipoMonedero: monedero.esVirtual === 1 ? 'virtual' : 'fisico',
         customerId: monedero.idPasajero2?.customerIdNetPay || null,
+        telefonoUsuario: monedero.idPasajero2?.idUsuario2?.telefono || null,
+        correoUsuario: monedero.idPasajero2?.idUsuario2?.userName || null,
       };
       return { data: monederoResult };
     } catch (error) {
@@ -657,7 +680,7 @@ ORDER BY m.Id DESC;
     try {
       const monedero = await this.monederoRepository.findOne({
         where: { numeroSerie: NumeroSerie },
-        relations: ['idPasajero2'],
+        relations: ['idPasajero2', 'idPasajero2.idUsuario2'],
       });
       if (!monedero) {
         throw new NotFoundException(
@@ -673,6 +696,8 @@ ORDER BY m.Id DESC;
         idCliente: Number(monedero.idCliente),
         tipoMonedero: monedero.esVirtual === 1 ? 'virtual' : 'fisico',
         customerId: monedero.idPasajero2?.customerIdNetPay || null,
+        telefonoUsuario: monedero.idPasajero2?.idUsuario2?.telefono || null,
+        correoUsuario: monedero.idPasajero2?.idUsuario2?.userName || null,
       };
       return { data: monederoResult };
     } catch (error) {
