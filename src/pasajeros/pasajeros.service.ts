@@ -862,6 +862,7 @@ ORDER BY p.Id DESC;
     idUser: number,
     cliente: number,
     rol: number,
+    anio?: number,
   ) {
     try {
       const pasajero = await this.pasajeroRepository.query(
@@ -957,10 +958,98 @@ GROUP BY p.Id, u.Id, u.UserName, p.Nombre, p.ApellidoPaterno, p.ApellidoMaterno;
       }
 
       const item = pasajero[0];
+      const idPasajero = Number(item.idPasajero);
+
+      // Usar el año proporcionado o el año actual por defecto
+      const anioFiltro = anio || new Date().getFullYear();
+
+      // Consulta para obtener gastos (HistoricoTransaccionesDebito) agrupados por mes del año especificado
+      const gastosPorMes = await this.pasajeroRepository.query(
+        `
+        SELECT 
+          MONTH(htd.FHRegistro) AS mes,
+          YEAR(htd.FHRegistro) AS anio,
+          COALESCE(SUM(htd.Monto), 0) AS totalGastado
+        FROM HistoricoTransaccionesDebito htd
+        INNER JOIN Monederos m ON htd.NumeroSerieMonedero = m.NumeroSerie
+        WHERE m.IdPasajero = ?
+          AND m.Estatus = 1
+          AND YEAR(htd.FHRegistro) = ?
+        GROUP BY MONTH(htd.FHRegistro), YEAR(htd.FHRegistro)
+        ORDER BY anio, mes
+        `,
+        [idPasajero, anioFiltro],
+      );
+
+      // Consulta para obtener recargas (HistoricoTransaccionesRecarga) agrupadas por mes del año especificado
+      const recargasPorMes = await this.pasajeroRepository.query(
+        `
+        SELECT 
+          MONTH(htr.FHRegistro) AS mes,
+          YEAR(htr.FHRegistro) AS anio,
+          COALESCE(SUM(htr.Monto), 0) AS totalRecargado
+        FROM HistoricoTransaccionesRecarga htr
+        INNER JOIN Monederos m ON htr.NumeroSerieMonedero = m.NumeroSerie
+        WHERE m.IdPasajero = ?
+          AND m.Estatus = 1
+          AND YEAR(htr.FHRegistro) = ?
+        GROUP BY MONTH(htr.FHRegistro), YEAR(htr.FHRegistro)
+        ORDER BY anio, mes
+        `,
+        [idPasajero, anioFiltro],
+      );
+
+      // Inicializar todos los meses del año con 0
+      const anioActual = anioFiltro;
+      const gastosYRecargasMap = new Map();
+      const gastosSoloMap = new Map();
+
+      for (let mes = 1; mes <= 12; mes++) {
+        gastosYRecargasMap.set(mes, { 
+          mes, 
+          anio: anioActual, 
+          totalGastado: 0, 
+          totalRecargado: 0 
+        });
+        gastosSoloMap.set(mes, { mes, anio: anioActual, total: 0 });
+      }
+
+      // Procesar gastos
+      gastosPorMes.forEach((item) => {
+        const mes = Number(item.mes);
+        const total = Number(item.totalGastado) || 0;
+        if (gastosYRecargasMap.has(mes)) {
+          gastosYRecargasMap.get(mes).totalGastado = Number(total.toFixed(2));
+        }
+        if (gastosSoloMap.has(mes)) {
+          gastosSoloMap.set(mes, {
+            mes,
+            anio: Number(item.anio),
+            total: Number(total.toFixed(2)),
+          });
+        }
+      });
+
+      // Procesar recargas
+      recargasPorMes.forEach((item) => {
+        const mes = Number(item.mes);
+        const total = Number(item.totalRecargado) || 0;
+        if (gastosYRecargasMap.has(mes)) {
+          gastosYRecargasMap.get(mes).totalRecargado = Number(total.toFixed(2));
+        }
+      });
+
+      // Convertir maps a arrays y formatear
+      const gastosYRecargasPorMes = Array.from(gastosYRecargasMap.values());
+
+      const gastosPorMesCompleto = Array.from(gastosSoloMap.values());
+
       const data = {
         ...item,
-        idPasajero: Number(item.idPasajero),
+        idPasajero: idPasajero,
         idUsuario: Number(item.idUsuario),
+        gastosYRecargasPorMes: gastosYRecargasPorMes,
+        gastosPorMes: gastosPorMesCompleto,
       };
 
       return {

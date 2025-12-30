@@ -208,6 +208,7 @@ SELECT
     m.IdPasajero AS idPasajero,
     m.IdCliente AS idCliente,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajeroMonederos,
     p.Nombre AS pasajeroNombre,
@@ -271,6 +272,7 @@ SELECT
     m.IdPasajero AS idPasajero,
     m.IdCliente AS idCliente,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajeroMonederos,
     p.Nombre AS pasajeroNombre,
@@ -336,6 +338,7 @@ SELECT
     m.IdPasajero AS idPasajero,
     m.IdCliente AS idCliente,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajeroMonederos,
     p.Nombre AS pasajeroNombre,
@@ -393,6 +396,7 @@ WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que qu
         idPasajeroMonedero: Number(item.idPasajeroMonederos),
         idClienteMonedero: Number(item.idClienteMonedero),
         tipoMonedero: item.esVirtual === 1 ? 'virtual' : 'fisico',
+        idCard: item.idCard || null,
       }));
 
       const total = Number(totalResult[0]?.total || 0);
@@ -444,6 +448,7 @@ WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que qu
         idPasajero: Number(item.idPasajero),
         idCliente: Number(item.idCliente),
         tipoMonedero: item.esVirtual === 1 ? 'virtual' : 'fisico',
+        idCard: item.idCard || null,
       }));
 
       const result: ApiResponseCommon = {
@@ -489,6 +494,7 @@ SELECT
     m.FechaActualizacion AS fechaActualizacion,
     m.Estatus AS estatusMonedero,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajero,
     p.Nombre AS pasajeroNombre,
@@ -533,6 +539,7 @@ SELECT
     m.FechaActualizacion AS fechaActualizacion,
     m.Estatus AS estatusMonedero,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajero,
     p.Nombre AS pasajeroNombre,
@@ -578,6 +585,7 @@ SELECT
     m.FechaActualizacion AS fechaActualizacion,
     m.Estatus AS estatusMonedero,
     m.EsVirtual AS esVirtual,
+    m.IdCard AS idCard,
 
     p.Id AS idPasajero,
     p.Nombre AS pasajeroNombre,
@@ -618,6 +626,7 @@ ORDER BY m.Id DESC;
         idPasajero: Number(item.idPasajero),
         idCliente: Number(item.idCliente),
         tipoMonedero: item.esVirtual === 1 ? 'virtual' : 'fisico',
+        idCard: item.idCard || null,
       }));
 
       //Api response
@@ -661,6 +670,7 @@ ORDER BY m.Id DESC;
         customerId: monedero.idPasajero2?.customerIdNetPay || null,
         telefonoUsuario: monedero.idPasajero2?.idUsuario2?.telefono || null,
         correoUsuario: monedero.idPasajero2?.idUsuario2?.userName || null,
+        idCard: monedero.idCard || null,
       };
       return { data: monederoResult };
     } catch (error) {
@@ -698,6 +708,7 @@ ORDER BY m.Id DESC;
         customerId: monedero.idPasajero2?.customerIdNetPay || null,
         telefonoUsuario: monedero.idPasajero2?.idUsuario2?.telefono || null,
         correoUsuario: monedero.idPasajero2?.idUsuario2?.userName || null,
+        idCard: monedero.idCard || null,
       };
       return { data: monederoResult };
     } catch (error) {

@@ -62,6 +62,9 @@ export class Monederos {
   @Column('tinyint', { name: 'EsVirtual', default: () => "'0'" })
   esVirtual: number;
 
+  @Column('varchar', { name: 'IdCard', nullable: true, length: 100 })
+  idCard: string | null;
+
   @ManyToOne(() => Clientes, (clientes) => clientes.monederos, {
     onDelete: 'NO ACTION',
     onUpdate: 'NO ACTION',

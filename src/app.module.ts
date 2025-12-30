@@ -57,6 +57,7 @@ import { IncidentesModule } from './incidentes/incidentes.module';
 import { CatTipoTarifaModule } from './cat-tipo-tarifa/cat-tipo-tarifa.module';
 import { NetpayModule } from './netpay/netpay.module';
 import { CatMetodoPagoModule } from './cat-metodo-pago/cat-metodo-pago.module';
+import { DireccionesModule } from './direcciones/direcciones.module';
 import Joi from 'joi';
 
 @Module({
@@ -218,6 +219,8 @@ import Joi from 'joi';
     NetpayModule,
 
     CatMetodoPagoModule,
+
+    DireccionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

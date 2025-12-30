@@ -70,6 +70,9 @@ export class TransaccionesDebito {
   @Column('tinyint', { name: 'EsQR', nullable: true, default: 0 })
   esQR: number | null;
 
+  @Column('decimal', { name: 'CobroMaximo', precision: 10, scale: 2, nullable: true })
+  cobroMaximo: number | null;
+
   @ManyToOne(() => Viajes, (viajes) => viajes, {
     onDelete: 'NO ACTION',
     onUpdate: 'NO ACTION',

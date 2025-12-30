@@ -12,6 +12,7 @@ import {
   ParseIntPipe,
   UseInterceptors,
   UploadedFile,
+  Query,
 } from '@nestjs/common';
 import { PasajerosService } from './pasajeros.service';
 import { CreatePasajeroDto } from './dto/create-pasajero.dto';
@@ -21,7 +22,7 @@ import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 import { ApiResponseCommon } from 'src/common/ApiResponse';
 import { UpdatePasajeroEstadoSolicitudDto } from './dto/update-pasajeros-estado-solicitud.dto';
 import { UpdatePasajeroCustomerIdDto } from './dto/update-pasajero-customer-id.dto';
-import { ApiBearerAuth, ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiConsumes, ApiBody, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as multer from 'multer';
 
@@ -81,14 +82,27 @@ export class PasajerosController {
   }
 
   @Get('wallet')
+  @ApiOperation({
+    summary: 'Obtener información principal del wallet del pasajero',
+    description: 'Retorna la información principal del wallet incluyendo saldos, transacciones y estadísticas mensuales de gastos y recargas. El parámetro anio es opcional, si no se proporciona se usa el año actual.',
+  })
+  @ApiQuery({
+    name: 'anio',
+    required: false,
+    type: Number,
+    description: 'Año para filtrar los arrays de gastosYRecargasPorMes y gastosPorMes. Si no se proporciona, se usa el año actual.',
+    example: 2025,
+  })
   findMainPasajero(
     @Request() req,
+    @Query('anio') anio?: string,
   ) {
     const idUsuario = req.user.userId;
     const idUser = req.user.userId;
     const cliente = req.user.cliente;
     const rol = req.user.rol;
-    return this.pasajerosService.obtenerMainPasajero(idUsuario, idUser, cliente, rol);
+    const anioFiltro = anio ? parseInt(anio, 10) : undefined;
+    return this.pasajerosService.obtenerMainPasajero(idUsuario, idUser, cliente, rol, anioFiltro);
   }
 
   @Get(':page/:limit')

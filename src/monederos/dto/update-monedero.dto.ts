@@ -49,4 +49,13 @@ export class UpdateMonederoDto {
   @IsInt()
   @IsOptional()
   idCliente?: number;
+
+  @ApiProperty({
+    example: 'CARD123456789',
+    description: 'ID de la tarjeta asociada al monedero',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  idCard?: string;
 }

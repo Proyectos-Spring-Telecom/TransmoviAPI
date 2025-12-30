@@ -547,6 +547,25 @@ export class NetpayService {
         }
       }
 
+      // Si se proporcionó token, asignar la tarjeta al customer recién creado
+      if (createCustomerDto.token && customerResponse?.id) {
+        try {
+          const customerId = customerResponse.id || customerResponse.clientId?.toString() || customerResponse.customerId;
+          
+          if (customerId) {
+            await this.assignCardToCustomer({
+              customerId: String(customerId),
+              token: createCustomerDto.token,
+              preAuth: false,
+            });
+          }
+        } catch (assignError) {
+          // Si falla la asignación de la tarjeta, no fallar la creación del customer
+          // Solo registrar el error
+          console.error('[NETPAY] Error al asignar tarjeta al customer:', assignError);
+        }
+      }
+
       return customerResponse;
     } catch (error) {
       this.handleError(error, 'createCustomer');

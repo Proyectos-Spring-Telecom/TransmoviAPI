@@ -7,9 +7,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Clientes } from 'src/entities/Clientes';
 import { Turnos } from 'src/entities/Turnos';
 import { ConteoPasajeros } from 'src/entities/ConteoPasajeros';
+import { Instalaciones } from 'src/entities/Instalaciones';
+import { Contadores } from 'src/entities/Contadores';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Viajes, Clientes, Turnos, ConteoPasajeros]), BitacoraModule],
+  imports: [TypeOrmModule.forFeature([Viajes, Clientes, Turnos, ConteoPasajeros, Instalaciones, Contadores]), BitacoraModule],
   controllers: [ViajesController],
   providers: [ViajesService],
 })

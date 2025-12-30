@@ -20,6 +20,8 @@ import { EnumModulos, EstatusEnum, EstatusConteo } from 'src/common/estatus.enum
 import { Clientes } from 'src/entities/Clientes';
 import { Turnos } from 'src/entities/Turnos';
 import { ConteoPasajeros } from 'src/entities/ConteoPasajeros';
+import { Instalaciones } from 'src/entities/Instalaciones';
+import { Contadores } from 'src/entities/Contadores';
 import { UpdateViajeDto } from './dto/update-viaje.dto';
 
 @Injectable()
@@ -34,6 +36,10 @@ export class ViajesService {
     private readonly turnosRepository: Repository<Turnos>,
     @InjectRepository(ConteoPasajeros)
     private readonly conteoPasajerosRepository: Repository<ConteoPasajeros>,
+    @InjectRepository(Instalaciones)
+    private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(Contadores)
+    private readonly contadoresRepository: Repository<Contadores>,
   ) { }
   // ========================================
   // 🔹 CREAR UN VIAJE
@@ -81,6 +87,57 @@ export class ViajesService {
 
       const newViaje = await this.viajesRepository.create(createViajeDto);
       const viajeSave = await this.viajesRepository.save(newViaje);
+
+      // Intentar crear un conteoPasajeros automáticamente si hay un contador disponible
+      try {
+        // Obtener el turno con su instalación
+        const turno = await this.turnosRepository.findOne({
+          where: { id: createViajeDto.idTurno },
+          relations: ['idInstalacion2'],
+        });
+
+        if (turno && turno.idInstalacion2) {
+          const instalacion = turno.idInstalacion2;
+          
+          // Obtener el contador relacionado con la instalación
+          const contador = await this.contadoresRepository.findOne({
+            where: {
+              id: instalacion.idContador,
+              idCliente: cliente,
+              estatus: 1,
+            },
+          });
+
+          if (contador) {
+            // Crear el conteoPasajeros
+            const dataToCreate: any = {
+              numeroSerieContador: contador.numeroSerie,
+              idViaje: viajeSave.id,
+              diferencia: 0,
+              entradas: 0,
+              salidas: 0,
+              estatus: EstatusConteo.ACTIVO,
+            };
+
+            const newConteoPasajero = this.conteoPasajerosRepository.create(dataToCreate);
+            await this.conteoPasajerosRepository.save(newConteoPasajero);
+          }
+        }
+      } catch (conteoError) {
+        // Si falla la creación del conteoPasajeros, no fallar la creación del viaje
+        // Solo registrar el error en la bitácora
+        console.error('[VIAJES] Error al crear conteoPasajeros automáticamente:', conteoError);
+        await this.bitacoraLogger.logToBitacora(
+          'Viajes',
+          `Se creó el viaje con ID: ${viajeSave.id} pero no se pudo crear el conteoPasajeros automáticamente.`,
+          'CREATE',
+          { viajeId: viajeSave.id, error: conteoError.message },
+          idUser,
+          EnumModulos.VIAJES,
+          EstatusEnumBitcora.ERROR,
+          conteoError.message,
+        );
+      }
 
       // Registro en la bitácora SUCCESS
       const querylogger = { createViajeDto };
@@ -169,15 +226,43 @@ export class ViajesService {
       await this.viajesRepository.update(id, updateViajeDto);
 
       // Cerrar todos los conteos de pasajeros activos relacionados con este viaje
-      await this.conteoPasajerosRepository.update(
-        {
-          idViaje: id,
-          estatus: EstatusConteo.ACTIVO,
-        },
-        {
-          estatus: EstatusConteo.INACTIVO,
-        },
-      );
+      try {
+        const conteosCerrados = await this.conteoPasajerosRepository.update(
+          {
+            idViaje: id,
+            estatus: EstatusConteo.ACTIVO,
+          },
+          {
+            estatus: EstatusConteo.INACTIVO,
+          },
+        );
+
+        // Registrar en bitácora si se cerraron conteos
+        if (conteosCerrados.affected && conteosCerrados.affected > 0) {
+          await this.bitacoraLogger.logToBitacora(
+            'Viajes',
+            `Se cerraron ${conteosCerrados.affected} conteo(s) de pasajeros activos para el viaje con ID: ${id}`,
+            'UPDATE',
+            { viajeId: id, conteosCerrados: conteosCerrados.affected },
+            idUser,
+            EnumModulos.VIAJES,
+            EstatusEnumBitcora.SUCCESS,
+          );
+        }
+      } catch (conteoError) {
+        // Si falla el cierre de conteos, registrar error pero no fallar el cierre del viaje
+        console.error('[VIAJES] Error al cerrar conteos de pasajeros:', conteoError);
+        await this.bitacoraLogger.logToBitacora(
+          'Viajes',
+          `Se cerró el viaje con ID: ${id} pero hubo un error al cerrar los conteos de pasajeros.`,
+          'UPDATE',
+          { viajeId: id, error: conteoError.message },
+          idUser,
+          EnumModulos.VIAJES,
+          EstatusEnumBitcora.ERROR,
+          conteoError.message,
+        );
+      }
 
       // Registro en la bitácora SUCCESS
       const querylogger = { updateViajeDto };

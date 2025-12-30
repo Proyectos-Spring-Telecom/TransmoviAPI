@@ -111,65 +111,281 @@ export class TransaccionesService {
   }
 
   /**
-   * Calcula la distancia en kil?metros desde el punto inicial de la variante hasta el punto de transacci?n,
+   * Calcula la distancia en kil?metros desde el punto inicial de la variante hasta el último punto de la variante,
    * sumando punto a punto a lo largo del recorridoDetallado
    * @param variante Variante con recorridoDetallado y puntoInicio
    * @param latitud Latitud del punto de la transacci?n
    * @param longitud Longitud del punto de la transacci?n
-   * @returns Distancia en kil?metros desde el punto inicial hasta el punto de transacci?n, o 0 si no se puede calcular
+   * @param tarifaInfo Información de la tarifa (opcional) para calcular el extra potencial
+   * @returns Distancia en kil?metros desde el punto inicial hasta el último punto de la variante, o 0 si no se puede calcular
    */
   private calcularDistanciaInicialKm(
     variante: Variantes | null,
     latitud: number,
     longitud: number,
+    tarifaInfo?: { tarifaBase?: number; costoAdicional?: number; distanciaBaseKm?: number; incrementoCadaMetros?: number; tipoTarifa?: number } | null,
   ): number {
     if (!variante?.recorridoDetallado) {
+      console.log('[TRANSACCIONES] No se puede calcular distancia: variante sin recorridoDetallado');
       return 0;
     }
 
     try {
       const recorrido = this.parsearRecorridoDetallado(variante.recorridoDetallado);
       if (!recorrido || recorrido.length === 0) {
+        console.log('[TRANSACCIONES] No se puede calcular distancia: recorrido vacío o inválido');
         return 0;
       }
 
+      // Encontrar el punto más cercano del recorrido al punto de transacción
       const puntoTransaccion = { lat: latitud, lng: longitud };
       const puntoMasCercanoIndex = this.encontrarPuntoMasCercano(recorrido, puntoTransaccion);
       
-      if (puntoMasCercanoIndex === -1) {
-        return 0;
+      let puntoMasCercano: { lat: number; lng: number } | null = null;
+      let distanciaAlPuntoMasCercano = Infinity;
+      
+      if (puntoMasCercanoIndex !== -1 && puntoMasCercanoIndex < recorrido.length) {
+        puntoMasCercano = recorrido[puntoMasCercanoIndex];
+        if (puntoMasCercano) {
+          distanciaAlPuntoMasCercano = haversine(puntoMasCercano, puntoTransaccion);
+        }
       }
 
-      const puntoMasCercano = recorrido[puntoMasCercanoIndex];
-      
       // Calcular distancia desde puntoInicio hasta el primer punto del recorrido (si son diferentes)
       const distanciaDesdePuntoInicio = this.calcularDistanciaDesdePuntoInicio(
         variante,
         recorrido[0],
       );
 
-      // Calcular distancia acumulada a lo largo del recorrido desde el inicio hasta el punto m?s cercano
-      const distanciaAcumuladaRecorrido = this.calcularDistanciaAcumuladaRecorrido(
+      // Calcular el tamaño total del recorridoDetallado (sumando punto por punto desde el primero hasta el último)
+      const tamañoTotalRecorrido = this.calcularDistanciaAcumuladaRecorrido(
         recorrido,
-        puntoMasCercanoIndex,
+        recorrido.length - 1, // Hasta el último punto
       );
+      const tamañoTotalRecorridoKm = parseFloat((tamañoTotalRecorrido / 1000).toFixed(2));
 
-      // Calcular distancia desde el punto m?s cercano hasta el punto de transacci?n
-      const distanciaPuntoMasCercanoATransaccion = haversine(
-        puntoMasCercano,
-        puntoTransaccion,
-      );
+      // Calcular distancia desde el punto de transacción hasta el punto 1 del recorrido
+      // Esto incluye: distancia al punto más cercano + distancia desde ese punto hasta el punto 1
+      let distanciaDesdeTransaccionHastaPunto1 = 0;
 
-      // Distancia total = distancia desde puntoInicio + distancia a lo largo del recorrido + distancia final
-      const distanciaTotal = distanciaDesdePuntoInicio + 
-                            distanciaAcumuladaRecorrido + 
-                            distanciaPuntoMasCercanoATransaccion;
+      if (puntoMasCercanoIndex !== -1 && puntoMasCercano) {
+        // Distancia desde punto de transacción al punto más cercano
+        const distanciaAlPuntoMasCercano = haversine(puntoTransaccion, puntoMasCercano);
+        
+        // Si el punto más cercano es el punto 1, solo usamos la distancia directa
+        if (puntoMasCercanoIndex === 0) {
+          distanciaDesdeTransaccionHastaPunto1 = distanciaAlPuntoMasCercano;
+        } else {
+          // Calcular distancia desde el punto más cercano hasta el punto 1 (sumando punto por punto hacia atrás)
+          const distanciaDesdePuntoMasCercanoHastaPunto1 = this.calcularDistanciaAcumuladaRecorrido(
+            recorrido,
+            puntoMasCercanoIndex,
+          );
+          
+          // La distancia total es: distancia al punto más cercano + distancia desde ese punto hasta el punto 1
+          distanciaDesdeTransaccionHastaPunto1 = distanciaAlPuntoMasCercano + distanciaDesdePuntoMasCercanoHastaPunto1;
+        }
+      } else {
+        // Si no se encuentra punto cercano, calcular distancia directa al punto 1
+        distanciaDesdeTransaccionHastaPunto1 = haversine(puntoTransaccion, recorrido[0]);
+      }
 
-      const distanciaEnKm = parseFloat((distanciaTotal / 1000).toFixed(2));
+      const distanciaEnKm = parseFloat((distanciaDesdeTransaccionHastaPunto1 / 1000).toFixed(2));
+      
+      // Imprimir en consola el cálculo detallado
+      console.log('[TRANSACCIONES] ===== CÁLCULO DE DISTANCIA INICIAL KM =====');
+      console.log(`[TRANSACCIONES] Variante ID: ${variante.id}`);
+      console.log(`[TRANSACCIONES] Total de puntos en recorrido: ${recorrido.length}`);
+      console.log(`[TRANSACCIONES] Tamaño total del recorridoDetallado: ${tamañoTotalRecorridoKm} km (${tamañoTotalRecorrido.toFixed(2)} metros)`);
+      console.log(`[TRANSACCIONES] Punto de transacción: Lat ${latitud}, Lng ${longitud}`);
+      console.log(`[TRANSACCIONES] Punto 1 del recorrido: Lat ${recorrido[0].lat}, Lng ${recorrido[0].lng}`);
+      console.log(`[TRANSACCIONES] Último punto del recorrido: Lat ${recorrido[recorrido.length - 1].lat}, Lng ${recorrido[recorrido.length - 1].lng}`);
+      
+      if (puntoMasCercanoIndex !== -1 && puntoMasCercano) {
+        console.log(`[TRANSACCIONES] --- PUNTO MÁS CERCANO DEL RECORRIDO ---`);
+        console.log(`[TRANSACCIONES] Índice del punto más cercano: ${puntoMasCercanoIndex + 1} (de ${recorrido.length})`);
+        console.log(`[TRANSACCIONES] Coordenadas del punto más cercano: Lat ${puntoMasCercano.lat}, Lng ${puntoMasCercano.lng}`);
+        console.log(`[TRANSACCIONES] Distancia desde punto de transacción al punto más cercano: ${(distanciaAlPuntoMasCercano / 1000).toFixed(2)} km (${distanciaAlPuntoMasCercano.toFixed(2)} metros)`);
+        
+        if (puntoMasCercanoIndex === 0) {
+          console.log(`[TRANSACCIONES] El punto más cercano ES el punto 1, usando distancia directa`);
+        } else {
+          // Calcular distancia desde el punto más cercano hasta el punto 1
+          const distanciaDesdePuntoMasCercanoHastaPunto1 = this.calcularDistanciaAcumuladaRecorrido(
+            recorrido,
+            puntoMasCercanoIndex,
+          );
+          console.log(`[TRANSACCIONES] Distancia desde punto más cercano hasta punto 1 (sumando punto por punto): ${(distanciaDesdePuntoMasCercanoHastaPunto1 / 1000).toFixed(2)} km`);
+          
+          // Imprimir detalle punto por punto desde punto más cercano hasta punto 1
+          console.log('[TRANSACCIONES] --- Detalle punto por punto (desde punto más cercano hasta punto 1) ---');
+          let distanciaAcumuladaHaciaPunto1 = 0;
+          for (let i = puntoMasCercanoIndex; i > 0; i--) {
+            const puntoActual = recorrido[i];
+            const puntoAnterior = recorrido[i - 1];
+            
+            if (
+              typeof puntoActual.lat === 'number' &&
+              typeof puntoActual.lng === 'number' &&
+              typeof puntoAnterior.lat === 'number' &&
+              typeof puntoAnterior.lng === 'number'
+            ) {
+              const distanciaSegmento = haversine(puntoActual, puntoAnterior);
+              distanciaAcumuladaHaciaPunto1 += distanciaSegmento;
+              console.log(`[TRANSACCIONES] Punto ${i + 1} -> Punto ${i}: ${(distanciaSegmento / 1000).toFixed(2)} km | Acumulado hacia punto 1: ${(distanciaAcumuladaHaciaPunto1 / 1000).toFixed(2)} km`);
+            }
+          }
+        }
+      } else {
+        console.log(`[TRANSACCIONES] No se encontró un punto cercano válido, usando distancia directa al punto 1`);
+      }
+      
+      console.log(`[TRANSACCIONES] --- RESULTADO FINAL ---`);
+      console.log(`[TRANSACCIONES] Distancia desde punto de transacción hasta punto 1: ${distanciaEnKm} km`);
+      
+      // Imprimir detalle punto por punto del recorrido completo para mostrar el tamaño total
+      console.log('[TRANSACCIONES] --- Detalle punto por punto del recorrido completo (tamaño total) ---');
+      let distanciaAcumuladaRecorridoCompleto = 0;
+      for (let i = 0; i < recorrido.length - 1; i++) {
+        const puntoActual = recorrido[i];
+        const puntoSiguiente = recorrido[i + 1];
+        
+        if (
+          typeof puntoActual.lat === 'number' &&
+          typeof puntoActual.lng === 'number' &&
+          typeof puntoSiguiente.lat === 'number' &&
+          typeof puntoSiguiente.lng === 'number'
+        ) {
+          const distanciaSegmento = haversine(puntoActual, puntoSiguiente);
+          distanciaAcumuladaRecorridoCompleto += distanciaSegmento;
+          console.log(`[TRANSACCIONES] Punto ${i + 1} -> Punto ${i + 2}: ${(distanciaSegmento / 1000).toFixed(2)} km | Acumulado total: ${(distanciaAcumuladaRecorridoCompleto / 1000).toFixed(2)} km`);
+        }
+      }
+      console.log(`[TRANSACCIONES] Tamaño total del recorridoDetallado (verificado): ${(distanciaAcumuladaRecorridoCompleto / 1000).toFixed(2)} km`);
+      
+      // Calcular y mostrar información de tarifa y extra potencial
+      if (tarifaInfo) {
+        const tarifaBase = tarifaInfo.tarifaBase || 0;
+        const costoAdicional = tarifaInfo.costoAdicional || 0;
+        const distanciaBaseKm = tarifaInfo.distanciaBaseKm || 0;
+        const incrementoCadaMetros = tarifaInfo.incrementoCadaMetros || 0;
+        const tipoTarifa = tarifaInfo.tipoTarifa;
+        
+        console.log('[TRANSACCIONES] --- INFORMACIÓN DE TARIFA Y COSTO POTENCIAL ---');
+        console.log(`[TRANSACCIONES] Tarifa base: $${tarifaBase.toFixed(2)}`);
+        // INCREMENTAL = 2 según el usuario
+        const esTarifaIncremental = tipoTarifa === 2; // Valor 2 corresponde a INCREMENTAL
+        const nombreTipoTarifa = tipoTarifa === 1 ? 'FIJA' : tipoTarifa === 2 ? 'INCREMENTAL' : 'DESCONOCIDO';
+        console.log(`[TRANSACCIONES] Tipo de tarifa: ${tipoTarifa} (${nombreTipoTarifa})`);
+        console.log(`[TRANSACCIONES] Distancia base incluida: ${distanciaBaseKm} km`);
+        
+        // Solo calcular el extra potencial si la tarifa es INCREMENTAL (valor 2) y tiene configuración de costo adicional
+        if (esTarifaIncremental && costoAdicional > 0 && incrementoCadaMetros > 0) {
+          const distanciaTotalMetros = distanciaAcumuladaRecorridoCompleto;
+          const distanciaBaseMetros = distanciaBaseKm * 1000;
+          
+          // Calcular cuántos incrementos se aplicarían si hace el recorrido completo
+          let extraPotencial = 0;
+          if (distanciaTotalMetros > distanciaBaseMetros) {
+            const distanciaExcedente = distanciaTotalMetros - distanciaBaseMetros;
+            const numeroIncrementos = Math.ceil(distanciaExcedente / incrementoCadaMetros);
+            extraPotencial = numeroIncrementos * costoAdicional;
+            
+            console.log(`[TRANSACCIONES] Distancia total del recorrido: ${(distanciaTotalMetros / 1000).toFixed(2)} km (${distanciaTotalMetros.toFixed(2)} metros)`);
+            console.log(`[TRANSACCIONES] Distancia excedente sobre la base: ${(distanciaExcedente / 1000).toFixed(2)} km (${distanciaExcedente.toFixed(2)} metros)`);
+            console.log(`[TRANSACCIONES] Incremento cada: ${incrementoCadaMetros} metros`);
+            console.log(`[TRANSACCIONES] Costo adicional por incremento: $${costoAdicional.toFixed(2)}`);
+            console.log(`[TRANSACCIONES] Número de incrementos necesarios: ${numeroIncrementos}`);
+            console.log(`[TRANSACCIONES] Extra potencial si hace el recorrido completo: $${extraPotencial.toFixed(2)}`);
+            console.log(`[TRANSACCIONES] Costo total potencial (tarifa base + extra): $${(tarifaBase + extraPotencial).toFixed(2)}`);
+          } else {
+            console.log(`[TRANSACCIONES] La distancia del recorrido (${(distanciaTotalMetros / 1000).toFixed(2)} km) está dentro de la distancia base (${distanciaBaseKm} km)`);
+            console.log(`[TRANSACCIONES] No se aplicaría costo adicional. Costo total: $${tarifaBase.toFixed(2)}`);
+          }
+        } else {
+          if (!esTarifaIncremental) {
+            console.log(`[TRANSACCIONES] Tipo de tarifa no es INCREMENTAL (tipo: ${tipoTarifa}), no se calcula extra por distancia`);
+          } else {
+            console.log(`[TRANSACCIONES] No hay configuración de costo adicional (costoAdicional: ${costoAdicional}, incrementoCadaMetros: ${incrementoCadaMetros})`);
+          }
+          console.log(`[TRANSACCIONES] Costo total: $${tarifaBase.toFixed(2)} (solo tarifa base)`);
+        }
+      } else {
+        console.log('[TRANSACCIONES] No se proporcionó información de tarifa para calcular el extra potencial');
+      }
+      
+      console.log('[TRANSACCIONES] ===========================================');
       
       return isNaN(distanciaEnKm) || distanciaEnKm < 0 ? 0 : distanciaEnKm;
     } catch (error) {
+      console.error('[TRANSACCIONES] Error al calcular distancia inicial:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Calcula el cobro máximo potencial basado en la tarifa y la distancia total del recorrido
+   * Solo se calcula para tarifas INCREMENTAL (tipoTarifa === 2)
+   * @param variante Variante con recorridoDetallado
+   * @param tarifaInfo Información de la tarifa
+   * @returns Cobro máximo potencial o null si no aplica
+   */
+  private calcularCobroMaximo(
+    variante: Variantes | null,
+    tarifaInfo?: { tarifaBase?: number; costoAdicional?: number; distanciaBaseKm?: number; incrementoCadaMetros?: number; tipoTarifa?: number } | null,
+  ): number | null {
+    if (!variante?.recorridoDetallado || !tarifaInfo) {
+      return null;
+    }
+
+    const tipoTarifa = tarifaInfo.tipoTarifa;
+    // Solo calcular para tarifas INCREMENTAL (tipoTarifa === 2)
+    if (tipoTarifa !== 2) {
+      return null;
+    }
+
+    const tarifaBase = tarifaInfo.tarifaBase || 0;
+    const costoAdicional = tarifaInfo.costoAdicional || 0;
+    const distanciaBaseKm = tarifaInfo.distanciaBaseKm || 0;
+    const incrementoCadaMetros = tarifaInfo.incrementoCadaMetros || 0;
+
+    // Si no hay configuración de costo adicional, el cobro máximo es solo la tarifa base
+    if (costoAdicional <= 0 || incrementoCadaMetros <= 0) {
+      return tarifaBase;
+    }
+
+    try {
+      const recorrido = this.parsearRecorridoDetallado(variante.recorridoDetallado);
+      if (!recorrido || recorrido.length === 0) {
+        return tarifaBase;
+      }
+
+      // Calcular el tamaño total del recorridoDetallado
+      const tamañoTotalRecorrido = this.calcularDistanciaAcumuladaRecorrido(
+        recorrido,
+        recorrido.length - 1,
+      );
+
+      const distanciaTotalMetros = tamañoTotalRecorrido;
+      const distanciaBaseMetros = distanciaBaseKm * 1000;
+
+      // Si la distancia total está dentro de la distancia base, el cobro máximo es solo la tarifa base
+      if (distanciaTotalMetros <= distanciaBaseMetros) {
+        return tarifaBase;
+      }
+
+      // Calcular cuántos incrementos se aplicarían si hace el recorrido completo
+      const distanciaExcedente = distanciaTotalMetros - distanciaBaseMetros;
+      const numeroIncrementos = Math.ceil(distanciaExcedente / incrementoCadaMetros);
+      const extraMaximo = numeroIncrementos * costoAdicional;
+      const cobroMaximo = tarifaBase + extraMaximo;
+
+      console.log(`[TRANSACCIONES] Cobro máximo calculado: $${cobroMaximo.toFixed(2)} (tarifa base: $${tarifaBase.toFixed(2)} + extra: $${extraMaximo.toFixed(2)})`);
+
+      return parseFloat(cobroMaximo.toFixed(2));
+    } catch (error) {
+      console.error('[TRANSACCIONES] Error al calcular cobro máximo:', error);
+      return tarifaBase; // En caso de error, retornar al menos la tarifa base
     }
   }
 
@@ -510,6 +726,8 @@ export class TransaccionesService {
           nombreVariante: viaje.idVariante2?.nombre || null,
           TarifaBase: tarifa?.tarifaBase || null,
           CostoAdicional: tarifa?.costoAdicional || null,
+          DistanciaBaseKm: tarifa?.distanciaBaseKm || null,
+          IncrementoCadaMetros: tarifa?.incrementoCadaMetros || null,
           TipoTarifa: tarifa?.tipoTarifa || null,
         }];
       } else {
@@ -527,6 +745,8 @@ export class TransaccionesService {
             va.Nombre AS nombreVariante,
             ta.TarifaBase,
             ta.CostoAdicional,
+            ta.DistanciaBaseKm,
+            ta.IncrementoCadaMetros,
             ta.TipoTarifa
           FROM DashCamDev.Instalaciones i
           JOIN DashCamDev.Validadores v ON i.IdValidador = v.Id
@@ -562,6 +782,11 @@ export class TransaccionesService {
       const tarifaBase = Number(tarifaInfo.TarifaBase) || 0;
       const idViaje = tarifaInfo.idViaje ? Number(tarifaInfo.idViaje) : null;
 
+      console.log('[TRANSACCIONES] ===== INFORMACIÓN DE TARIFA =====');
+      console.log(`[TRANSACCIONES] Tipo de tarifa: ${tipoTarifa} (${tipoTarifa === 1 ? 'FIJA' : tipoTarifa === 2 ? 'INCREMENTAL' : 'OTRO'})`);
+      console.log(`[TRANSACCIONES] Tarifa base: $${tarifaBase.toFixed(2)}`);
+      console.log('[TRANSACCIONES] ==========================================');
+
       // 2.5?? Determinamos controlTransaccion seg?n el tipo de tarifa
       // Si TipoTarifa = 1 (Fija), controlTransaccion = PAGADO
       // Si TipoTarifa = 2 (Abierta), controlTransaccion = ABIERTA
@@ -574,6 +799,10 @@ export class TransaccionesService {
         // Por defecto, si no se puede determinar, usar PAGADO
         controlTransaccion = EnumControlTransacciones.PAGADO;
       }
+
+      console.log('[TRANSACCIONES] ===== CONTROL DE TRANSACCIÓN =====');
+      console.log(`[TRANSACCIONES] Control transacción: ${controlTransaccion === EnumControlTransacciones.PAGADO ? 'PAGADO (0)' : 'ABIERTA (1)'}`);
+      console.log('[TRANSACCIONES] ========================================');
 
       // 2.6?? Calculamos el monto seg?n el tipo de tarifa
       // Si TipoTarifa = 1 (Fija), usar TarifaBase
@@ -739,6 +968,12 @@ export class TransaccionesService {
 
       let montoFinal = Number(monedero.saldo) - montoConDescuento;
 
+      console.log('[TRANSACCIONES] ===== DESCUENTO DEL MONEDERO =====');
+      console.log(`[TRANSACCIONES] Saldo ANTES del descuento: $${Number(monedero.saldo).toFixed(2)}`);
+      console.log(`[TRANSACCIONES] Monto a descontar (con descuentos aplicados): $${montoConDescuento.toFixed(2)}`);
+      console.log(`[TRANSACCIONES] Saldo DESPUÉS del descuento: $${montoFinal.toFixed(2)}`);
+      console.log('[TRANSACCIONES] =============================================');
+
       // 4?? Validaci?n de saldo
       if (montoFinal < 0) {
         estado = transicionarEstado(
@@ -758,6 +993,13 @@ export class TransaccionesService {
           variante,
           createTransaccioneDebitoDto.latitud,
           createTransaccioneDebitoDto.longitud,
+          {
+            tarifaBase: tarifaInfo.TarifaBase ? Number(tarifaInfo.TarifaBase) : undefined,
+            costoAdicional: tarifaInfo.CostoAdicional ? Number(tarifaInfo.CostoAdicional) : undefined,
+            distanciaBaseKm: tarifaInfo.DistanciaBaseKm ? Number(tarifaInfo.DistanciaBaseKm) : undefined,
+            incrementoCadaMetros: tarifaInfo.IncrementoCadaMetros ? Number(tarifaInfo.IncrementoCadaMetros) : undefined,
+            tipoTarifa: tarifaInfo.TipoTarifa ? Number(tarifaInfo.TipoTarifa) : undefined,
+          },
         );
         
         // Asegurar que el valor sea un n?mero v?lido
@@ -765,6 +1007,15 @@ export class TransaccionesService {
           ? parseFloat(distanciaInicialKm.toFixed(2)) 
           : 0;
         
+        // Calcular cobro máximo solo si es tarifa INCREMENTAL (tipoTarifa === 2)
+        const cobroMaximoRechazo = this.calcularCobroMaximo(variante, {
+          tarifaBase: tarifaInfo.TarifaBase ? Number(tarifaInfo.TarifaBase) : undefined,
+          costoAdicional: tarifaInfo.CostoAdicional ? Number(tarifaInfo.CostoAdicional) : undefined,
+          distanciaBaseKm: tarifaInfo.DistanciaBaseKm ? Number(tarifaInfo.DistanciaBaseKm) : undefined,
+          incrementoCadaMetros: tarifaInfo.IncrementoCadaMetros ? Number(tarifaInfo.IncrementoCadaMetros) : undefined,
+          tipoTarifa: tarifaInfo.TipoTarifa ? Number(tarifaInfo.TipoTarifa) : undefined,
+        });
+
         const newTransaccion = this.transaccionesdebitoRepository.create({
           idTipoTransaccion: EnumTipoTransaccion.RECHAZO,
           monto: montoConDescuento,
@@ -777,6 +1028,7 @@ export class TransaccionesService {
           numeroSerieValidador: createTransaccioneDebitoDto.numeroSerieValidador,
           idViaje: idViaje,
           esQR: createTransaccioneDebitoDto.esQR ? 1 : 0,
+          cobroMaximo: cobroMaximoRechazo,
         });
         await this.transaccionesdebitoRepository.save(newTransaccion);
         
@@ -805,15 +1057,40 @@ export class TransaccionesService {
       // Si es ABIERTA, no se descuenta el saldo todav?a
       let montoAGuardar = 0;
       if (controlTransaccion === EnumControlTransacciones.PAGADO) {
+        console.log('[TRANSACCIONES] ===== ACTUALIZANDO SALDO DEL MONEDERO =====');
+        console.log(`[TRANSACCIONES] Número de serie del monedero: ${createTransaccioneDebitoDto.numeroSerieMonedero}`);
+        console.log(`[TRANSACCIONES] Saldo que se va a guardar en el monedero: $${montoFinal.toFixed(2)}`);
+        console.log(`[TRANSACCIONES] Control transacción: PAGADO`);
+        
         await this.monederosService.updateMonederoSaldo(
           createTransaccioneDebitoDto.numeroSerieMonedero,
           idUser,
           montoFinal,
         );
-        montoAGuardar = montoConDescuento;
+        
+        console.log('[TRANSACCIONES] Saldo del monedero actualizado exitosamente');
+        console.log('[TRANSACCIONES] =================================================');
+        
+        // Para tarifas INCREMENTAL (tipoTarifa === 2), guardar la tarifa base en el campo monto
+        // Para otras tarifas, guardar el monto con descuento
+        if (tipoTarifa === 2) {
+          montoAGuardar = tarifaBase; // Guardar tarifa base para tarifas INCREMENTAL
+        } else {
+          montoAGuardar = montoConDescuento;
+        }
       } else {
-        // Para transacciones ABIERTAS, el monto se guarda como 0
-        montoAGuardar = 0;
+        console.log('[TRANSACCIONES] ===== TRANSACCIÓN ABIERTA - NO SE DESCUENTA SALDO =====');
+        console.log(`[TRANSACCIONES] Control transacción: ABIERTA`);
+        console.log(`[TRANSACCIONES] El saldo del monedero NO se descuenta todavía`);
+        console.log('[TRANSACCIONES] =======================================================');
+        
+        // Para transacciones ABIERTAS, si es tarifa INCREMENTAL (tipoTarifa === 2), guardar la tarifa base
+        // Si no es INCREMENTAL, el monto se guarda como 0
+        if (tipoTarifa === 2) {
+          montoAGuardar = tarifaBase; // Guardar tarifa base para tarifas INCREMENTAL
+        } else {
+          montoAGuardar = 0;
+        }
       }
 
       // 6?? Guardamos transacci?n aprobada
@@ -828,12 +1105,27 @@ export class TransaccionesService {
         variante,
         createTransaccioneDebitoDto.latitud,
         createTransaccioneDebitoDto.longitud,
+        {
+          tarifaBase: tarifaInfo.TarifaBase ? Number(tarifaInfo.TarifaBase) : undefined,
+          costoAdicional: tarifaInfo.CostoAdicional ? Number(tarifaInfo.CostoAdicional) : undefined,
+          distanciaBaseKm: tarifaInfo.DistanciaBaseKm ? Number(tarifaInfo.DistanciaBaseKm) : undefined,
+          incrementoCadaMetros: tarifaInfo.IncrementoCadaMetros ? Number(tarifaInfo.IncrementoCadaMetros) : undefined,
+        },
       );
       
       // Asegurar que el valor sea un n?mero v?lido
       const distanciaInicialKmFinal = (typeof distanciaInicialKm === 'number' && !isNaN(distanciaInicialKm)) 
         ? parseFloat(distanciaInicialKm.toFixed(2)) 
         : 0;
+      
+      // Calcular cobro máximo solo si es tarifa INCREMENTAL (tipoTarifa === 2)
+      const cobroMaximo = this.calcularCobroMaximo(variante, {
+        tarifaBase: tarifaInfo.TarifaBase ? Number(tarifaInfo.TarifaBase) : undefined,
+        costoAdicional: tarifaInfo.CostoAdicional ? Number(tarifaInfo.CostoAdicional) : undefined,
+        distanciaBaseKm: tarifaInfo.DistanciaBaseKm ? Number(tarifaInfo.DistanciaBaseKm) : undefined,
+        incrementoCadaMetros: tarifaInfo.IncrementoCadaMetros ? Number(tarifaInfo.IncrementoCadaMetros) : undefined,
+        tipoTarifa: tarifaInfo.TipoTarifa ? Number(tarifaInfo.TipoTarifa) : undefined,
+      });
       
       const newTransaccion = this.transaccionesdebitoRepository.create({
         idTipoTransaccion: EnumTipoTransaccion.DEBITO,
@@ -848,6 +1140,7 @@ export class TransaccionesService {
         numeroTransbordo,
         idViaje: idViaje,
         esQR: createTransaccioneDebitoDto.esQR ? 1 : 0,
+        cobroMaximo: cobroMaximo,
       });
       const transaccionSave =
         await this.transaccionesdebitoRepository.save(newTransaccion);
