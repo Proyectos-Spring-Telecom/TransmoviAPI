@@ -7,17 +7,13 @@ import { throwError } from 'rxjs';
 
 @Injectable()
 export class DireccionesService {
-  private readonly apiUrl: string;
-  private readonly apiKey: string;
+  private readonly apiUrl: string = 'https://api.copomex.com/query/info_cp';
+  private readonly apiKey: string = '56d7a6da1c873c83c818f89e4b0f37fba8c63c36';
 
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
-  ) {
-    // URL y API Key hardcodeadas
-    this.apiUrl = 'https://api.copomex.com/query/info_cp';
-    this.apiKey = '56d7a6da1c873c83c818f89e4b0f37fba8c63c36';
-  }
+  ) {}
 
   async findByCodigoPostal(cp: string): Promise<any> {
     try {
