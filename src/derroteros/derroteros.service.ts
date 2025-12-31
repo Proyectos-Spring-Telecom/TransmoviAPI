@@ -21,6 +21,7 @@ import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { UsuariosRegiones } from 'src/entities/UsuariosRegiones';
 import { UpdateDerroterosEstatusDto } from './dto/update-derrotero-estatus.dto';
 import { Clientes } from 'src/entities/Clientes';
+import { EnumModulos } from 'src/common/estatus.enum';
 
 @Injectable()
 export class DerroterosService {
@@ -34,7 +35,7 @@ export class DerroterosService {
     @InjectRepository(Clientes)
     private readonly clienteRepository: Repository<Clientes>,
     private readonly bitacoraLogger: BitacoraLoggerService,
-  ) {}
+  ) { }
 
   async create(
     idUser: number,
@@ -43,11 +44,23 @@ export class DerroterosService {
     createDerroteroDto: CreateDerroteroDto,
   ) {
     try {
-      const { recorridoDetallado: puntos } = createDerroteroDto;
-      const newDerrotero =
-        await this.derroterosRepository.create(createDerroteroDto);
+      const { recorridoDetallado: puntos, crearDerroteroRegreso } = createDerroteroDto;
 
-      // Aplicamos interpolación
+      // ========================================
+      // 🔹 VALIDAR QUE LA RUTA EXISTA
+      // ========================================
+      const ruta = await this.rutasRepository.findOne({
+        where: { id: createDerroteroDto.idRuta },
+      });
+
+      if (!ruta) {
+        throw new NotFoundException('Ruta no encontrada');
+      }
+
+      const { crearDerroteroRegreso: _, ...bodyDerrotero } = createDerroteroDto;
+
+      const newDerrotero = this.derroterosRepository.create(bodyDerrotero);
+
       const { recorridoDetallado, distanciaKm } =
         await generarRecorridoDetallado(puntos as any);
 
@@ -55,45 +68,99 @@ export class DerroterosService {
 
       const derroteroSave = await this.derroterosRepository.save(newDerrotero);
 
-      // Registro en la bitácora SUCCESS
-      const querylogger = { createDerroteroDto };
+      // ========================================
+      // 🔹 CREAR DERROTERO DE REGRESO (SI SE SOLICITA)
+      // ========================================
+      let derroteroRegresoSave;
+
+      // Solo crea si: 1) El usuario lo solicita Y 2) La ruta tiene ruta de regreso
+      if (crearDerroteroRegreso === 1 && ruta.idRutaRegreso) {
+        const puntosRegreso = [...puntos].reverse();
+
+        const {
+          recorridoDetallado: recorridoRegreso,
+          distanciaKm: distanciaRegreso
+        } = await generarRecorridoDetallado(puntosRegreso as any);
+
+        const derroteroRegreso = this.derroterosRepository.create({
+          nombre: `${bodyDerrotero.nombre} Regreso`,
+          puntoInicio: bodyDerrotero.puntoFin,
+          puntoFin: bodyDerrotero.puntoInicio,
+          recorridoDetallado: puntosRegreso,
+          distanciaKm: distanciaRegreso || bodyDerrotero.distanciaKm,
+          estatus: bodyDerrotero.estatus ?? 1,
+          idRuta: ruta.idRutaRegreso,
+        });
+
+        derroteroRegreso.recorridoInterpolar = recorridoRegreso;
+
+        derroteroRegresoSave = await this.derroterosRepository.save(derroteroRegreso);
+
+        await this.bitacoraLogger.logToBitacora(
+          'Derroteros',
+          `Se creó derrotero de regreso con nombre: ${derroteroRegresoSave.nombre} y Id: ${derroteroRegresoSave.id}`,
+          'CREATE',
+          { derroteroRegreso: derroteroRegresoSave },
+          idUser,
+          EnumModulos.DERROTEROS,
+          EstatusEnumBitcora.SUCCESS,
+        );
+      }
+
       await this.bitacoraLogger.logToBitacora(
         'Derroteros',
         `Se creó un derrotero con nombre: ${derroteroSave.nombre} y Id: ${derroteroSave.id}`,
         'CREATE',
-        querylogger,
+        { createDerroteroDto },
         idUser,
-        18,
+        EnumModulos.DERROTEROS,
         EstatusEnumBitcora.SUCCESS,
       );
 
-      //API response
-      const result: ApiDerroteroResponse = {
-        status: 'succes',
-        message: 'Se creo correctamente derrotero',
-        id: Number(derroteroSave.id),
-        nombre: derroteroSave.nombre,
-        distancia: Number(derroteroSave.distanciaKm),
-        estatus: derroteroSave.estatus,
+
+      const result = {
+        status: 'success',
+        message: derroteroRegresoSave
+          ? 'Se creó correctamente derrotero y derrotero de regreso'
+          : 'Se creó correctamente derrotero',
+        data: {
+          derroteroPrincipal: {
+            id: Number(derroteroSave.id),
+            nombre: derroteroSave.nombre,
+            distanciaKm: Number(derroteroSave.distanciaKm),
+            estatus: derroteroSave.estatus,
+            idRuta: Number(derroteroSave.idRuta),
+          },
+          ...(derroteroRegresoSave && {
+            derroteroRegreso: {
+              id: Number(derroteroRegresoSave.id),
+              nombre: derroteroRegresoSave.nombre,
+              distanciaKm: Number(derroteroRegresoSave.distanciaKm),
+              estatus: derroteroRegresoSave.estatus,
+              idRuta: Number(derroteroRegresoSave.idRuta),
+            },
+          }),
+        },
       };
 
       return result;
+
     } catch (error) {
-      // Registro en la bitácora ERROR
-      const querylogger = { createDerroteroDto };
       await this.bitacoraLogger.logToBitacora(
         'Derroteros',
-        `Se creó un derrotero con nombre: ${createDerroteroDto.nombre}`,
+        `Error al crear derrotero con nombre: ${createDerroteroDto.nombre}`,
         'CREATE',
-        querylogger,
+        { createDerroteroDto },
         idUser,
-        18,
+        EnumModulos.DERROTEROS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
+
       if (error instanceof HttpException) {
         throw error;
       }
+
       throw new InternalServerErrorException({
         message: 'Error al crear derrotero',
         error: error.message,
@@ -1066,7 +1133,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1090,7 +1157,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -1135,7 +1202,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1159,7 +1226,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -1192,7 +1259,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1216,7 +1283,7 @@ WHERE ur.IdUsuario = ?
         'UPDATE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
@@ -1258,7 +1325,7 @@ WHERE ur.IdUsuario = ?
         'DELETE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
       );
 
@@ -1282,7 +1349,7 @@ WHERE ur.IdUsuario = ?
         'DELETE',
         querylogger,
         idUser,
-        18,
+        EnumModulos.RUTAS,
         EstatusEnumBitcora.ERROR,
         error.message,
       );
