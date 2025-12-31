@@ -26,6 +26,15 @@ class PuntoDto {
 
 export class CreateDerroteroDto {
   @ApiProperty({
+    description: 'Variable para crear derrotero de regreso (0 = No generar, 1 = Generar)',
+    example: 0,
+  })
+  @IsNumber()
+  @IsIn([0, 1], { message: 'Solo puede ser 0 ó 1' })
+  @IsNotEmpty()
+  crearDerroteroRegreso: number;
+
+  @ApiProperty({
     description: 'Nombre del derrotero',
     example: 'Derrotero Centro-Norte',
     maxLength: 100,
@@ -95,5 +104,4 @@ export class CreateDerroteroDto {
   @IsPositive({ message: 'El ID de la ruta debe ser un número positivo' })
   @Type(() => Number)
   idRuta: number;
-
 }

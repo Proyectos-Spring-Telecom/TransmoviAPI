@@ -70,5 +70,5 @@ export class Rutas {
   idRegionFin2: Regiones | null;
 
   @Column('bigint', { name: 'IdRutaRegreso', nullable: true })
-  IdRutaRegreso: number | null;
+  idRutaRegreso: number | null;
 }

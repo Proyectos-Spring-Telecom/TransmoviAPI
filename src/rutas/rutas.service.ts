@@ -66,10 +66,10 @@ export class RutasService {
           idRegion: bodyRuta.idRegionFin === undefined || bodyRuta.idRegionFin === null ? bodyRuta.idRegion : bodyRuta.idRegionFin,
           idRegionFin: bodyRuta.idRegionFin === null || bodyRuta.idRegionFin === undefined ? null : bodyRuta.idRegion
         })
-        //const rutaRegresoSave = await this.rutasRepository.save(rutaRegreso);
-        //idRutaRegreso = rutaRegresoSave.id
+        const rutaRegresoSave = await this.rutasRepository.save(rutaRegreso);
+        idRutaRegreso = rutaRegresoSave.id
 
-        console.log('Ruta regreso', rutaRegreso, 'ver id region: ', typeof(bodyRuta.idRegion))
+        console.log('Ruta regreso', rutaRegreso, 'ver id region: ', typeof (bodyRuta.idRegion))
       } else {
         idRutaRegreso = null
       }
@@ -84,14 +84,14 @@ export class RutasService {
         estatus: EstatusEnum.ACTIVO,
         idRegion: bodyRuta.idRegion,
         idRegionFin: bodyRuta.idRegionFin || null,
-        IdRutaRegreso: idRutaRegreso
+        idRutaRegreso: idRutaRegreso
       });
       console.log('DTO: ', bodyRuta)
 
-      //const rutaSave = await this.rutasRepository.save(newRuta);
+      const rutaSave = await this.rutasRepository.save(newRuta);
 
-      // Registro en la bitácora SUCCESS
-      /* const querylogger = { createRutaDto };
+      //Registro en la bitácora SUCCESS
+      const querylogger = { createRutaDto };
       await this.bitacoraLogger.logToBitacora(
         'Rutas',
         `Se creó una ruta con nombre: ${rutaSave.nombre}  y Id ${rutaSave.id}`,
@@ -100,18 +100,15 @@ export class RutasService {
         idUser,
         EnumModulos.RUTAS,
         EstatusEnumBitcora.SUCCESS,
-      ); 
-      rutaSave.id
-      Ruta ${rutaSave.id} Nombre: ${rutaSave.nombre}
-      */
+      );
 
       // API response (con mensajes corregidos)
       const result: ApiCrudResponse = {
         status: 'success',
         message: 'Ruta creada correctamente',
         data: {
-          id: Number(1),
-          nombre: ``,
+          id: Number(rutaSave.id),
+          nombre: `Ruta ${rutaSave.id} Nombre: ${rutaSave.nombre}`,
         },
       };
       return result;
