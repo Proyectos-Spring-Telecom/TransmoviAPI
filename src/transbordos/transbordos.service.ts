@@ -210,7 +210,6 @@ export class TransbordosService {
         LEFT JOIN CatTipoDescuentoTransbordo tdt ON tp.IdTipoDescuento = tdt.Id
         LEFT JOIN DetalleTransbordos dt ON tp.Id = dt.IdTransbordo
         WHERE tp.IdCliente IN (${placeholders})
-          AND tp.Estatus = 1
         GROUP BY tp.Id, tp.IdCliente, tp.IdTipoDescuento, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, tp.Estatus, c.Nombre, tdt.Nombre
         ORDER BY tp.Id DESC
         LIMIT ? OFFSET ?
@@ -220,7 +219,6 @@ export class TransbordosService {
         SELECT COUNT(*) as total
         FROM TransbordosPermitidos tp
         WHERE tp.IdCliente IN (${placeholders})
-          AND tp.Estatus = 1
       `;
 
       const data = await this.transbordosRepository.query(query, [...ids, limit, offset]);
