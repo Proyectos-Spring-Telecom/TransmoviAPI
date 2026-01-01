@@ -10,6 +10,8 @@ import { Monederos } from 'src/entities/Monederos';
 import { Rutas } from 'src/entities/Rutas';
 import { Variantes } from 'src/entities/Variantes';
 import { CatTiposPasajeros } from 'src/entities/CatTiposPasajeros';
+import { HistoricoTransaccionesDebito } from 'src/entities/HistoricoTransaccionesDebito';
+import { ConteoPasajeros } from 'src/entities/ConteoPasajeros';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { CatTiposPasajeros } from 'src/entities/CatTiposPasajeros';
       Rutas,
       Variantes,
       CatTiposPasajeros,
+      HistoricoTransaccionesDebito,
+      ConteoPasajeros,
     ]),
   ],
   controllers: [DashboardController],

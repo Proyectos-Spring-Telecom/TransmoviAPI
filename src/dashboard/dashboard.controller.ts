@@ -26,7 +26,7 @@ export class DashboardController {
   @Get('metrics')
   @ApiOperation({ 
     summary: 'Obtener métricas del dashboard',
-    description: 'Obtiene las métricas del dashboard. Puede filtrar por período: hoy (default), ultimos7dias, mesActual, añoActual'
+    description: 'Obtiene las métricas del dashboard. Puede filtrar por período: 1 (hoy - default), 2 (últimos 7 días), 3 (mes actual), 4 (año actual)'
   })
   @ApiResponse({ status: 200, description: 'Métricas obtenidas exitosamente' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -38,7 +38,7 @@ export class DashboardController {
       +idUser, 
       +cliente, 
       +rol,
-      metricsFilterDto.filtro || 'hoy'
+      metricsFilterDto.filtro || 1
     );
   }
 }

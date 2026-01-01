@@ -9,6 +9,8 @@ import { Monederos } from 'src/entities/Monederos';
 import { Rutas } from 'src/entities/Rutas';
 import { Variantes } from 'src/entities/Variantes';
 import { CatTiposPasajeros } from 'src/entities/CatTiposPasajeros';
+import { HistoricoTransaccionesDebito } from 'src/entities/HistoricoTransaccionesDebito';
+import { ConteoPasajeros } from 'src/entities/ConteoPasajeros';
 import { Repository } from 'typeorm';
 import { EnumFiltros } from 'src/common/estatus.enum';
 import { error, log } from 'console';
@@ -33,6 +35,10 @@ export class DashboardService {
     private readonly variantesRepository: Repository<Variantes>,
     @InjectRepository(CatTiposPasajeros)
     private readonly catTiposPasajerosRepository: Repository<CatTiposPasajeros>,
+    @InjectRepository(HistoricoTransaccionesDebito)
+    private readonly historicoTransaccionesDebitoRepository: Repository<HistoricoTransaccionesDebito>,
+    @InjectRepository(ConteoPasajeros)
+    private readonly conteoPasajerosRepository: Repository<ConteoPasajeros>,
   ) { }
 
   //funcion para obtener los clientes hijos
@@ -1230,7 +1236,7 @@ ORDER BY periodo, ruta;
     idUser: number,
     cliente: number,
     rol: number,
-    filtro: string = 'hoy',
+    filtro: number = 1,
   ) {
     try {
       // Calcular fechas según el filtro
@@ -1250,17 +1256,32 @@ ORDER BY periodo, ruta;
         } else {
           // Si no hay clientes hijos, retornar datos vacíos
           return {
-            ticketPromedio: { ticketPromedio: 0, totalTransacciones: 0, ingresosTotales: 0 },
-            porcentajeMonederoVirtual: { totalDebitos: 0, debitosVirtuales: 0, porcentajeVirtual: 0 },
+            ticketPromedio: { ticketPromedio: 0, totalTransacciones: 0 },
+            ingresosTotales: 0,
+            porcentajeMonederoVirtual: { totalDebitos: 0, debitosTarjeta: 0, debitosPagoElectronico: 0, porcentajeTarjeta: 0, porcentajePagoElectronico: 0 },
             viajesAbiertos: { viajesAbiertos: 0, totalValidadores: 0, porcentajeViajesActivos: 0 },
             top5Rutas: [],
             pasajerosPorRutaTipo: [],
+            pasajerosValidados: 0,
+            unidadesEnServicio: 0,
+            validacionesExitosas: 0,
+            validacionesFallidas: 0,
+            graficaAscensosVsBoletos: [],
           };
         }
       }
 
       // 1. Costo del ticket promedio (de TransaccionesDebito)
-      const ticketPromedio = await this.getTicketPromedio(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
+      const ticketPromedioData = await this.getTicketPromedio(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
+      
+      // Extraer ingresosTotales del ticketPromedio
+      const ingresosTotales = Number(ticketPromedioData.ingresosTotales) || 0;
+      
+      // Remover ingresosTotales del objeto ticketPromedio
+      const ticketPromedio = {
+        ticketPromedio: ticketPromedioData.ticketPromedio,
+        totalTransacciones: ticketPromedioData.totalTransacciones,
+      };
 
       // 2. Porcentaje de débitos con monedero virtual (EsQR = 1)
       const porcentajeMonederoVirtual = await this.getPorcentajeMonederoVirtual(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
@@ -1274,13 +1295,45 @@ ORDER BY periodo, ruta;
       // 5. Pasajeros por ruta según tipo de pasajero (gráfica apilada)
       const pasajerosPorRutaTipo = await this.getPasajerosPorRutaTipo(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
 
-      return {
+      // 6. Pasajeros validados (pasajeros únicos que debitaron)
+      const pasajerosValidados = await this.getPasajerosValidados(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
+
+      // 7. Unidades en servicio (viajes activos)
+      const unidadesEnServicio = await this.getUnidadesEnServicio(clienteFilter, clienteParams);
+
+      // 8. Validaciones exitosas y fallidas
+      const validaciones = await this.getValidaciones(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
+
+      // 9. Gráfica Ascensos vs Boletos
+      const graficaAscensosVsBoletos = await this.getGraficaAscensosVsBoletos(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin);
+
+      // Si el filtro es "hoy" (1), calcular también los ingresos de ayer
+      let ingresoTotalAyer: number | null = null;
+      if (filtro === 1) {
+        const { fechaInicioAyer, fechaFinAyer } = this.calcularFechasAyer();
+        ingresoTotalAyer = await this.getIngresoTotalAyer(clienteFilter, clienteFilter2, clienteParams, fechaInicioAyer, fechaFinAyer);
+      }
+
+      const resultado: any = {
         ticketPromedio,
+        ingresosTotales,
         porcentajeMonederoVirtual,
         viajesAbiertos,
         top5Rutas,
         pasajerosPorRutaTipo,
+        pasajerosValidados,
+        unidadesEnServicio,
+        validacionesExitosas: validaciones.exitosas,
+        validacionesFallidas: validaciones.fallidas,
+        graficaAscensosVsBoletos,
       };
+
+      // Agregar ingresoTotalAyer solo si el filtro es "hoy" (1)
+      if (filtro === 1 && ingresoTotalAyer !== null) {
+        resultado.ingresoTotalAyer = ingresoTotalAyer;
+      }
+
+      return resultado;
     } catch (error) {
       console.error('Error en getDashboardMetrics:', error);
       if (error instanceof HttpException) {
@@ -1294,7 +1347,7 @@ ORDER BY periodo, ruta;
   }
 
   // Calcular fechas según el filtro
-  private calcularFechasPorFiltro(filtro: string): { fechaInicio: string; fechaFin: string } {
+  private calcularFechasPorFiltro(filtro: number): { fechaInicio: string; fechaFin: string } {
     function pad(n: number) {
       return n < 10 ? '0' + n : n;
     }
@@ -1307,33 +1360,84 @@ ORDER BY periodo, ruta;
     let fechaFin: string;
 
     switch (filtro) {
-      case 'ultimos7dias':
-        // Últimos 7 días
+      case 2: // Últimos 7 días
         const hace7Dias = new Date(fechaDesfasada.getTime() - 7 * 24 * 60 * 60 * 1000);
         fechaInicio = `${hace7Dias.getFullYear()}-${pad(hace7Dias.getMonth() + 1)}-${pad(hace7Dias.getDate())}`;
         fechaFin = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
         break;
       
-      case 'mesActual':
-        // Mes actual
+      case 3: // Mes actual
         fechaInicio = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-01`;
         fechaFin = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
         break;
       
-      case 'añoActual':
-        // Año actual
+      case 4: // Año actual
         fechaInicio = `${fechaDesfasada.getFullYear()}-01-01`;
         fechaFin = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
         break;
       
-      default: // 'hoy'
-        // Hoy
+      default: // 1 - Hoy
         fechaInicio = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
         fechaFin = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
         break;
     }
 
     return { fechaInicio, fechaFin };
+  }
+
+  // Calcular fechas de ayer
+  private calcularFechasAyer(): { fechaInicioAyer: string; fechaFinAyer: string } {
+    function pad(n: number) {
+      return n < 10 ? '0' + n : n;
+    }
+    
+    const ahora = new Date();
+    const desfaseMs = -6 * 60 * 60 * 1000; // -6 horas
+    const fechaDesfasada = new Date(ahora.getTime() + desfaseMs);
+    
+    // Restar 1 día para obtener ayer
+    const ayer = new Date(fechaDesfasada.getTime() - 24 * 60 * 60 * 1000);
+    
+    const fechaInicioAyer = `${ayer.getFullYear()}-${pad(ayer.getMonth() + 1)}-${pad(ayer.getDate())}`;
+    const fechaFinAyer = `${ayer.getFullYear()}-${pad(ayer.getMonth() + 1)}-${pad(ayer.getDate())}`;
+    
+    return { fechaInicioAyer, fechaFinAyer };
+  }
+
+  // Obtener ingresos totales de ayer
+  private async getIngresoTotalAyer(
+    clienteFilter: string, 
+    clienteFilter2: string, 
+    clienteParams: any[],
+    fechaInicioAyer: string,
+    fechaFinAyer: string,
+  ) {
+    const query = `
+      SELECT 
+        COALESCE(SUM(monto), 0) AS ingresoTotalAyer
+      FROM (
+        SELECT td.Monto AS monto
+        FROM TransaccionesDebito td
+        INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
+        INNER JOIN Clientes c ON v.IdCliente = c.Id
+        WHERE td.IdTipoTransaccion = 2
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter}
+        UNION ALL
+        SELECT htd.Monto AS monto
+        FROM HistoricoTransaccionesDebito htd
+        INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
+        INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
+        WHERE htd.IdTipoTransaccion = 2
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter2}
+      ) AS todas_transacciones
+    `;
+    const params = clienteParams.length > 0 
+      ? [fechaInicioAyer, fechaFinAyer, ...clienteParams, fechaInicioAyer, fechaFinAyer, ...clienteParams]
+      : [fechaInicioAyer, fechaFinAyer, fechaInicioAyer, fechaFinAyer];
+    const result = await this.clienteRepository.query(query, params);
+    return Number(result[0]?.ingresoTotalAyer) || 0;
   }
 
   // 1. Costo del ticket promedio
@@ -1355,7 +1459,7 @@ ORDER BY periodo, ruta;
         INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
         INNER JOIN Clientes c ON v.IdCliente = c.Id
         WHERE td.IdTipoTransaccion = 2
-          AND DATE(td.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter}
         UNION ALL
         SELECT htd.Monto AS monto
@@ -1363,16 +1467,18 @@ ORDER BY periodo, ruta;
         INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
         INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
         WHERE htd.IdTipoTransaccion = 2
-          AND DATE(htd.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter2}
       ) AS todas_transacciones
     `;
-    const params = clienteParams.length > 0 ? [...clienteParams, ...clienteParams] : [];
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
     const result = await this.clienteRepository.query(query, params);
     return result[0] || { ticketPromedio: 0, totalTransacciones: 0, ingresosTotales: 0 };
   }
 
-  // 2. Porcentaje de débitos con monedero virtual (EsQR = 1)
+  // 2. Porcentaje de débitos: Tarjeta (EsQR = 0) y Pago electrónico (EsQR = 1)
   private async getPorcentajeMonederoVirtual(
     clienteFilter: string, 
     clienteFilter2: string, 
@@ -1383,18 +1489,23 @@ ORDER BY periodo, ruta;
     const query = `
       SELECT 
         COUNT(*) AS totalDebitos,
-        SUM(CASE WHEN esQR = 1 THEN 1 ELSE 0 END) AS debitosVirtuales,
+        SUM(CASE WHEN esQR = 0 THEN 1 ELSE 0 END) AS debitosTarjeta,
+        SUM(CASE WHEN esQR = 1 THEN 1 ELSE 0 END) AS debitosPagoElectronico,
+        ROUND(
+          SUM(CASE WHEN esQR = 0 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) * 100,
+          2
+        ) AS porcentajeTarjeta,
         ROUND(
           SUM(CASE WHEN esQR = 1 THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) * 100,
           2
-        ) AS porcentajeVirtual
+        ) AS porcentajePagoElectronico
       FROM (
         SELECT td.EsQR AS esQR
         FROM TransaccionesDebito td
         INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
         INNER JOIN Clientes c ON v.IdCliente = c.Id
         WHERE td.IdTipoTransaccion = 2
-          AND DATE(td.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter}
         UNION ALL
         SELECT htd.EsQR AS esQR
@@ -1402,16 +1513,24 @@ ORDER BY periodo, ruta;
         INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
         INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
         WHERE htd.IdTipoTransaccion = 2
-          AND DATE(htd.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter2}
       ) AS todas_transacciones
     `;
-    const params = clienteParams.length > 0 ? [...clienteParams, ...clienteParams] : [];
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
     const result = await this.clienteRepository.query(query, params);
-    return result[0] || { totalDebitos: 0, debitosVirtuales: 0, porcentajeVirtual: 0 };
+    return result[0] || { 
+      totalDebitos: 0, 
+      debitosTarjeta: 0, 
+      debitosPagoElectronico: 0, 
+      porcentajeTarjeta: 0, 
+      porcentajePagoElectronico: 0 
+    };
   }
 
-  // 3. Viajes abiertos en últimos 15 minutos vs posibles según número de validadores
+  // 3. Viajes abiertos vs posibles según número de validadores
   private async getViajesAbiertos(clienteFilter: string, clienteParams: any[]) {
     // Primero obtener el total de validadores
     const validadoresQuery = `
@@ -1424,14 +1543,13 @@ ORDER BY periodo, ruta;
     const validadoresResult = await this.clienteRepository.query(validadoresQuery, clienteParams);
     const totalValidadores = Number(validadoresResult[0]?.total) || 0;
 
-    // Luego obtener los viajes abiertos
+    // Luego obtener los viajes abiertos (estatus = 1 y Fin IS NULL)
     const viajesQuery = `
       SELECT COUNT(DISTINCT v.Id) AS total
       FROM Viajes v
       INNER JOIN Clientes c ON v.IdCliente = c.Id
       WHERE v.Estatus = 1
         AND v.Fin IS NULL
-        AND v.Inicio >= DATE_SUB(NOW(), INTERVAL 15 MINUTE)
         ${clienteFilter}
     `;
     const viajesResult = await this.clienteRepository.query(viajesQuery, clienteParams);
@@ -1467,7 +1585,7 @@ ORDER BY periodo, ruta;
         INNER JOIN Clientes c ON val.IdCliente = c.Id
         WHERE td.IdTipoTransaccion = 2
           AND td.IdViaje IS NOT NULL
-          AND DATE(td.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter}
         UNION ALL
         SELECT htd.Monto AS monto, htd.IdViaje AS idViaje, htd.NumeroSerieValidador
@@ -1476,7 +1594,7 @@ ORDER BY periodo, ruta;
         INNER JOIN Clientes c2 ON val2.IdCliente = c2.Id
         WHERE htd.IdTipoTransaccion = 2
           AND htd.IdViaje IS NOT NULL
-          AND DATE(htd.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter2}
       ) AS todas_transacciones
       INNER JOIN Viajes v ON todas_transacciones.idViaje = v.Id
@@ -1486,7 +1604,9 @@ ORDER BY periodo, ruta;
       ORDER BY ingresosTotales DESC
       LIMIT 5
     `;
-    const params = clienteParams.length > 0 ? [...clienteParams, ...clienteParams] : [];
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
     return await this.clienteRepository.query(query, params);
   }
 
@@ -1512,7 +1632,7 @@ ORDER BY periodo, ruta;
         INNER JOIN Clientes c ON m.IdCliente = c.Id
         WHERE td.IdTipoTransaccion = 2
           AND td.IdViaje IS NOT NULL
-          AND DATE(td.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter}
         UNION ALL
         SELECT htd.NumeroSerieMonedero AS numeroSerieMonedero, htd.IdViaje AS idViaje, m2.IdTipoPasajero AS idTipoPasajero, m2.IdCliente AS idCliente
@@ -1521,7 +1641,7 @@ ORDER BY periodo, ruta;
         INNER JOIN Clientes c2 ON m2.IdCliente = c2.Id
         WHERE htd.IdTipoTransaccion = 2
           AND htd.IdViaje IS NOT NULL
-          AND DATE(htd.FechaHoraFinal) BETWEEN '${fechaInicio}' AND '${fechaFin}'
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
           ${clienteFilter2}
       ) AS todas_transacciones
       INNER JOIN Viajes v ON todas_transacciones.idViaje = v.Id
@@ -1531,7 +1651,183 @@ ORDER BY periodo, ruta;
       GROUP BY r.Id, r.Nombre, ctp.Id, ctp.Nombre
       ORDER BY r.Nombre, ctp.Nombre
     `;
-    const params = clienteParams.length > 0 ? [...clienteParams, ...clienteParams] : [];
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
     return await this.clienteRepository.query(query, params);
+  }
+
+  // 6. Pasajeros validados (transacciones de débito exitosas - ControlTransaccion = 1)
+  private async getPasajerosValidados(
+    clienteFilter: string, 
+    clienteFilter2: string, 
+    clienteParams: any[],
+    fechaInicio: string,
+    fechaFin: string,
+  ) {
+    const query = `
+      SELECT COUNT(*) AS pasajerosValidados
+      FROM (
+        SELECT td.NumeroSerieMonedero AS numeroSerieMonedero
+        FROM TransaccionesDebito td
+        INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
+        INNER JOIN Clientes c ON v.IdCliente = c.Id
+        WHERE td.IdTipoTransaccion = 2
+          AND td.ControlTransaccion = 1
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter}
+        UNION ALL
+        SELECT htd.NumeroSerieMonedero AS numeroSerieMonedero
+        FROM HistoricoTransaccionesDebito htd
+        INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
+        INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
+        WHERE htd.IdTipoTransaccion = 2
+          AND htd.ControlTransaccion = 1
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter2}
+      ) AS todas_transacciones
+    `;
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
+    const result = await this.clienteRepository.query(query, params);
+    return Number(result[0]?.pasajerosValidados) || 0;
+  }
+
+  // 7. Unidades en servicio (viajes activos con estatus = 1)
+  private async getUnidadesEnServicio(clienteFilter: string, clienteParams: any[]) {
+    const query = `
+      SELECT COUNT(DISTINCT v.Id) AS unidadesEnServicio
+      FROM Viajes v
+      INNER JOIN Clientes c ON v.IdCliente = c.Id
+      WHERE v.Estatus = 1
+        ${clienteFilter}
+    `;
+    const result = await this.clienteRepository.query(query, clienteParams);
+    return Number(result[0]?.unidadesEnServicio) || 0;
+  }
+
+  // 8. Validaciones exitosas (ControlTransaccion = 1) y fallidas (ControlTransaccion = 3)
+  private async getValidaciones(
+    clienteFilter: string, 
+    clienteFilter2: string, 
+    clienteParams: any[],
+    fechaInicio: string,
+    fechaFin: string,
+  ) {
+    const query = `
+      SELECT 
+        SUM(CASE WHEN controlTransaccion = 1 THEN 1 ELSE 0 END) AS exitosas,
+        SUM(CASE WHEN controlTransaccion = 3 THEN 1 ELSE 0 END) AS fallidas
+      FROM (
+        SELECT td.ControlTransaccion AS controlTransaccion
+        FROM TransaccionesDebito td
+        INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
+        INNER JOIN Clientes c ON v.IdCliente = c.Id
+        WHERE td.IdTipoTransaccion = 2
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter}
+        UNION ALL
+        SELECT htd.ControlTransaccion AS controlTransaccion
+        FROM HistoricoTransaccionesDebito htd
+        INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
+        INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
+        WHERE htd.IdTipoTransaccion = 2
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter2}
+      ) AS todas_transacciones
+    `;
+    const params = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
+    const result = await this.clienteRepository.query(query, params);
+    return {
+      exitosas: Number(result[0]?.exitosas) || 0,
+      fallidas: Number(result[0]?.fallidas) || 0,
+    };
+  }
+
+  // 9. Gráfica Ascensos vs Boletos (por viaje)
+  private async getGraficaAscensosVsBoletos(
+    clienteFilter: string, 
+    clienteFilter2: string, 
+    clienteParams: any[],
+    fechaInicio: string,
+    fechaFin: string,
+  ) {
+    // Primero obtener los boletos por viaje
+    const queryBoletos = `
+      SELECT 
+        idViaje,
+        COUNT(DISTINCT CASE WHEN controlTransaccion = 1 THEN idTransaccion END) AS boletos
+      FROM (
+        SELECT td.Id AS idTransaccion, td.IdViaje AS idViaje, td.ControlTransaccion AS controlTransaccion
+        FROM TransaccionesDebito td
+        INNER JOIN Validadores v ON td.NumeroSerieValidador = v.NumeroSerie
+        INNER JOIN Clientes c ON v.IdCliente = c.Id
+        WHERE td.IdTipoTransaccion = 2
+          AND td.IdViaje IS NOT NULL
+          AND DATE(td.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter}
+        UNION ALL
+        SELECT htd.Id AS idTransaccion, htd.IdViaje AS idViaje, htd.ControlTransaccion AS controlTransaccion
+        FROM HistoricoTransaccionesDebito htd
+        INNER JOIN Validadores v2 ON htd.NumeroSerieValidador = v2.NumeroSerie
+        INNER JOIN Clientes c2 ON v2.IdCliente = c2.Id
+        WHERE htd.IdTipoTransaccion = 2
+          AND htd.IdViaje IS NOT NULL
+          AND DATE(htd.FHRegistro) BETWEEN ? AND ?
+          ${clienteFilter2}
+      ) AS todas_transacciones
+      GROUP BY idViaje
+    `;
+
+    // Luego obtener los ascensos por viaje desde ConteoPasajeros
+    const queryAscensos = `
+      SELECT 
+        cp.IdViaje AS idViaje,
+        SUM(cp.Entradas) AS ascensos
+      FROM ConteoPasajeros cp
+      INNER JOIN Viajes v ON cp.IdViaje = v.Id
+      INNER JOIN Clientes c ON v.IdCliente = c.Id
+      WHERE cp.IdViaje IS NOT NULL
+        AND DATE(cp.FHRegistro) BETWEEN ? AND ?
+        ${clienteFilter}
+      GROUP BY cp.IdViaje
+    `;
+
+    const paramsBoletos = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams, fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin, fechaInicio, fechaFin];
+    
+    const paramsAscensos = clienteParams.length > 0 
+      ? [fechaInicio, fechaFin, ...clienteParams]
+      : [fechaInicio, fechaFin];
+
+    const [boletosResult, ascensosResult] = await Promise.all([
+      this.clienteRepository.query(queryBoletos, paramsBoletos),
+      this.clienteRepository.query(queryAscensos, paramsAscensos),
+    ]);
+
+    // Crear mapas para facilitar la combinación
+    const boletosMap = new Map<number, number>();
+    boletosResult.forEach((item: any) => {
+      boletosMap.set(Number(item.idViaje), Number(item.boletos) || 0);
+    });
+
+    const ascensosMap = new Map<number, number>();
+    ascensosResult.forEach((item: any) => {
+      ascensosMap.set(Number(item.idViaje), Number(item.ascensos) || 0);
+    });
+
+    // Combinar ambos resultados
+    const allViajes = new Set([...boletosMap.keys(), ...ascensosMap.keys()]);
+    const resultado = Array.from(allViajes).map(idViaje => ({
+      idViaje,
+      boletos: boletosMap.get(idViaje) || 0,
+      ascensos: ascensosMap.get(idViaje) || 0,
+    }));
+
+    return resultado.sort((a, b) => b.idViaje - a.idViaje);
   }
 }
