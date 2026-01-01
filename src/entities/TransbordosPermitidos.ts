@@ -35,6 +35,9 @@ export class TransbordosPermitidos {
   @Column("int", { name: "NumeroTransbordos", nullable: true })
   numeroTransbordos: number | null;
 
+  @Column("tinyint", { name: "Estatus", default: () => "'1'" })
+  estatus: number;
+
   @ManyToOne(() => Clientes, (clientes) => clientes.transbordosPermitidos, {
     onDelete: "NO ACTION",
     onUpdate: "NO ACTION",

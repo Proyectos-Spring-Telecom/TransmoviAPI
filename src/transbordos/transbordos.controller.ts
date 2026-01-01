@@ -217,27 +217,66 @@ export class TransbordosController {
     return this.transbordosService.update(id, idUser, updateTransbordoDto);
   }
 
-  @Delete(':id')
+  @Patch('activar/:id')
   @ApiOperation({
-    summary: 'Eliminar un transbordo',
+    summary: 'Activar un transbordo',
     description:
-      'Elimina un transbordo y todos sus detalles asociados. ' +
-      'Esta operación es permanente y no se puede deshacer.',
+      'Activa un transbordo que estaba inactivo, cambiando su estatus a 1. ' +
+      'Solo se pueden activar transbordos que estén inactivos (estatus = 0).',
   })
   @ApiParam({ name: 'id', type: 'number', description: 'ID del transbordo', example: 1 })
   @ApiResponse({
     status: 200,
-    description: 'Transbordo eliminado exitosamente',
+    description: 'Transbordo activado exitosamente',
     schema: {
       example: {
         status: 'success',
-        message: 'Transbordo eliminado correctamente',
+        message: 'Transbordo activado correctamente',
         data: {
           id: 1,
           nombre: 'TRANSBORDO ZONA CENTRO',
         },
       },
     },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El transbordo ya está activo',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Transbordo no encontrado',
+  })
+  activar(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    const idUser = req.user.userId;
+    return this.transbordosService.activar(id, idUser);
+  }
+
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Dar de baja un transbordo',
+    description:
+      'Da de baja un transbordo cambiando su estatus a 0 (eliminación lógica). ' +
+      'El transbordo no se elimina físicamente, solo se marca como inactivo.',
+  })
+  @ApiParam({ name: 'id', type: 'number', description: 'ID del transbordo', example: 1 })
+  @ApiResponse({
+    status: 200,
+    description: 'Transbordo dado de baja exitosamente',
+    schema: {
+      example: {
+        status: 'success',
+        message: 'Transbordo dado de baja correctamente',
+        data: {
+          id: 1,
+          nombre: 'TRANSBORDO ZONA CENTRO',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'El transbordo ya está inactivo',
   })
   @ApiResponse({
     status: 404,

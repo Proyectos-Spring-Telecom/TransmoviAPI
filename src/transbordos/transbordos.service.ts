@@ -92,6 +92,7 @@ export class TransbordosService {
         numeroTransbordos: createTransbordoDto.numeroTransbordos,
         idCliente: createTransbordoDto.idCliente,
         idTipoDescuento: createTransbordoDto.idTipoDescuento || null,
+        estatus: 1, // Por defecto activo
       });
 
       const transbordoGuardado = await queryRunner.manager.save(nuevoTransbordo);
@@ -195,6 +196,7 @@ export class TransbordosService {
           tp.Nombre,
           tp.Tiempo,
           tp.NumeroTransbordos,
+          tp.Estatus,
           c.Nombre as NombreCliente,
           tdt.Nombre as NombreTipoDescuento,
           COUNT(dt.Id) as CantidadDetalles,
@@ -208,7 +210,8 @@ export class TransbordosService {
         LEFT JOIN CatTipoDescuentoTransbordo tdt ON tp.IdTipoDescuento = tdt.Id
         LEFT JOIN DetalleTransbordos dt ON tp.Id = dt.IdTransbordo
         WHERE tp.IdCliente IN (${placeholders})
-        GROUP BY tp.Id, tp.IdCliente, tp.IdTipoDescuento, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, c.Nombre, tdt.Nombre
+          AND tp.Estatus = 1
+        GROUP BY tp.Id, tp.IdCliente, tp.IdTipoDescuento, tp.Nombre, tp.Tiempo, tp.NumeroTransbordos, tp.Estatus, c.Nombre, tdt.Nombre
         ORDER BY tp.Id DESC
         LIMIT ? OFFSET ?
       `;
@@ -217,6 +220,7 @@ export class TransbordosService {
         SELECT COUNT(*) as total
         FROM TransbordosPermitidos tp
         WHERE tp.IdCliente IN (${placeholders})
+          AND tp.Estatus = 1
       `;
 
       const data = await this.transbordosRepository.query(query, [...ids, limit, offset]);
@@ -233,6 +237,7 @@ export class TransbordosService {
         nombre: item.Nombre,
         tiempo: item.Tiempo ? Number(item.Tiempo) : null,
         numeroTransbordos: Number(item.NumeroTransbordos),
+        estatus: Number(item.Estatus),
         cantidadDetalles: Number(item.CantidadDetalles),
         detalles: item.Detalles
           ? JSON.parse(`[${item.Detalles}]`)
@@ -300,6 +305,11 @@ export class TransbordosService {
         throw new NotFoundException(`Transbordo con ID ${id} no encontrado`);
       }
 
+      // Verificar que el transbordo esté activo
+      if (transbordo.estatus === 0) {
+        throw new NotFoundException(`Transbordo con ID ${id} no encontrado o está inactivo`);
+      }
+
       // Registro en la bitácora SUCCESS
       await this.bitacoraLogger.logToBitacora(
         'TransbordosPermitidos',
@@ -317,6 +327,7 @@ export class TransbordosService {
           nombre: transbordo.nombre,
           tiempo: transbordo.tiempo,
           numeroTransbordos: transbordo.numeroTransbordos,
+          estatus: transbordo.estatus,
           idCliente: transbordo.idCliente,
           idTipoDescuento: transbordo.idTipoDescuento,
           nombreTipoDescuento: transbordo.tipoDescuento?.nombre || null,
@@ -530,13 +541,9 @@ export class TransbordosService {
   }
 
   /**
-   * Eliminar un transbordo y sus detalles (cascade)
+   * Eliminar un transbordo (eliminación lógica - estatus = 0)
    */
   async remove(id: number, idUser: number): Promise<ApiCrudResponse> {
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
       const transbordo = await this.transbordosRepository.findOne({
         where: { id },
@@ -546,24 +553,21 @@ export class TransbordosService {
         throw new NotFoundException(`Transbordo con ID ${id} no encontrado`);
       }
 
+      if (transbordo.estatus === 0) {
+        throw new BadRequestException(`El Transbordo con ID ${id} ya está inactivo`);
+      }
+
       const nombreTransbordo = transbordo.nombre || '';
 
-      // Primero eliminamos los detalles asociados
-      await queryRunner.manager.delete(DetalleTransbordos, {
-        idTransbordo: id,
-      });
-
-      // Luego eliminamos el transbordo
-      await queryRunner.manager.delete(TransbordosPermitidos, { id });
-
-      await queryRunner.commitTransaction();
+      // Eliminación lógica: cambiar estatus a 0
+      await this.transbordosRepository.update(id, { estatus: 0 });
 
       // Registro en la bitácora SUCCESS
       await this.bitacoraLogger.logToBitacora(
         'TransbordosPermitidos',
-        `Se eliminó el Transbordo con nombre: ${nombreTransbordo} e ID ${id}`,
-        'DELETE',
-        { id },
+        `Se dio de baja el Transbordo con nombre: ${nombreTransbordo} e ID ${id}`,
+        'UPDATE',
+        { id, estatus: 0 },
         idUser,
         19,
         EstatusEnumBitcora.SUCCESS,
@@ -572,7 +576,7 @@ export class TransbordosService {
       // API response
       const result: ApiCrudResponse = {
         status: 'success',
-        message: 'Transbordo eliminado correctamente',
+        message: 'Transbordo dado de baja correctamente',
         data: {
           id: Number(id),
           nombre: nombreTransbordo,
@@ -580,13 +584,11 @@ export class TransbordosService {
       };
       return result;
     } catch (error) {
-      await queryRunner.rollbackTransaction();
-
       // Registro en la bitácora ERROR
       await this.bitacoraLogger.logToBitacora(
         'TransbordosPermitidos',
-        `Error al eliminar Transbordo con ID ${id}`,
-        'DELETE',
+        `Error al dar de baja Transbordo con ID ${id}`,
+        'UPDATE',
         { id },
         idUser,
         19,
@@ -599,11 +601,76 @@ export class TransbordosService {
       }
 
       throw new InternalServerErrorException({
-        message: `Error al eliminar Transbordo con ID ${id}`,
+        message: `Error al dar de baja Transbordo con ID ${id}`,
         error: error.message,
       });
-    } finally {
-      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Activar un transbordo (estatus = 1)
+   */
+  async activar(id: number, idUser: number): Promise<ApiCrudResponse> {
+    try {
+      const transbordo = await this.transbordosRepository.findOne({
+        where: { id },
+      });
+
+      if (!transbordo) {
+        throw new NotFoundException(`Transbordo con ID ${id} no encontrado`);
+      }
+
+      if (transbordo.estatus === 1) {
+        throw new BadRequestException(`El Transbordo con ID ${id} ya está activo`);
+      }
+
+      const nombreTransbordo = transbordo.nombre || '';
+
+      // Activar: cambiar estatus a 1
+      await this.transbordosRepository.update(id, { estatus: 1 });
+
+      // Registro en la bitácora SUCCESS
+      await this.bitacoraLogger.logToBitacora(
+        'TransbordosPermitidos',
+        `Se activó el Transbordo con nombre: ${nombreTransbordo} e ID ${id}`,
+        'UPDATE',
+        { id, estatus: 1 },
+        idUser,
+        19,
+        EstatusEnumBitcora.SUCCESS,
+      );
+
+      // API response
+      const result: ApiCrudResponse = {
+        status: 'success',
+        message: 'Transbordo activado correctamente',
+        data: {
+          id: Number(id),
+          nombre: nombreTransbordo,
+        },
+      };
+      return result;
+    } catch (error) {
+      // Registro en la bitácora ERROR
+      await this.bitacoraLogger.logToBitacora(
+        'TransbordosPermitidos',
+        `Error al activar Transbordo con ID ${id}`,
+        'UPDATE',
+        { id },
+        idUser,
+        19,
+        EstatusEnumBitcora.ERROR,
+        error.message,
+      );
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException({
+        message: `Error al activar Transbordo con ID ${id}`,
+        error: error.message,
+      });
     }
   }
 

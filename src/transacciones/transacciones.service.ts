@@ -820,10 +820,11 @@ export class TransaccionesService {
       // Si no existe un transbordo para el cliente, continuamos con la l?gica normal
       let numeroTransbordo: number | null = null;
       
-      // Buscar el transbordo que pertenezca al cliente
+      // Buscar el transbordo que pertenezca al cliente y esté activo
       const transbordoPermitido = await this.transbordosPermitidosRepository.findOne({
         where: { 
           idCliente: Number(monedero.idCliente),
+          estatus: 1,
         },
         relations: ['tipoDescuento'],
       });
