@@ -48,6 +48,24 @@ export class TurnosService {
       if (!idOperador) {
         throw new UnauthorizedException(`El usuario no está autorizado para generar un turno.`)
       }
+
+      // Validar que el operador no tenga 2 turnos activos al mismo tiempo
+      const turnosActivos = await this.turnosRepository.find({
+        where: {
+          idOperador: idOperador,
+          estatus: EstatusEnum.ACTIVO,
+        },
+      });
+
+      // Verificar si hay turnos activos sin fecha de fin (aún en curso)
+      const turnosActivosSinFin = turnosActivos.filter(turno => turno.fin === null);
+
+      if (turnosActivosSinFin.length > 0) {
+        throw new BadRequestException(
+          `El operador ya tiene un turno activo. No se puede crear otro turno hasta que se finalice el turno actual (ID: ${turnosActivosSinFin[0].id}).`
+        );
+      }
+
       //Creamos el turno
       function pad(n: number) {
         return n < 10 ? '0' + n : n;
@@ -59,7 +77,7 @@ export class TurnosService {
 
 
       const { numeroSerieValidador } = createTurnoDto
- 
+
       const query = `
       SELECT
 	i.Id 

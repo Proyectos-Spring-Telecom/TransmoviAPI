@@ -56,6 +56,23 @@ export class ViajesService {
         throw new UnauthorizedException(`Usuario no autorizado para la generación de viajes.`)
       }
 
+      // Validar que el operador no tenga un viaje activo
+      const viajesActivos = await this.viajesRepository.find({
+        where: {
+          idOperador: idOperador,
+          estatus: EstatusEnum.ACTIVO,
+        },
+      });
+
+      // Verificar si hay viajes activos sin fecha de fin (aún en curso)
+      const viajesActivosSinFin = viajesActivos.filter(viaje => viaje.fin === null);
+
+      if (viajesActivosSinFin.length > 0) {
+        throw new BadRequestException(
+          `El operador ya tiene un viaje activo. No se puede abrir otro viaje hasta que se finalice el viaje actual (ID: ${viajesActivosSinFin[0].id}).`
+        );
+      }
+
       // Validar que el turno existe y está activo (estatus = 1)
       if (createViajeDto.idTurno) {
         const turno = await this.turnosRepository.findOne({
