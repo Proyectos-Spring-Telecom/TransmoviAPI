@@ -73,6 +73,7 @@ export class ConteopasajerosService {
       };
       return result;
     } catch (error) {
+      console.log(error);
       const querylogger = { createConteopasajeroDto };
       await this.bitacoraLogger.logToBitacora(
         'ConteoPasajeros',
@@ -340,6 +341,7 @@ INNER JOIN Clientes c
       };
       return result;
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -499,6 +501,7 @@ AND c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 
       return { data: data };
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -524,6 +527,7 @@ AND c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
       conteopasajero.id = Number(conteopasajero.id);
       return { data: conteopasajero };
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -561,6 +565,7 @@ AND c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
         },
       };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por fecha',
         error: error.message,
@@ -700,6 +705,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
       };
       return result;
     } catch (error) {
+      console.log(error);
       if (error instanceof HttpException) {
         throw error;
       }
@@ -743,6 +749,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
         },
       };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por fecha y hora',
         error: error.message,
@@ -778,6 +785,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
         },
       };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros de hoy',
         error: error.message,
@@ -814,6 +822,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
         },
       };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros de la última semana',
         error: error.message,
@@ -858,6 +867,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
         },
       };
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException({
         message: 'Error al obtener conteo pasajeros por BlueVox y fecha',
         error: error.message,
@@ -949,6 +959,7 @@ WHERE cp.FechaHora BETWEEN '${fechaInicio}TT00:00:00' AND '${fechaFin}T23:59:00'
       };
       return result;
     } catch (error) {
+      console.log(error);
       const querylogger = { updateConteoPasajerosDto };
       await this.bitacoraLogger.logToBitacora(
         'ConteoPasajeros',
