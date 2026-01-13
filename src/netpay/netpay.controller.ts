@@ -31,6 +31,7 @@ export class NetpayController {
   constructor(private readonly netpayService: NetpayService) {}
 
   @Get('test-connection')
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: 'Verifica la conectividad con Netpay' })
   @ApiResponse({ status: 200, description: 'Estado de la conexión' })
   async testConnection() {
@@ -38,6 +39,7 @@ export class NetpayController {
   }
 
   @Get('public-key')
+  @ApiExcludeEndpoint()
   @ApiOperation({
     summary: 'Obtiene la public key para usar en NetpayJS (frontend)',
     description: 'Este endpoint devuelve la public key que debe usarse en el frontend con NetpayJS para tokenizar tarjetas de forma segura.',
@@ -49,6 +51,7 @@ export class NetpayController {
 
   @Post('payment/with-token')
   @HttpCode(HttpStatus.OK)
+  @ApiExcludeEndpoint()
   @ApiOperation({
     summary: 'Procesa un pago con token generado desde NetpayJS (frontend) - RECOMENDADO',
     description:
@@ -89,6 +92,7 @@ export class NetpayController {
   }
 
   @Get('datos-tarjeta')
+  @ApiExcludeEndpoint()
   @ApiOperation({ 
     summary: 'Obtiene datos de tarjeta y direcciones por CustomerIdNetPay',
     description: 'Obtiene los datos de tarjeta y direcciones asociadas filtrados por CustomerIdNetPay.',
@@ -124,6 +128,7 @@ export class NetpayController {
   }
 
   @Put('customers/:customerId/cards')
+  @ApiExcludeEndpoint()
   @ApiOperation({ 
     summary: 'Asigna una tarjeta (token) a un cliente existente (alias)',
     description: 'Alias para /token. Asigna un token de tarjeta generado por NetpayJS a un cliente existente. Acepta clientId (número) o id (string).',
@@ -183,6 +188,7 @@ export class NetpayController {
 
   @Put('transactions/:tokenId/refund')
   @HttpCode(HttpStatus.OK)
+  @ApiExcludeEndpoint()
   @ApiOperation({ summary: 'Cancela o reembolsa una transacción' })
   @ApiResponse({ status: 200, description: 'Transacción cancelada/reembolsada exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })

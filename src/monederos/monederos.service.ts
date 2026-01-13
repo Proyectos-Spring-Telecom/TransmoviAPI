@@ -76,7 +76,7 @@ export class MonederosService {
         if (monederoPorIdCard) {
           throw new BadRequestException(
             `El ID de tarjeta "${createMonederoDto.idCard}" ya está registrado. Por favor, use un ID de tarjeta diferente.`,
-          );
+        );
         }
       }
 

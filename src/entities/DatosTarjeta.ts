@@ -31,9 +31,6 @@ export class DatosTarjeta {
   @Column('varchar', { name: 'CustomerIdNetPay', nullable: true, length: 255 })
   customerIdNetPay: string | null;
 
-  @Column('varchar', { name: 'TokenCard', nullable: true, length: 255 })
-  tokenCard: string | null;
-
   @Column('tinyint', { name: 'Estatus', nullable: true, default: () => "'1'" })
   estatus: number | null;
 

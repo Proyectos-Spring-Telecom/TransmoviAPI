@@ -53,6 +53,7 @@ export class Posiciones {
   @ManyToOne(() => Validadores, (validadores) => validadores.posiciones, {
     onDelete: "NO ACTION",
     onUpdate: "NO ACTION",
+    createForeignKeyConstraints: false,
   })
   @JoinColumn([
     { name: "NumeroSerieValidador", referencedColumnName: "numeroSerie" },

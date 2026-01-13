@@ -25,6 +25,12 @@ export class ReportesService {
     const ids = idsFiltrados
       .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
       .filter(Boolean);
+    
+    // Asegurar que el cliente mismo esté incluido en la lista
+    if (!ids.includes(cliente)) {
+      ids.unshift(cliente);
+    }
+    
     if (ids.length === 0) {
       return { ids: [], placeholders: '' };
     }
@@ -38,8 +44,14 @@ export class ReportesService {
     cliente: number,
   ): Promise<ApiResponseCommon> {
     try {
-      // Obtener jerarquía de clientes
-      const { ids: clienteIds, placeholders } = await this.clienteHijos(cliente);
+      // Si idCliente es null o undefined, usar el cliente del usuario autenticado y sus hijos
+      // Si idCliente tiene valor, usar ese cliente y sus hijos
+      const clienteFiltro = filtros.idCliente !== null && filtros.idCliente !== undefined 
+        ? filtros.idCliente 
+        : cliente;
+      
+      // Obtener jerarquía de clientes (cliente y sus hijos)
+      const { ids: clienteIds, placeholders } = await this.clienteHijos(clienteFiltro);
       
       if (clienteIds.length === 0) {
         return {
@@ -119,8 +131,7 @@ SELECT
 FROM TransaccionesDebito td
 INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
 INNER JOIN Clientes c ON m.IdCliente = c.Id
-LEFT JOIN ViajesTransacciones vt ON vt.IdTransaccionDebito = td.Id
-LEFT JOIN Viajes v ON vt.IdViaje = v.Id
+LEFT JOIN Viajes v ON td.IdViaje = v.Id
 LEFT JOIN Variantes d ON v.IdVariante = d.Id
 LEFT JOIN Rutas r ON d.IdRuta = r.Id
 LEFT JOIN Zonas reg ON r.IdZona = reg.Id
@@ -173,9 +184,18 @@ ORDER BY DATE(td.FHRegistro) DESC, reg.Nombre, r.Nombre, d.Nombre;
     filtros: RecaudacionPorOperadorDto,
     cliente: number,
   ): Promise<ApiResponseCommon> {
+    let query: string = '';
+    let parametrosCompletos: any[] = [];
+    
     try {
-      // Obtener jerarquía de clientes
-      const { ids: clienteIds, placeholders } = await this.clienteHijos(cliente);
+      // Si idCliente es null o undefined, usar el cliente del usuario autenticado y sus hijos
+      // Si idCliente tiene valor, usar ese cliente y sus hijos
+      const clienteFiltro = filtros.idCliente !== null && filtros.idCliente !== undefined 
+        ? filtros.idCliente 
+        : cliente;
+      
+      // Obtener jerarquía de clientes (cliente y sus hijos)
+      const { ids: clienteIds, placeholders } = await this.clienteHijos(clienteFiltro);
       
       if (clienteIds.length === 0) {
         return {
@@ -187,13 +207,16 @@ ORDER BY DATE(td.FHRegistro) DESC, reg.Nombre, r.Nombre, d.Nombre;
       const fechaInicio = filtros.fechaInicio ? filtros.fechaInicio.split('T')[0] : null;
       const fechaFin = filtros.fechaFin ? filtros.fechaFin.split('T')[0] : null;
 
+      // Construir la lista de IDs de clientes como string para usar en subconsultas
+      const clienteIdsStr = clienteIds.join(',');
+      
       // Consulta: empezar desde transacciones y agrupar por operador
       // Las subconsultas de turnos y viajes NO tienen filtro de fecha
-      const query = `
+      query = `
 SELECT
     datos.idOperador,
     datos.operador,
-    datos.licencia,
+    licencias_data.licencia,
     COALESCE(turnos_data.totalTurnos, 0) AS turnos,
     COALESCE(viajes_data.totalViajes, 0) AS viajes,
     datos.validaciones,
@@ -204,16 +227,16 @@ SELECT
 FROM (
     SELECT
         COALESCE(o.Id, 0) AS idOperador,
-        COALESCE(
-            CONCAT(
+        CASE 
+            WHEN o.Id IS NOT NULL AND u.Nombre IS NOT NULL
+            THEN CONCAT(
                 u.Nombre,
                 ' ',
-                u.ApellidoPaterno,
+                COALESCE(u.ApellidoPaterno, ''),
                 IFNULL(CONCAT(' ', u.ApellidoMaterno), '')
-            ),
-            'Sin operador asignado'
-        ) AS operador,
-        GROUP_CONCAT(DISTINCT l.NumeroLicencia SEPARATOR ', ') AS licencia,
+            )
+            ELSE 'Sin operador asignado'
+        END AS operador,
         COUNT(DISTINCT td.Id) AS validaciones,
         COALESCE(SUM(td.Monto), 0) AS ingresos,
         CASE 
@@ -229,40 +252,47 @@ FROM (
     FROM TransaccionesDebito td
     INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
     INNER JOIN Clientes c ON m.IdCliente = c.Id
-    LEFT JOIN ViajesTransacciones vt ON vt.IdTransaccionDebito = td.Id
-    LEFT JOIN Viajes v ON vt.IdViaje = v.Id
+    LEFT JOIN Viajes v ON td.IdViaje = v.Id
     LEFT JOIN Operadores o ON v.IdOperador = o.Id
     LEFT JOIN Usuarios u ON o.IdUsuario = u.Id
-    LEFT JOIN Licencias l ON l.IdOperador = o.Id
     LEFT JOIN ViajesConteos vc_rel ON vc_rel.IdViaje = v.Id
     LEFT JOIN ConteoPasajeros vc ON vc_rel.IdConteo = vc.Id
     WHERE c.Id IN (${placeholders})
     ${fechaInicio ? `AND DATE(td.FHRegistro) >= ?` : ''}
     ${fechaFin ? `AND DATE(td.FHRegistro) <= ?` : ''}
     ${filtros.idOperador ? 'AND (o.Id = ? OR o.Id IS NULL)' : ''}
-    GROUP BY COALESCE(o.Id, 0), u.Nombre, u.ApellidoPaterno, u.ApellidoMaterno
+    GROUP BY o.Id, u.Nombre, u.ApellidoPaterno, u.ApellidoMaterno
 ) AS datos
 LEFT JOIN (
     SELECT 
-        COALESCE(t.IdOperador, 0) AS IdOperador,
+        l.IdOperador AS IdOperador,
+        GROUP_CONCAT(DISTINCT l.NumeroLicencia SEPARATOR ', ') AS licencia
+    FROM Licencias l
+    GROUP BY l.IdOperador
+) AS licencias_data ON licencias_data.IdOperador = datos.idOperador AND datos.idOperador > 0
+LEFT JOIN (
+    SELECT 
+        t.IdOperador AS IdOperador,
         COUNT(DISTINCT t.Id) AS totalTurnos,
         MAX(t.Inicio) AS ultimoTurno
     FROM Turnos t
-    GROUP BY COALESCE(t.IdOperador, 0)
-) AS turnos_data ON turnos_data.IdOperador = datos.idOperador
+    WHERE t.IdCliente IN (${clienteIdsStr})
+    GROUP BY t.IdOperador
+) AS turnos_data ON turnos_data.IdOperador = datos.idOperador AND datos.idOperador > 0
 LEFT JOIN (
     SELECT 
-        COALESCE(v2.IdOperador, 0) AS IdOperador,
+        v2.IdOperador AS IdOperador,
         COUNT(DISTINCT v2.Id) AS totalViajes
     FROM Viajes v2
-    GROUP BY COALESCE(v2.IdOperador, 0)
-) AS viajes_data ON viajes_data.IdOperador = datos.idOperador
+    WHERE v2.IdCliente IN (${clienteIdsStr})
+    GROUP BY v2.IdOperador
+) AS viajes_data ON viajes_data.IdOperador = datos.idOperador AND datos.idOperador > 0
 ORDER BY datos.ingresos DESC, datos.operador ASC;
       `;
 
       // Construir parámetros para la consulta principal
-      // Orden: clienteIds, fechas WHERE principal (solo transacciones), idOperador
-      const parametrosCompletos = [...clienteIds];
+      // Orden: clienteIds (para datos), fechas WHERE principal (solo transacciones), idOperador
+      parametrosCompletos = [...clienteIds];
       
       // Parámetros de fecha para el WHERE principal (solo transacciones)
       if (fechaInicio) {
@@ -304,6 +334,9 @@ ORDER BY datos.ingresos DESC, datos.operador ASC;
       if (error instanceof BadRequestException) {
         throw error;
       }
+      console.error('Error en recaudacionPorOperador:', error);
+      console.error('Query:', query);
+      console.error('Parámetros:', parametrosCompletos);
       throw new InternalServerErrorException({
         message: 'Error al generar el reporte de recaudación por operador',
         error: error.message,
@@ -317,8 +350,14 @@ ORDER BY datos.ingresos DESC, datos.operador ASC;
     cliente: number,
   ): Promise<ApiResponseCommon> {
     try {
-      // Obtener jerarquía de clientes
-      const { ids: clienteIds, placeholders } = await this.clienteHijos(cliente);
+      // Si idCliente es null o undefined, usar el cliente del usuario autenticado y sus hijos
+      // Si idCliente tiene valor, usar ese cliente y sus hijos
+      const clienteFiltro = filtros.idCliente !== null && filtros.idCliente !== undefined 
+        ? filtros.idCliente 
+        : cliente;
+      
+      // Obtener jerarquía de clientes (cliente y sus hijos)
+      const { ids: clienteIds, placeholders } = await this.clienteHijos(clienteFiltro);
       
       if (clienteIds.length === 0) {
         return {
@@ -364,8 +403,7 @@ FROM (
     FROM TransaccionesDebito td
     INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
     INNER JOIN Clientes c ON m.IdCliente = c.Id
-    LEFT JOIN ViajesTransacciones vt ON vt.IdTransaccionDebito = td.Id
-    LEFT JOIN Viajes v ON vt.IdViaje = v.Id
+    LEFT JOIN Viajes v ON td.IdViaje = v.Id
     LEFT JOIN Turnos t ON v.IdTurno = t.Id
     LEFT JOIN Instalaciones ins ON t.IdInstalacion = ins.Id
     LEFT JOIN Vehiculos veh ON ins.IdVehiculo = veh.Id
@@ -469,8 +507,14 @@ ORDER BY datos.ingresos DESC, datos.numeroEconomico ASC;
     cliente: number,
   ): Promise<ApiResponseCommon> {
     try {
-      // Obtener jerarquía de clientes
-      const { ids: clienteIds, placeholders } = await this.clienteHijos(cliente);
+      // Si idCliente es null o undefined, usar el cliente del usuario autenticado y sus hijos
+      // Si idCliente tiene valor, usar ese cliente y sus hijos
+      const clienteFiltro = filtros.idCliente !== null && filtros.idCliente !== undefined 
+        ? filtros.idCliente 
+        : cliente;
+      
+      // Obtener jerarquía de clientes (cliente y sus hijos)
+      const { ids: clienteIds, placeholders } = await this.clienteHijos(clienteFiltro);
       
       if (clienteIds.length === 0) {
         return {
@@ -501,7 +545,7 @@ FROM (
     SELECT
         ins.Id AS idInstalacion,
         disp.NumeroSerie AS serieDispositivo,
-        c.NumeroSerie AS serieContador,
+        GROUP_CONCAT(DISTINCT cont.NumeroSerie SEPARATOR ', ') AS serieContador,
         veh.NumeroEconomico AS numeroEconomico,
         veh.Placa AS placa,
         CONCAT(veh.NumeroEconomico, ' - ', veh.Placa) AS vehiculo,
@@ -510,20 +554,20 @@ FROM (
         disp.EstadoActual AS estadoDispositivo
     FROM TransaccionesDebito td
     INNER JOIN Monederos m ON td.NumeroSerieMonedero = m.NumeroSerie
-    INNER JOIN Clientes c ON m.IdCliente = c.Id
-    LEFT JOIN ViajesTransacciones vt ON vt.IdTransaccionDebito = td.Id
-    LEFT JOIN Viajes v ON vt.IdViaje = v.Id
+    INNER JOIN Clientes cli ON m.IdCliente = cli.Id
+    LEFT JOIN Viajes v ON td.IdViaje = v.Id
     LEFT JOIN Turnos t ON v.IdTurno = t.Id
     LEFT JOIN Instalaciones ins ON t.IdInstalacion = ins.Id
-    LEFT JOIN Validadores disp ON ins.IdValidador = disp.Id
-    LEFT JOIN Contadores c ON ins.IdContador = c.Id
-    LEFT JOIN Vehiculos veh ON ins.IdVehiculo = veh.Id
-    WHERE c.Id IN (${placeholders})
+    LEFT JOIN Validadores disp ON ins.IdValidador = disp.Id AND ins.IdCliente = disp.IdCliente
+    LEFT JOIN InstalacionContadores ic ON ic.IdInstalacion = ins.Id AND ic.Estatus = 1
+    LEFT JOIN Contadores cont ON ic.IdContador = cont.Id
+    LEFT JOIN Vehiculos veh ON ins.IdVehiculo = veh.Id AND ins.IdCliente = veh.IdCliente
+    WHERE ins.IdCliente IN (${placeholders})
     ${fechaInicio ? `AND DATE(td.FHRegistro) >= ?` : ''}
     ${fechaFin ? `AND DATE(td.FHRegistro) <= ?` : ''}
     ${filtros.idValidador ? 'AND disp.Id = ?' : ''}
     ${filtros.idInstalacion ? 'AND ins.Id = ?' : ''}
-    GROUP BY ins.Id, disp.NumeroSerie, c.NumeroSerie, veh.NumeroEconomico, veh.Placa, disp.EstadoActual
+    GROUP BY ins.Id, disp.NumeroSerie, veh.NumeroEconomico, veh.Placa, disp.EstadoActual
 ) AS datos
 LEFT JOIN (
     SELECT 
@@ -545,7 +589,7 @@ ORDER BY datos.ingresos DESC, datos.serieDispositivo ASC;
       `;
 
       // Construir parámetros para la consulta principal
-      // Orden: clienteIds, fechas (solo transacciones), idDispositivo, idInstalacion
+      // Orden: clienteIds (para ins.IdCliente), fechas (solo transacciones), idDispositivo, idInstalacion
       const parametrosCompletos = [...clienteIds];
       
       // Parámetros de fecha (solo para transacciones)

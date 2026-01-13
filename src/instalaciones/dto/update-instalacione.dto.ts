@@ -8,7 +8,27 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+// DTO para contadores anteriores
+export class ContadorAnteriorDto {
+  @ApiProperty({
+    description: 'ID del contador que se va a retirar/actualizar',
+    example: 5,
+  })
+  @IsNumber()
+  idContador: number;
+
+  @ApiProperty({
+    description: 'Estatus anterior del contador (0=Inactivo, 1=Disponible, 2=Asignado, 3=Mantenimiento, 4=Dañado, 5=Retirado)',
+    example: 5,
+  })
+  @IsInt()
+  @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
+  estatusAnterior: number;
+}
 
 export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   @ApiProperty({
@@ -20,8 +40,8 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   idValidador?: number;
 
   @ApiProperty({
-    description: 'ID del validador asociado a la instalación',
-    example: 101,
+    description: 'Estatus anterior del validador (en caso de reemplazarlo)',
+    example: 1,
   })
   @IsOptional({
     message: 'Para saber el estado de los componentes en caso de cambiarlos',
@@ -31,8 +51,8 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   estatusValidadorAnterior?: number;
 
   @ApiProperty({
-    description: 'IDs de los contadores asociados a la instalación',
-    example: [202, 203],
+    description: 'IDs de los contadores asociados a la instalación (nuevos o actuales)',
+    example: [8, 10],
     type: [Number],
   })
   @IsOptional({ message: 'Los IdContadores son opcionales' })
@@ -41,39 +61,32 @@ export class UpdateInstalacioneDto extends PartialType(CreateInstalacionesDto) {
   idContadores?: number[];
 
   @ApiProperty({
-    description: 'IDs de los contadores anteriores (para actualizar estado)',
-    example: [201],
-    type: [Number],
+    description: 'Array de contadores anteriores con su ID y estatus anterior',
+    example: [
+      { idContador: 5, estatusAnterior: 5 },
+      { idContador: 7, estatusAnterior: 1 }
+    ],
+    type: [ContadorAnteriorDto],
   })
   @IsOptional({
     message: 'Para saber el estado de los componentes en caso de cambiarlos',
   })
-  @IsArray({ message: 'IdContadoresAnteriores debe ser un array' })
-  @IsNumber({}, { each: true })
-  idContadoresAnteriores?: number[];
+  @IsArray({ message: 'ContadoresAnteriores debe ser un array' })
+  @ValidateNested({ each: true })
+  @Type(() => ContadorAnteriorDto)
+  contadoresAnteriores?: ContadorAnteriorDto[];
 
   @ApiProperty({
-    description: 'Estatus anterior de los contadores',
-    example: 1,
-  })
-  @IsOptional({
-    message: 'Para saber el estado de los componentes en caso de cambiarlos',
-  })
-  @IsInt()
-  @IsIn([0, 1, 2, 3, 4, 5], { message: 'Solo se permite 0, 1, 2, 3, 4, 5' })
-  estatusContadoresAnteriores?: number;
-
-  @ApiProperty({
-    description: 'Comentario acerca de los componentes',
-    example: 404,
+    description: 'Comentario acerca del validador',
+    example: 'Reemplazo por falla',
   })
   @IsString()
   @IsOptional()
   comentariosValidador?: string;
 
   @ApiProperty({
-    description: 'Comentario acerca de los componentes',
-    example: 404,
+    description: 'Comentario acerca de los contadores',
+    example: 'Se retiraron contadores dañados',
   })
   @IsString()
   @IsOptional()

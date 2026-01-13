@@ -305,8 +305,8 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -330,8 +330,8 @@ LIMIT ? OFFSET ?;
   SELECT COUNT(DISTINCT i.Id) AS total
   FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -395,8 +395,8 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -417,8 +417,8 @@ ORDER BY i.Id DESC
   SELECT COUNT(DISTINCT i.Id) AS total
   FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -516,8 +516,8 @@ SELECT
 FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -542,8 +542,8 @@ ORDER BY i.Id DESC
   FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
-INNER JOIN Contadores b ON ic.IdContador = b.Id
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 	WHERE ui.IdUsuario = ?
@@ -565,11 +565,11 @@ INNER JOIN Clientes c ON i.IdCliente = c.Id
         numeroSerieContadores: item.numeroSerieContadores ? item.numeroSerieContadores.split(', ') : [],
         marcaContadores: item.marcaContadores ? item.marcaContadores.split(', ') : [],
         modeloContadores: item.modeloContadores ? item.modeloContadores.split(', ') : [],
-        // Mantener compatibilidad con código antiguo (primer contador)
+        // Mantener compatibilidad con código antiguo (concatenados con coma)
         idContador: item.idContadores ? Number(item.idContadores.split(',')[0]) : null,
-        numeroSerieContador: item.numeroSerieContadores ? item.numeroSerieContadores.split(', ')[0] : null,
-        marcaContador: item.marcaContadores ? item.marcaContadores.split(', ')[0] : null,
-        modeloContador: item.modeloContadores ? item.modeloContadores.split(', ')[0] : null,
+        numeroSerieContador: item.numeroSerieContadores || null,
+        marcaContador: item.marcaContadores || null,
+        modeloContador: item.modeloContadores || null,
         idVehiculo: Number(item.idVehiculo),
         idCliente: Number(item.idCliente),
       }));
@@ -612,11 +612,16 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
 
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contador (múltiples contadores concatenados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
+  -- Para compatibilidad con código antiguo (todos los contadores concatenados)
+  MIN(b.Id) AS idContador,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContador,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContador,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContador,
 
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -634,14 +639,19 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON ic.IdInstalacion = i.Id AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE c.Estatus = 1
 AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
 AND i.Estatus = 1
-  
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC
    `;
@@ -677,11 +687,16 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
 
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contador (múltiples contadores concatenados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
+  -- Para compatibilidad con código antiguo (todos los contadores concatenados)
+  MIN(b.Id) AS idContador,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContador,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContador,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContador,
 
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -699,12 +714,18 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON ic.IdInstalacion = i.Id AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE i.Estatus = 1
 AND c.Estatus = 1
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
 
@@ -749,11 +770,16 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
   
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contador (múltiples contadores concatenados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
+  -- Para compatibilidad con código antiguo (todos los contadores concatenados)
+  MIN(b.Id) AS idContador,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContador,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContador,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContador,
   
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -772,7 +798,8 @@ SELECT
 FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
@@ -780,6 +807,11 @@ WHERE ui.IdUsuario = ?
   AND ui.Estatus = 1
   AND i.Estatus = 1
   AND c.Estatus = 1
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
 
@@ -831,11 +863,11 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
 
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contadores (agregados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
 
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -853,12 +885,18 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE i.Id = ?
 AND i.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
    `;
@@ -889,11 +927,11 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
 
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contadores (agregados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
 
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -911,11 +949,17 @@ SELECT
 
 FROM Instalaciones i
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE i.Id = ?
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
 
@@ -961,11 +1005,11 @@ SELECT
   d.Marca AS marcaValidador,
   d.Modelo AS modeloValidador,
   
-  -- Contador
-  i.IdContador AS idContador,
-  b.NumeroSerie AS numeroSerieContador,
-  b.Marca AS marcaContador,
-  b.Modelo AS modeloContador,
+  -- Contadores (agregados)
+  GROUP_CONCAT(DISTINCT b.Id ORDER BY b.Id SEPARATOR ',') AS idContadores,
+  GROUP_CONCAT(DISTINCT b.NumeroSerie ORDER BY b.Id SEPARATOR ', ') AS numeroSerieContadores,
+  GROUP_CONCAT(DISTINCT b.Marca ORDER BY b.Id SEPARATOR ', ') AS marcaContadores,
+  GROUP_CONCAT(DISTINCT b.Modelo ORDER BY b.Id SEPARATOR ', ') AS modeloContadores,
   
   -- Vehículo
   i.IdVehiculo AS idVehiculo,
@@ -984,13 +1028,19 @@ SELECT
 FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Validadores d ON i.IdValidador = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN Contadores b ON i.IdContador = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN InstalacionContadores ic ON i.Id = ic.IdInstalacion AND ic.Estatus = 1
+LEFT JOIN Contadores b ON ic.IdContador = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 WHERE ui.IdUsuario = ?
   AND ui.Estatus = 1
   AND i.Id = ?
+
+GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
+         i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
 
@@ -1004,12 +1054,20 @@ ORDER BY i.Id DESC;
         throw new NotFoundException('No se encontraron instalaciones.');
       }
 
-      // 🔥 Transformamos ids a number y añadimos nombreCompleto
+      // 🔥 Transformamos ids a number y convertimos idContadores a array
       const data = instalaciones.map((item) => ({
         ...item,
         id: Number(item.id),
         idValidador: Number(item.idValidador),
-        idContador: Number(item.idContador),
+        idContadores: item.idContadores ? item.idContadores.split(',').map(id => Number(id)) : [],
+        numeroSerieContadores: item.numeroSerieContadores ? item.numeroSerieContadores.split(', ') : [],
+        marcaContadores: item.marcaContadores ? item.marcaContadores.split(', ') : [],
+        modeloContadores: item.modeloContadores ? item.modeloContadores.split(', ') : [],
+        // Mantener compatibilidad con código antiguo (primer contador)
+        idContador: item.idContadores ? Number(item.idContadores.split(',')[0]) : null,
+        numeroSerieContador: item.numeroSerieContadores ? item.numeroSerieContadores.split(', ')[0] : null,
+        marcaContador: item.marcaContadores ? item.marcaContadores.split(', ')[0] : null,
+        modeloContador: item.modeloContadores ? item.modeloContadores.split(', ')[0] : null,
         idVehiculo: Number(item.idVehiculo),
         idCliente: Number(item.idCliente),
       }));
@@ -1290,21 +1348,16 @@ ORDER BY i.Id DESC;
 
       //verificamos que exista el contadores a actualizar
       if (updateInstalacioneDto.idContadores && updateInstalacioneDto.idContadores.length > 0) {
-        // Obtener contadores actuales de la instalación
-        const contadoresActuales = await this.instalacionContadoresRepository.find({
-          where: { idInstalacion: id, estatus: 1 },
-        });
-
-        // Si hay contadores anteriores a actualizar
-        if (updateInstalacioneDto.idContadoresAnteriores && updateInstalacioneDto.idContadoresAnteriores.length > 0) {
-          // Actualizar estado de contadores anteriores
-          for (const idContadorAnterior of updateInstalacioneDto.idContadoresAnteriores) {
-            await this.contadoresRepository.update(idContadorAnterior, {
-              estadoActual: updateInstalacioneDto.estatusContadoresAnteriores || EstadoComponente.DISPONIBLE,
+        // Si hay contadores anteriores a actualizar (con su estatus específico)
+        if (updateInstalacioneDto.contadoresAnteriores && updateInstalacioneDto.contadoresAnteriores.length > 0) {
+          // Actualizar estado de cada contador anterior con su estatus específico
+          for (const contadorAnterior of updateInstalacioneDto.contadoresAnteriores) {
+            await this.contadoresRepository.update(contadorAnterior.idContador, {
+              estadoActual: contadorAnterior.estatusAnterior,
             });
             // Desactivar relación anterior
             await this.instalacionContadoresRepository.update(
-              { idInstalacion: id, idContador: idContadorAnterior },
+              { idInstalacion: id, idContador: contadorAnterior.idContador },
               { estatus: 0 },
             );
           }
@@ -1312,7 +1365,7 @@ ORDER BY i.Id DESC;
 
         // Agregar nuevos contadores
         for (const idContador of updateInstalacioneDto.idContadores) {
-          // Verificar si ya existe la relación
+          // Verificar si ya existe la relación activa
           const existeRelacion = await this.instalacionContadoresRepository.findOne({
             where: { idInstalacion: id, idContador: idContador, estatus: 1 },
           });

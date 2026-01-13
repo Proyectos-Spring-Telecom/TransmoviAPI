@@ -726,7 +726,6 @@ export class NetpayService {
         email: dato.email,
         telefono: dato.telefono,
         customerIdNetPay: dato.customerIdNetPay,
-        tokenCard: dato.tokenCard,
         estatus: dato.estatus,
         direcciones: dato.direccionesTarjeta?.map((dir) => ({
           id: dir.id,

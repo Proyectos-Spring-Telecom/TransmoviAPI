@@ -38,9 +38,20 @@ export class PosicionesService {
     
   ): Promise<ApiCrudResponse> {
     try {
-      //Creamos la posicion
-      const newPosicion = await this.posicionesRepository.create(createPosicionesDto);
-      const posicionSave = await this.posicionesRepository.save(newPosicion);
+      //Creamos la posicion sin cargar relaciones
+      const newPosicion = this.posicionesRepository.create({
+        exactitud: createPosicionesDto.exactitud,
+        estado: createPosicionesDto.estado,
+        velocidad: createPosicionesDto.velocidad,
+        direccion: createPosicionesDto.direccion,
+        latitud: createPosicionesDto.latitud,
+        longitud: createPosicionesDto.longitud,
+        fechaHora: createPosicionesDto.fechaHora,
+        numeroSerieValidador: createPosicionesDto.numeroSerieValidador,
+      });
+      const posicionSave = await this.posicionesRepository.save(newPosicion, {
+        reload: false,
+      });
 
       // Registro en la bitácora----- SUCCESS
       const querylogger = { createPosicionesDto };
@@ -66,6 +77,7 @@ export class PosicionesService {
       return result;
     } catch (error) {
       // Registro en la bitácora----- ERROR
+      console.log(error);
       const querylogger = { createPosicionesDto };
       await this.bitacoraLogger.logToBitacora(
         'Posiciones',
