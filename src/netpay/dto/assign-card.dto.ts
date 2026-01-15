@@ -21,6 +21,14 @@ export class AssignCardDto {
   token: string;
 
   @ApiPropertyOptional({
+    description: 'Reference ID de la tarjeta (identificador único de la tarjeta guardada en Netpay). Si no se proporciona, se intentará obtener de la respuesta de Netpay.',
+    example: '1222337263222',
+  })
+  @IsString()
+  @IsOptional()
+  referenceId?: string;
+
+  @ApiPropertyOptional({
     description: 'Indica si es una pre-autorización',
     example: false,
     default: false,

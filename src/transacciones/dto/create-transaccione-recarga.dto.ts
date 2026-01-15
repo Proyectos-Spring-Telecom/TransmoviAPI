@@ -124,4 +124,58 @@ export class CreateTransaccioneRecargaDto {
   @IsNotEmpty({ message: 'El referenceIdNetPay es obligatorio cuando el método de pago es Tarjeta' })
   referenceIdNetPay?: string;
 
+  @ApiPropertyOptional({
+    example: '1721779181755',
+    description: 'Session ID para Netpay (obligatorio si método de pago es Tarjeta)',
+  })
+  @ValidateIf((o) => o.idMetodoPago === EnumMetodoPago.TARJETA_CREDITO || o.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO)
+  @IsString({ message: 'El sessionId debe ser una cadena de texto' })
+  @IsNotEmpty({ message: 'El sessionId es obligatorio cuando el método de pago es Tarjeta' })
+  sessionId?: string;
+
+  @ApiPropertyOptional({
+    example: '1721779181755',
+    description: 'Device Fingerprint para Netpay (obligatorio si método de pago es Tarjeta)',
+  })
+  @ValidateIf((o) => o.idMetodoPago === EnumMetodoPago.TARJETA_CREDITO || o.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO)
+  @IsString({ message: 'El deviceFingerPrint debe ser una cadena de texto' })
+  @IsNotEmpty({ message: 'El deviceFingerPrint es obligatorio cuando el método de pago es Tarjeta' })
+  deviceFingerPrint?: string;
+
+  @ApiPropertyOptional({
+    example: 1,
+    description: 'ID de la dirección guardada en BD (obligatorio si método de pago es Tarjeta)',
+  })
+  @ValidateIf((o) => o.idMetodoPago === EnumMetodoPago.TARJETA_CREDITO || o.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO)
+  @IsNumber()
+  @IsNotEmpty({ message: 'El idDireccion es obligatorio cuando el método de pago es Tarjeta' })
+  @Transform(toNumberDecimal)
+  idDireccion?: number;
+
+  @ApiPropertyOptional({
+    example: {
+      deviceChannel: 'Browser',
+      httpBrowserColorDepth: '24',
+      httpBrowserJavaEnabled: 'FALSE',
+      httpBrowserJavaScriptEnabled: 'TRUE',
+      httpBrowserLanguage: 'es',
+      httpBrowserScreenHeight: '687',
+      httpBrowserScreenWidth: '1718',
+      httpBrowserTimeDifference: '360',
+    },
+    description: 'Información del dispositivo para Netpay (obligatorio si método de pago es Tarjeta)',
+  })
+  @ValidateIf((o) => o.idMetodoPago === EnumMetodoPago.TARJETA_CREDITO || o.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO)
+  @IsOptional()
+  deviceInformation?: {
+    deviceChannel?: string;
+    httpBrowserColorDepth?: string;
+    httpBrowserJavaEnabled?: string;
+    httpBrowserJavaScriptEnabled?: string;
+    httpBrowserLanguage?: string;
+    httpBrowserScreenHeight?: string;
+    httpBrowserScreenWidth?: string;
+    httpBrowserTimeDifference?: string;
+  };
+
 }

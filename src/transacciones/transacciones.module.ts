@@ -4,6 +4,7 @@ import { TransaccionesController } from './transacciones.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MonederosModule } from 'src/monederos/monederos.module';
 import { BitacoraModule } from 'src/bitacora/bitacora.module';
+import { NetpayModule } from 'src/netpay/netpay.module';
 import { Validadores } from 'src/entities/Validadores';
 import { PasajerosModule } from 'src/pasajeros/pasajeros.module';
 import { Clientes } from 'src/entities/Clientes';
@@ -23,14 +24,17 @@ import { Instalaciones } from 'src/entities/Instalaciones';
 import { CatTiposTransacciones } from 'src/entities/CatTiposTransacciones';
 import { Usuarios } from 'src/entities/Usuarios';
 import { Pasajeros } from 'src/entities/Pasajeros';
+import { DireccionesTarjeta } from 'src/entities/DireccionesTarjeta';
+import { DatosTarjeta } from 'src/entities/DatosTarjeta';
 
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TransaccionesRecarga, TransaccionesDebito, HistoricoTransaccionesDebito, HistoricoTransaccionesRecarga, Validadores, Clientes, Monederos, CatTiposPasajeros, TransbordosPermitidos, DetalleTransbordos, Viajes, Tarifas, Variantes, Turnos, Instalaciones, CatTiposTransacciones, Usuarios, Pasajeros]),
+    TypeOrmModule.forFeature([TransaccionesRecarga, TransaccionesDebito, HistoricoTransaccionesDebito, HistoricoTransaccionesRecarga, Validadores, Clientes, Monederos, CatTiposPasajeros, TransbordosPermitidos, DetalleTransbordos, Viajes, Tarifas, Variantes, Turnos, Instalaciones, CatTiposTransacciones, Usuarios, Pasajeros, DireccionesTarjeta, DatosTarjeta]),
     MonederosModule,
     BitacoraModule,
     PasajerosModule,
+    NetpayModule,
   ],
   controllers: [TransaccionesController],
   providers: [TransaccionesService],

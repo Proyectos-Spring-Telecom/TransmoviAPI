@@ -654,6 +654,7 @@ export class NetpayService {
           estado: assignCardDto.direccion.estado || null,
           calle: assignCardDto.direccion.calle || null,
           calleEsquina: assignCardDto.direccion.calleEsquina || null,
+          colonia: assignCardDto.direccion.colonia || null,
           idDatosTarjeta: datosTarjetaGuardado.id,
           estatus: 1,
         });
@@ -679,9 +680,14 @@ export class NetpayService {
 
       // Después de una respuesta exitosa, crear relación en TokenDirecciones
       if (response.data && idDireccionFinal) {
+        // Obtener referenceId del DTO o de la respuesta de Netpay
+        // La respuesta de Netpay puede incluir referenceId aunque no esté tipado
+        const referenceId = assignCardDto.referenceId || (response.data as any).referenceId || null;
+        
         const tokenDireccion = this.tokenDireccionesRepository.create({
           idDireccion: idDireccionFinal,
           tokenCard: assignCardDto.token,
+          referenceId: referenceId,
         });
         await this.tokenDireccionesRepository.save(tokenDireccion);
       }
@@ -703,45 +709,80 @@ export class NetpayService {
         throw new BadRequestException('El parámetro customerIdNetPay es requerido');
       }
 
-      // Buscar datos de tarjeta por CustomerIdNetPay
+      // Buscar datos de tarjeta por CustomerIdNetPay con estatus activo (1)
       const datosTarjeta = await this.datosTarjetaRepository.find({
-        where: { customerIdNetPay: customerIdNetPay },
+        where: { 
+          customerIdNetPay: customerIdNetPay,
+          estatus: 1, // ✅ Solo tarjetas activas
+        },
         relations: ['direccionesTarjeta'],
         order: { id: 'DESC' },
       });
 
       if (!datosTarjeta || datosTarjeta.length === 0) {
-        return {
-          datosTarjeta: [],
-          direcciones: [],
-        };
+        return [];
       }
 
-      // Formatear la respuesta
-      const resultado = datosTarjeta.map((dato) => ({
-        id: dato.id,
-        nombre: dato.nombre,
-        apellidoPaterno: dato.apellidoPaterno,
-        apellidoMaterno: dato.apellidoMaterno,
-        email: dato.email,
-        telefono: dato.telefono,
-        customerIdNetPay: dato.customerIdNetPay,
-        estatus: dato.estatus,
-        direcciones: dato.direccionesTarjeta?.map((dir) => ({
-          id: dir.id,
-          ciudad: dir.ciudad,
-          pais: dir.pais,
-          CP: dir.cp,
-          estado: dir.estado,
-          calle: dir.calle,
-          calleEsquina: dir.calleEsquina,
-          estatus: dir.estatus,
-        })) || [],
-      }));
+      // Formatear la respuesta: array plano de direcciones con datos del titular
+      const resultado: any[] = [];
+      
+      for (const dato of datosTarjeta) {
+        // ✅ Filtrar solo direcciones activas (estatus = 1)
+        const direccionesActivas = dato.direccionesTarjeta?.filter(dir => dir.estatus === 1) || [];
+        
+        for (const dir of direccionesActivas) {
+          // ✅ Buscar tokens activos directamente en la BD para esta dirección
+          const tokensActivos = await this.tokenDireccionesRepository.find({
+            where: { 
+              idDireccion: dir.id,
+              estatus: 1, // Solo tokens activos
+            },
+            order: { id: 'DESC' },
+          });
+          
+          // Obtener el tokenCard y referenceId del primer token activo
+          let tokenCard: string | null = null;
+          let referenceId: string | null = null;
+          if (tokensActivos && tokensActivos.length > 0) {
+            tokenCard = tokensActivos[0].tokenCard || null;
+            referenceId = tokensActivos[0].referenceId || null;
+          }
+          
+          // Combinar apellidos
+          const apellidos = dato.apellidoMaterno 
+            ? `${dato.apellidoPaterno || ''} ${dato.apellidoMaterno}`.trim()
+            : dato.apellidoPaterno || '';
+          
+          const direccionObj: any = {
+            idDireccion: dir.id,
+            nombre: dato.nombre,
+            apellidos: apellidos,
+            telefono: dato.telefono,
+            email: dato.email,
+            ciudad: dir.ciudad,
+            pais: dir.pais,
+            CP: dir.cp,
+            estado: dir.estado,
+            calle: dir.calle,
+            calleEsquina: dir.calleEsquina,
+          };
+          
+          // Agregar colonia solo si existe
+          if (dir.colonia) {
+            direccionObj.colonia = dir.colonia;
+          }
+          
+          // Agregar tokenCard siempre (puede ser null)
+          direccionObj.tokenCard = tokenCard;
+          
+          // Agregar referenceId siempre (puede ser null)
+          direccionObj.referenceId = referenceId;
+          
+          resultado.push(direccionObj);
+        }
+      }
 
-      return {
-        datosTarjeta: resultado,
-      };
+      return resultado;
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
@@ -786,19 +827,38 @@ export class NetpayService {
 
       // Buscar datos relacionados en DatosTarjeta y DireccionesTarjeta
       const datosTarjeta = await this.datosTarjetaRepository.find({
-        where: { customerIdNetPay: customerId },
+        where: { 
+          customerIdNetPay: customerId,
+          estatus: 1, // Solo tarjetas activas
+        },
         relations: ['direccionesTarjeta'],
         order: { id: 'DESC' },
       });
 
       // Formatear el arreglo de datos de tarjeta con direcciones
-      const datosTarjetaArray = datosTarjeta.map((dato) => {
-        // Si tiene direcciones, crear un objeto por cada dirección
-        if (dato.direccionesTarjeta && dato.direccionesTarjeta.length > 0) {
-          return dato.direccionesTarjeta.map((direccion) => ({
+      const datosTarjetaArray: any[] = [];
+      
+      for (const dato of datosTarjeta) {
+        // Filtrar solo direcciones activas
+        const direccionesActivas = dato.direccionesTarjeta?.filter(dir => dir.estatus === 1) || [];
+        
+        for (const direccion of direccionesActivas) {
+          // Buscar tokens activos para esta dirección
+          const tokensActivos = await this.tokenDireccionesRepository.find({
+            where: { 
+              idDireccion: direccion.id,
+              estatus: 1,
+            },
+            order: { id: 'DESC' },
+          });
+          
+          const tokenCard = tokensActivos.length > 0 ? tokensActivos[0].tokenCard : null;
+          const referenceId = tokensActivos.length > 0 ? tokensActivos[0].referenceId : null;
+          
+          datosTarjetaArray.push({
             idDireccion: Number(direccion.id),
             nombre: dato.nombre,
-            apellidos: dato.apellidoMaterno 
+            apellidos: dato.apellidoMaterno
               ? `${dato.apellidoPaterno || ''} ${dato.apellidoMaterno}`.trim()
               : dato.apellidoPaterno || null,
             telefono: dato.telefono,
@@ -809,10 +869,17 @@ export class NetpayService {
             estado: direccion.estado,
             calle: direccion.calle,
             calleEsquina: direccion.calleEsquina,
-          }));
-        } else {
-          // Si no tiene direcciones, crear un objeto solo con los datos personales
-          return [{
+            colonia: direccion.colonia || null,
+            tokenCard: tokenCard,
+            referenceId: referenceId,
+          });
+        }
+      }
+
+      // Si no hay direcciones, crear objetos solo con datos personales
+      if (datosTarjetaArray.length === 0) {
+        for (const dato of datosTarjeta) {
+          datosTarjetaArray.push({
             idDireccion: null,
             nombre: dato.nombre,
             apellidos: dato.apellidoMaterno 
@@ -826,9 +893,11 @@ export class NetpayService {
             estado: null,
             calle: null,
             calleEsquina: null,
-          }];
+            colonia: null,
+            tokenCard: null,
+          });
         }
-      }).flat(); // Aplanar el arreglo de arreglos
+      } // Aplanar el arreglo de arreglos
 
       // Combinar la respuesta de Netpay con los datos de tarjeta
       return {
@@ -854,7 +923,7 @@ export class NetpayService {
       // Codificar los parámetros para evitar problemas con caracteres especiales
       const encodedCustomerId = encodeURIComponent(customerId);
       const encodedTokenCard = encodeURIComponent(tokenCard);
-      
+
       // URL completa para eliminar tarjeta - usar endpoint v3/clients/{clientId}/token/{tokenCard}
       const deleteUrl = this.isProduction
         ? `https://gateway.netpay.com.mx/gateway-ecommerce/v3/clients/${encodedCustomerId}/token/${encodedTokenCard}`
@@ -868,7 +937,75 @@ export class NetpayService {
           timeout: 30000,
         },
       );
-      return { success: true, message: 'Tarjeta eliminada correctamente' };
+
+      // ✅ Si la eliminación en Netpay fue exitosa, actualizar estatus en base de datos
+      console.log('[NETPAY] Tarjeta eliminada en Netpay, actualizando registros en BD...');
+      
+      // 1. Buscar en TokenDirecciones por el tokenCard
+      const tokenDireccion = await this.tokenDireccionesRepository.findOne({
+        where: { tokenCard: tokenCard },
+        relations: ['idDireccion2'], // Cargar la relación con DireccionesTarjeta
+      });
+
+      if (tokenDireccion) {
+        console.log('[NETPAY] TokenDireccion encontrado, ID:', tokenDireccion.id);
+        
+        // 2. Actualizar estatus de TokenDirecciones a 0 (inactivo)
+        await this.tokenDireccionesRepository.update(tokenDireccion.id, {
+          estatus: 0,
+        });
+        console.log('[NETPAY] TokenDireccion actualizado a estatus 0');
+
+        // 3. Si tiene relación con DireccionesTarjeta, actualizar también
+        if (tokenDireccion.idDireccion) {
+          const direccionTarjeta = await this.direccionesTarjetaRepository.findOne({
+            where: { id: tokenDireccion.idDireccion },
+            relations: ['idDatosTarjeta2'], // Cargar la relación con DatosTarjeta
+          });
+
+          if (direccionTarjeta) {
+            console.log('[NETPAY] DireccionTarjeta encontrada, ID:', direccionTarjeta.id);
+            
+            // 4. Actualizar estatus de DireccionesTarjeta a 0
+            await this.direccionesTarjetaRepository.update(direccionTarjeta.id, {
+              estatus: 0,
+            });
+            console.log('[NETPAY] DireccionTarjeta actualizada a estatus 0');
+
+            // 5. Si tiene relación con DatosTarjeta, actualizar también
+            if (direccionTarjeta.idDatosTarjeta) {
+              const datosTarjeta = await this.datosTarjetaRepository.findOne({
+                where: { id: direccionTarjeta.idDatosTarjeta },
+              });
+
+              if (datosTarjeta) {
+                console.log('[NETPAY] DatosTarjeta encontrados, ID:', datosTarjeta.id);
+                
+                // 6. Actualizar estatus de DatosTarjeta a 0
+                await this.datosTarjetaRepository.update(datosTarjeta.id, {
+                  estatus: 0,
+                });
+                console.log('[NETPAY] DatosTarjeta actualizados a estatus 0');
+              } else {
+                console.log('[NETPAY] No se encontraron DatosTarjeta con ID:', direccionTarjeta.idDatosTarjeta);
+              }
+            } else {
+              console.log('[NETPAY] DireccionTarjeta no tiene idDatosTarjeta asociado');
+            }
+          } else {
+            console.log('[NETPAY] No se encontró DireccionTarjeta con ID:', tokenDireccion.idDireccion);
+          }
+        } else {
+          console.log('[NETPAY] TokenDireccion no tiene idDireccion asociado');
+        }
+      } else {
+        console.log('[NETPAY] No se encontró TokenDireccion con tokenCard:', tokenCard);
+      }
+
+      return { 
+        success: true, 
+        message: 'Tarjeta eliminada correctamente de Netpay y registros actualizados en base de datos' 
+      };
     } catch (error) {
       this.handleError(error, 'deleteCard');
     }
@@ -895,63 +1032,7 @@ export class NetpayService {
       );
     }
 
-    // Validar que se proporcione idDireccion
-    if (!paymentSavedCardDto.idDireccion) {
-      throw new BadRequestException(
-        'idDireccion es requerido para construir el billing',
-      );
-    }
-
     try {
-      // 🔹 Buscar la dirección en la base de datos
-      const direccion = await this.direccionesTarjetaRepository.findOne({
-        where: { id: paymentSavedCardDto.idDireccion },
-        relations: ['idDatosTarjeta2'], // Relación con DatosTarjeta
-      });
-
-      if (!direccion) {
-        throw new BadRequestException(
-          `No se encontró la dirección con ID: ${paymentSavedCardDto.idDireccion}`,
-        );
-      }
-
-      // Validar que la dirección tenga un idDatosTarjeta asociado
-      if (!direccion.idDatosTarjeta) {
-        throw new BadRequestException(
-          `La dirección ${paymentSavedCardDto.idDireccion} no tiene datos de tarjeta asociados`,
-        );
-      }
-
-      // Buscar los datos de la tarjeta
-      const datosTarjeta = await this.datosTarjetaRepository.findOne({
-        where: { id: direccion.idDatosTarjeta },
-      });
-
-      if (!datosTarjeta) {
-        throw new BadRequestException(
-          `No se encontraron los datos de tarjeta asociados a la dirección ${paymentSavedCardDto.idDireccion}`,
-        );
-      }
-
-      // 🔹 Construir el objeto billing con los datos de la BD
-      const billing = {
-        firstName: datosTarjeta.nombre || '',
-        lastName: datosTarjeta.apellidoMaterno 
-          ? `${datosTarjeta.apellidoPaterno || ''} ${datosTarjeta.apellidoMaterno}`.trim()
-          : datosTarjeta.apellidoPaterno || '',
-        email: datosTarjeta.email || '',
-        phone: datosTarjeta.telefono || '',
-        address: {
-          city: direccion.ciudad || '',
-          country: direccion.pais || 'MX',
-          postalCode: direccion.cp || '',
-          state: direccion.estado || '',
-          street1: direccion.calle || '',
-          street2: direccion.calleEsquina || '',
-        },
-        merchantReferenceCode: paymentSavedCardDto.referenceId, // Usar el referenceId como merchantReferenceCode
-      };
-
       // Preparar payload según el formato exacto de Netpay v3.5/charges para tarjeta guardada
       // Orden exacto según el curl proporcionado (NO incluir token, customerId, cardId)
       // IMPORTANTE: Para tarjeta guardada solo se usa referenceID, NO token
@@ -981,8 +1062,10 @@ export class NetpayService {
       // Agregar currency después de deviceFingerPrint
       payload.currency = paymentSavedCardDto.currency || 'MXN';
 
-      // Agregar billing construido desde la BD (debe ir después de currency, antes de saveCard)
-      payload.billing = billing;
+      // Agregar billing si está presente (debe ir después de currency, antes de saveCard)
+      if (paymentSavedCardDto.billing && Object.keys(paymentSavedCardDto.billing).length > 0) {
+        payload.billing = paymentSavedCardDto.billing;
+      }
 
       // Agregar saveCard (string "true" o "false") - debe ir después de billing
       payload.saveCard = paymentSavedCardDto.saveCard || 'false';
@@ -1028,14 +1111,14 @@ export class NetpayService {
       // Limpiar el objeto usando JSON para eliminar cualquier campo undefined/null
       // Esto asegura que no haya campos adicionales que puedan causar problemas
       const finalPayload = JSON.parse(JSON.stringify(cleanPayload));
-
+      console.log(finalPayload);
       // Asegurar que NO haya customerId ni cardId (pero token sí puede estar si se proporciona)
       delete finalPayload.customerId;
       delete finalPayload.cardId;
 
       // URL completa para procesar pagos - usar endpoint v3.5/charges
       const paymentUrl = `${this.baseUrl}/gateway-ecommerce/v3.5/charges`;
-
+      console.log(paymentUrl);
       // Obtener headers de autenticación
       const headers = this.getAuthHeaders(true); // Incluir User-Agent para v3.5/charges
 
@@ -1050,13 +1133,13 @@ export class NetpayService {
           timeout: 30000,
         },
       );
-
+      console.log(response.data,"RESPONSE PAGO") 
       return response.data;
     } catch (error) {
       this.handleError(error, 'processPaymentWithSavedCard');
     }
   }
-
+  
   /**
    * Confirma una transacción después de 3D Secure
    * Usa el endpoint v3.5/charges/{transaccionTokenId}/confirm

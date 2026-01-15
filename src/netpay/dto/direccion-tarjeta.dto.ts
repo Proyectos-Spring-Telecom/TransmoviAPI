@@ -62,5 +62,15 @@ export class DireccionTarjetaDto {
   @IsString()
   @MaxLength(60)
   calleEsquina?: string;
+
+  @ApiPropertyOptional({
+    description: 'Colonia de la dirección de facturación',
+    example: 'El Porvenir',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  colonia?: string;
 }
 

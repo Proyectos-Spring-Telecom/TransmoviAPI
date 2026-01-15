@@ -4,9 +4,11 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { DatosTarjeta } from './DatosTarjeta';
+import { TokenDirecciones } from './TokenDirecciones';
 import { applySchema } from 'src/common/apply-schema.decorator';
 
 @applySchema
@@ -34,6 +36,9 @@ export class DireccionesTarjeta {
   @Column('varchar', { name: 'CalleEsquina', nullable: true, length: 60 })
   calleEsquina: string | null;
 
+  @Column('varchar', { name: 'Colonia', nullable: true, length: 100 })
+  colonia: string | null;
+
   @Column('tinyint', { name: 'Estatus', nullable: true, default: () => "'1'" })
   estatus: number | null;
 
@@ -46,5 +51,8 @@ export class DireccionesTarjeta {
   })
   @JoinColumn([{ name: 'IdDatosTarjeta', referencedColumnName: 'id' }])
   idDatosTarjeta2: DatosTarjeta | null;
+
+  @OneToMany(() => TokenDirecciones, (tokenDirecciones) => tokenDirecciones.idDireccion2)
+  tokenDirecciones: TokenDirecciones[];
 }
 

@@ -19,6 +19,7 @@ import { BitacoraLoggerService } from 'src/bitacora/bitacora.service';
 import { Validadores } from 'src/entities/Validadores';
 import { MonederosService } from 'src/monederos/monederos.service';
 import { PasajerosService } from 'src/pasajeros/pasajeros.service';
+import { NetpayService } from 'src/netpay/netpay.service';
 import { Clientes } from 'src/entities/Clientes';
 import { CreateTransaccioneDebitoDto } from './dto/create-transaccione-debito.dto';
 import {
@@ -48,6 +49,8 @@ import { Variantes } from 'src/entities/Variantes';
 import { Turnos } from 'src/entities/Turnos';
 import { Instalaciones } from 'src/entities/Instalaciones';
 import { Pasajeros } from 'src/entities/Pasajeros';
+import { DireccionesTarjeta } from 'src/entities/DireccionesTarjeta';
+import { DatosTarjeta } from 'src/entities/DatosTarjeta';
 
 import { UpdateTransaccioneDebitoDto } from './dto/update-transaccione-debito.dto';
 import { GetTransaccioneDto } from './dto/get-transacciones.dto';
@@ -93,9 +96,14 @@ export class TransaccionesService {
     private readonly turnosRepository: Repository<Turnos>,
     @InjectRepository(Instalaciones)
     private readonly instalacionesRepository: Repository<Instalaciones>,
+    @InjectRepository(DireccionesTarjeta)
+    private readonly direccionesTarjetaRepository: Repository<DireccionesTarjeta>,
+    @InjectRepository(DatosTarjeta)
+    private readonly datosTarjetaRepository: Repository<DatosTarjeta>,
     private readonly bitacoraLogger: BitacoraLoggerService,
     private readonly monederosService: MonederosService,
     private readonly pasajeroService: PasajerosService,
+    private readonly netpayService: NetpayService,
   ) { }
 
   /**
@@ -548,6 +556,136 @@ export class TransaccionesService {
         throw new BadRequestException('El campo idMetodoPago es obligatorio para crear una recarga.');
       }
 
+      // ✅ Si el método de pago es Tarjeta (3 o 4), primero procesar el pago con Netpay
+      let pagoNetpayResponse: any = null;
+      if (
+        createTransaccioneRecargaDto.idMetodoPago === EnumMetodoPago.TARJETA_CREDITO ||
+        createTransaccioneRecargaDto.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO
+      ) {
+        console.log('[TRANSACCIONES] Procesando pago con tarjeta en Netpay...');
+        
+        // Validar que se hayan proporcionado todos los datos necesarios
+        if (!createTransaccioneRecargaDto.tokenCardNetPay) {
+          throw new BadRequestException('El tokenCardNetPay es obligatorio cuando el método de pago es Tarjeta');
+        }
+        if (!createTransaccioneRecargaDto.referenceIdNetPay) {
+          throw new BadRequestException('El referenceIdNetPay es obligatorio cuando el método de pago es Tarjeta');
+        }
+        if (!createTransaccioneRecargaDto.sessionId) {
+          throw new BadRequestException('El sessionId es obligatorio cuando el método de pago es Tarjeta');
+        }
+        if (!createTransaccioneRecargaDto.deviceFingerPrint) {
+          throw new BadRequestException('El deviceFingerPrint es obligatorio cuando el método de pago es Tarjeta');
+        }
+        if (!createTransaccioneRecargaDto.idDireccion) {
+          throw new BadRequestException('El idDireccion es obligatorio cuando el método de pago es Tarjeta');
+        }
+
+        // Obtener la dirección y datos de tarjeta desde la BD para construir el billing
+        const direccion = await this.direccionesTarjetaRepository.findOne({
+          where: { id: createTransaccioneRecargaDto.idDireccion },
+          relations: ['idDatosTarjeta2'],
+        });
+
+        if (!direccion || !direccion.idDatosTarjeta) {
+          throw new BadRequestException(
+            `No se encontró la dirección con ID: ${createTransaccioneRecargaDto.idDireccion} o no tiene datos de tarjeta asociados`,
+          );
+        }
+
+        const datosTarjeta = await this.datosTarjetaRepository.findOne({
+          where: { id: direccion.idDatosTarjeta },
+        });
+
+        if (!datosTarjeta) {
+          throw new BadRequestException(
+            `No se encontraron los datos de tarjeta asociados a la dirección ${createTransaccioneRecargaDto.idDireccion}`,
+          );
+        }
+
+        // Construir el objeto billing con los datos de la BD
+        const billing = {
+          firstName: datosTarjeta.nombre || '',
+          lastName: datosTarjeta.apellidoMaterno ?? undefined,
+          email:  'accept@netpay.com.mx',
+          phone: datosTarjeta.telefono || '',
+          address: {
+            city: direccion.ciudad || '',
+            country: direccion.pais || 'MX',
+            postalCode: direccion.cp || '',
+            state: direccion.estado || '',
+            street1: direccion.calle || '',
+            street2: direccion.calleEsquina || '',
+          },
+          merchantReferenceCode: createTransaccioneRecargaDto.referenceIdNetPay,
+        };
+
+        // Construir el payload para Netpay
+        const paymentPayload = {
+          amount: createTransaccioneRecargaDto.monto,
+          description: `Recarga monedero ${createTransaccioneRecargaDto.numeroSerieMonedero}`,
+          currency: 'MXN',
+          referenceId: createTransaccioneRecargaDto.deviceFingerPrint,
+          token: createTransaccioneRecargaDto.tokenCardNetPay,
+          sessionId: createTransaccioneRecargaDto.deviceFingerPrint,
+          deviceFingerPrint: createTransaccioneRecargaDto.deviceFingerPrint,
+          saveCard: 'false',
+          billing: billing,
+          deviceInformation: createTransaccioneRecargaDto.deviceInformation || {
+            deviceChannel: 'Browser',
+            httpBrowserColorDepth: '24',
+            httpBrowserJavaEnabled: 'FALSE',
+            httpBrowserJavaScriptEnabled: 'TRUE',
+            httpBrowserLanguage: 'es',
+            httpBrowserScreenHeight: '687',
+            httpBrowserScreenWidth: '1718',
+            httpBrowserTimeDifference: '360',
+          },
+        };
+        console.log('PAYMENT PAYLOAD (objeto):', paymentPayload);
+        console.log('PAYMENT PAYLOAD (JSON):', JSON.stringify(paymentPayload, null, 2));
+        try {
+          // Procesar el pago con Netpay
+          pagoNetpayResponse = await this.netpayService.processPaymentWithSavedCard(paymentPayload);
+          console.log('[TRANSACCIONES] Pago procesado exitosamente en Netpay:', pagoNetpayResponse);
+
+          // Verificar si el pago fue exitoso
+          // Solo se realiza la recarga si el status es 'success'
+          if (!pagoNetpayResponse) {
+            throw new BadRequestException('No se recibió respuesta de Netpay');
+          }
+          
+          const status = pagoNetpayResponse.status;
+          
+          // Solo proceder con la recarga si el status es 'success'
+          if (status !== 'success') {
+            throw new BadRequestException(
+              `El pago con tarjeta no fue exitoso. Status: ${status}. ` +
+              `Mensaje: ${pagoNetpayResponse?.message || 'Sin mensaje'}. ` +
+              `La recarga no se realizará.`,
+            );
+          }
+        } catch (error) {
+          console.error('[TRANSACCIONES] Error al procesar pago con Netpay:', error);
+          
+          // Registrar en bitácora el error de pago
+          await this.bitacoraLogger.logToBitacora(
+            'Transacciones',
+            `Error al procesar pago con Netpay para recarga de ${createTransaccioneRecargaDto.numeroSerieMonedero}`,
+            'CREATE',
+            { createTransaccioneRecargaDto, error: error.message },
+            idUser,
+            EnumModulos.TRANSACCIONES,
+            EstatusEnumBitcora.ERROR,
+            error.message,
+          );
+
+          throw new BadRequestException(
+            `No se pudo procesar el pago con tarjeta: ${error.message}. La recarga no se realizó.`,
+          );
+        }
+      }
+
       //Buscamos el monedero
       const monedero = await this.monederosService.findOneMonederoBySerie(
         createTransaccioneRecargaDto.numeroSerieMonedero,
@@ -561,7 +699,7 @@ export class TransaccionesService {
         Number(monedero.data.saldo) +
         Number(createTransaccioneRecargaDto.monto);
 
-  
+
 
       //actualizamos el saldo del monedero
       await this.monederosService.updateMonederoSaldo(
@@ -590,12 +728,13 @@ export class TransaccionesService {
         createTransaccioneRecargaDto.idMetodoPago === EnumMetodoPago.TARJETA_DEBITO
       ) {
         newTransaccion.tokenCardNetPay = createTransaccioneRecargaDto.tokenCardNetPay || null;
-        newTransaccion.transactionTokenIdNetPay = createTransaccioneRecargaDto.transactionTokenIdNetPay || null;
+        // ✅ Guardar el transactionTokenId de la respuesta de Netpay
+        newTransaccion.transactionTokenIdNetPay = pagoNetpayResponse?.transactionTokenId || createTransaccioneRecargaDto.transactionTokenIdNetPay || null;
         newTransaccion.referenceIdNetPay = createTransaccioneRecargaDto.referenceIdNetPay || null;
       }
-      
 
-    
+
+
       const transaccionSave =
         await this.transaccionesrecargaRepository.save(newTransaccion);
 
@@ -1449,17 +1588,6 @@ export class TransaccionesService {
     fechaFin?: string
   ) {
     try {
-      console.log('[paginado] Inicio - Parámetros recibidos:', {
-        idUser,
-        email,
-        cliente,
-        rol,
-        page,
-        limit,
-        fechaInicio,
-        fechaFin,
-      });
-
       //Declaramos las variables para el consumo del api
       let entidadRecarga;
       let entidadDebito;
@@ -1474,15 +1602,12 @@ export class TransaccionesService {
       // Solo la fecha del momento
       const fechaActual = `${fechaDesfasada.getFullYear()}-${pad(fechaDesfasada.getMonth() + 1)}-${pad(fechaDesfasada.getDate())}`;
 
-      console.log('[paginado] Fecha actual calculada:', fechaActual);
-
       //Si fechaInicio y fechaFin son null arroja las transacciones del dia de la tabla TransaccionesRecarga y TransaccionesDebito
       if (!fechaInicio && !fechaFin) {
         fechaInicio = fechaActual
         fechaFin = fechaActual
         entidadRecarga = 'TransaccionesRecarga';
         entidadDebito = 'TransaccionesDebito';
-        console.log('[paginado] Sin fechas - usando tablas actuales:', { entidadRecarga, entidadDebito, fechaInicio, fechaFin });
         transacciones = await this.resolverPorRolDefault(fechaInicio, fechaFin, email, cliente, rol, page, limit, entidadDebito, entidadRecarga);
       } else {
         //Si fechaInicio y fechaFin no son null arroja las transacciones del dia de la tabla HistoricoTransaccionesRecarga y HistoricoTransaccionesDebito
@@ -1491,17 +1616,10 @@ export class TransaccionesService {
         fechaFin = fechaFin?.split("T")[0] ?? fechaActual;
         entidadRecarga = 'HistoricoTransaccionesRecarga';
         entidadDebito = 'HistoricoTransaccionesDebito';
-        console.log('[paginado] Con fechas - usando tablas históricas:', { entidadRecarga, entidadDebito, fechaInicio, fechaFin });
         transacciones = await this.resolverPorRolDefault(fechaInicio, fechaFin, email, cliente, rol, page, limit, entidadDebito, entidadRecarga);
       }
 
-      console.log('[paginado] Resultado de resolverPorRolDefault:', {
-        tieneData: !!transacciones?.data,
-        cantidadData: Array.isArray(transacciones?.data) ? transacciones.data.length : 'no es array',
-        total: transacciones?.total,
-      });
-
-      const { data, total } = transacciones
+      const { data, total } = transacciones;
 
       //API Response
       const result: ApiResponseCommon = {
@@ -1512,19 +1630,8 @@ export class TransaccionesService {
           lastPage: Math.ceil(total / limit),
         },
       };
-      console.log('[paginado] Respuesta final preparada:', {
-        cantidadData: Array.isArray(data) ? data.length : 'no es array',
-        total,
-        page,
-        lastPage: Math.ceil(total / limit),
-      });
       return result;
     } catch (error) {
-      console.error('[paginado] ERROR:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-      });
       if (error instanceof HttpException) {
         throw error;
       }
@@ -1547,26 +1654,12 @@ export class TransaccionesService {
     entidadRecarga: string
   ) {
     try {
-      console.log('[resolverPorRolDefault] Inicio - Parámetros:', {
-        fechaInicio,
-        fechaFin,
-        email,
-        cliente,
-        rol,
-        page,
-        limit,
-        entidadDebito,
-        entidadRecarga,
-      });
-
       let totalResult;
       let transacciones;
       const offset = (page - 1) * limit;
-      console.log('[resolverPorRolDefault] Offset calculado:', offset);
       
       switch (rol) {
         case 1:
-          console.log('[resolverPorRolDefault] Caso 1 (Super Admin) - Ejecutando query de transacciones');
           transacciones = await this.transaccionesrecargaRepository.query(
             `
 SELECT * FROM (
@@ -1653,13 +1746,8 @@ LIMIT ? OFFSET ?;
         `,
             [fechaInicio, fechaFin, fechaInicio, fechaFin, Number(limit), Number(offset)],
           );
-          console.log('[resolverPorRolDefault] Caso 1 - Query transacciones ejecutado:', {
-            esArray: Array.isArray(transacciones),
-            cantidad: Array.isArray(transacciones) ? transacciones.length : 'no es array',
-          });
 
           // Query para total (sin paginación)
-          console.log('[resolverPorRolDefault] Caso 1 - Ejecutando query de total');
           totalResult = await this.transaccionesrecargaRepository.query(
             `
 SELECT COUNT(*) AS total
@@ -1695,10 +1783,6 @@ WHERE DATE(tr.FHRegistro) BETWEEN ? AND ?
   `,
             [fechaInicio, fechaFin, fechaInicio, fechaFin],
           );
-          console.log('[resolverPorRolDefault] Caso 1 - Query total ejecutado:', {
-            resultado: totalResult,
-            total: totalResult?.[0]?.total,
-          });
           break;
 
         case 3:
@@ -1794,14 +1878,8 @@ LIMIT ? OFFSET ?;
         `,
             [fechaInicio, fechaFin, Number(cliente), fechaInicio, fechaFin, Number(cliente), Number(limit), Number(offset)],
           );
-          console.log('[resolverPorRolDefault] Caso 3 - Query transacciones ejecutado:', {
-            esArray: Array.isArray(transacciones),
-            cantidad: Array.isArray(transacciones) ? transacciones.length : 'no es array',
-            cliente,
-          });
 
           // Query para total (sin paginación)
-          console.log('[resolverPorRolDefault] Caso 3 - Ejecutando query de total');
           totalResult = await this.transaccionesrecargaRepository.query(
             `
 SELECT COUNT(*) AS total
@@ -1843,15 +1921,12 @@ AND (m.IdCliente = ? OR m.IdCliente IS NULL)
 
         case 9:
           //Datos por usuario
-          console.log('[resolverPorRolDefault] Caso 9 - Buscando pasajero con email:', email);
           const pasajero =
             await this.pasajeroService.findOnePasajeroCorreo(email);
-          
+
           if (!pasajero || !pasajero.id) {
             throw new NotFoundException('Pasajero no encontrado para el usuario');
           }
-          
-          console.log('[resolverPorRolDefault] Caso 9 - Pasajero encontrado:', { id: pasajero.id, email: pasajero.correo });
           
           // Validar parámetros
           if (!fechaInicio || !fechaFin) {
@@ -1864,16 +1939,6 @@ AND (m.IdCliente = ? OR m.IdCliente IS NULL)
           const pasajeroId = Number(pasajero.id);
           const limitNum = Number(limit);
           const offsetNum = Number(offset);
-          
-          console.log('[resolverPorRolDefault] Caso 9 - Ejecutando query con parámetros:', {
-            fechaInicio,
-            fechaFin,
-            pasajeroId,
-            limit: limitNum,
-            offset: offsetNum,
-            entidadDebito,
-            entidadRecarga,
-          });
           
           transacciones = await this.transaccionesrecargaRepository.query(
             `
@@ -1967,14 +2032,8 @@ LIMIT ? OFFSET ?;
         `,
             [fechaInicio, fechaFin, pasajeroId, fechaInicio, fechaFin, pasajeroId, limitNum, offsetNum],
           );
-          console.log('[resolverPorRolDefault] Caso 9 - Query transacciones ejecutado:', {
-            esArray: Array.isArray(transacciones),
-            cantidad: Array.isArray(transacciones) ? transacciones.length : 'no es array',
-            pasajeroId: pasajero.id,
-          });
 
           // Query para total (sin paginaci?n)
-          console.log('[resolverPorRolDefault] Caso 9 - Ejecutando query de total');
           totalResult = await this.transaccionesrecargaRepository.query(
             `
 SELECT COUNT(*) AS total
@@ -2155,35 +2214,17 @@ AND m.IdCliente IN (${placeholders})
   `,
             [fechaInicio, fechaFin, ...ids, fechaInicio, fechaFin, ...ids],
           );
-          console.log('[resolverPorRolDefault] Caso 2/8/10 - Query total ejecutado:', {
-            resultado: totalResult,
-            total: totalResult?.[0]?.total,
-          });
           break;
       }
 
-      console.log('[resolverPorRolDefault] Procesando resultados:', {
-        totalResult,
-        totalResultLength: totalResult?.length,
-        transaccionesEsArray: Array.isArray(transacciones),
-        transaccionesLength: Array.isArray(transacciones) ? transacciones.length : 'no es array',
-      });
-
       const total = Number(totalResult[0]?.total || 0);
-      console.log('[resolverPorRolDefault] Total calculado:', total);
 
       // Validar que transacciones sea un array
       if (!Array.isArray(transacciones)) {
-        console.error('[resolverPorRolDefault] ERROR: transacciones no es un array:', {
-          tipo: typeof transacciones,
-          valor: transacciones,
-        });
         throw new BadRequestException({
           message: 'Error: las transacciones no se obtuvieron correctamente',
         });
       }
-
-      console.log('[resolverPorRolDefault] Transformando datos - cantidad de transacciones:', transacciones.length);
       // ?? Transformaci?n de datos (ids ? number, nombreCompleto)
       const data = transacciones.map((item) => ({
         ...item,
@@ -2200,14 +2241,6 @@ AND m.IdCliente IN (${placeholders})
           : null,
       }));
 
-      console.log('[resolverPorRolDefault] Datos transformados - cantidad:', data.length);
-      console.log('[resolverPorRolDefault] Retornando resultado:', {
-        dataLength: data.length,
-        total,
-        page,
-        lastPage: Math.ceil(total / limit),
-      });
-
       //API Response
       const result: ApiResponseCommon = {
         data: data,
@@ -2219,18 +2252,6 @@ AND m.IdCliente IN (${placeholders})
       };
       return { data, total };
     } catch (error) {
-      console.error('[resolverPorRolDefault] ERROR:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-        rol,
-        cliente,
-        email,
-        fechaInicio,
-        fechaFin,
-        entidadDebito,
-        entidadRecarga,
-      });
       if (error instanceof HttpException) {
         throw error;
       }
