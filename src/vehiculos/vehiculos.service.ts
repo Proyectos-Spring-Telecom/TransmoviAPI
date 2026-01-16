@@ -535,6 +535,7 @@ SELECT
   v.EstadoActual AS estadoActual,
   v.Estatus AS estatus,
   v.KM AS km,
+  v.IdCombustible AS idCombustible,
   ctc.Nombre AS nombre,
   v.CapacidadLitros AS CapacidadLitros,
 
@@ -580,6 +581,7 @@ SELECT
   v.EstadoActual AS estadoActual,
   v.Estatus AS estatus,
   v.KM AS km,
+  v.IdCombustible AS idCombustible,
   ctc.Nombre AS nombre,
   v.CapacidadLitros AS CapacidadLitros,
 
@@ -609,6 +611,8 @@ ORDER BY v.Id DESC;
         ...item,
         id: Number(item.id),
         idCliente: Number(item.idCliente),
+        idCombustible: item.idCombustible ? Number(item.idCombustible) : null,
+        cantidadPuertas: item.cantidadPuertas ? Number(item.cantidadPuertas) : null,
       }));
 
       return { data: data };
@@ -736,6 +740,7 @@ ORDER BY v.Id DESC;
       return result;
     } catch (error) {
       //-----Registro en la bitacora----- ERROR
+      console.log(error)
       const querylogger = { updateVehiculoDto };
       await this.bitacoraLogger.logToBitacora(
         'Vehiculos',

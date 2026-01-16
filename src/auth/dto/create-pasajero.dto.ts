@@ -9,6 +9,8 @@ import {
   Matches,
   MaxLength,
   MinLength,
+  IsNumber,
+  ValidateIf,
 } from 'class-validator';
 import { EnumSolicitudPasajero } from 'src/common/estatus.enum';
 
@@ -103,6 +105,16 @@ export class CreateAltaPasajaroDto {
   @IsOptional()
   @IsString()
   numeroSerieMonedero?: string;
+
+  @ValidateIf((o) => !o.numeroSerieMonedero)
+  @IsNotEmpty({ message: 'El idCliente es obligatorio cuando no se proporciona numeroSerieMonedero' })
+  @IsNumber({}, { message: 'El idCliente debe ser un número' })
+  @ApiProperty({
+    description: 'ID del cliente. Obligatorio si no se proporciona numeroSerieMonedero. Si se proporciona numeroSerieMonedero, se obtendrá automáticamente del monedero.',
+    example: 1,
+    required: false,
+  })
+  idCliente?: number;
 
   @IsOptional()
   @IsString()

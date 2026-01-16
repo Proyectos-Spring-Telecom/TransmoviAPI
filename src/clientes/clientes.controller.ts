@@ -17,14 +17,32 @@ import { UpdateClienteDto } from './dto/update-cliente.dto';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
 import { UpdateClienteEstatusDto } from './dto/update-clientes-estatus.dto';
 import { ApiCrudResponse, ApiResponseCommon } from 'src/common/ApiResponse';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Clientes')
-@ApiBearerAuth('bearer-token')
-@UseGuards(JwtAuthGuard)
 @Controller('clientes')
 export class ClientesController {
   constructor(private readonly clientesService: ClientesService) { }
+
+  // ========================================
+  // 🔹 ENDPOINT PÚBLICO - SIN AUTENTICACIÓN
+  // ========================================
+  @Get('public')
+  @ApiOperation({
+    summary: 'Obtener todos los clientes activos (público)',
+    description: 'Lista todos los clientes con estatus activo (1). No requiere autenticación.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de clientes obtenida exitosamente' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  async getClientesPublicos(): Promise<ApiResponseCommon> {
+    return this.clientesService.getClientesPublicos();
+  }
+
+  // ========================================
+  // 🔹 ENDPOINTS PRIVADOS - CON AUTENTICACIÓN
+  // ========================================
+  @ApiBearerAuth('bearer-token')
+  @UseGuards(JwtAuthGuard)
   //Crear cliente
   @Post()
   async createCliente(@Body() createClienteDto: CreateClienteDto, @Request() req): Promise<ApiCrudResponse> {

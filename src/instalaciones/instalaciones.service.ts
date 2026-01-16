@@ -295,6 +295,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -315,7 +316,7 @@ WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que qu
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC
@@ -385,6 +386,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -402,7 +404,7 @@ INNER JOIN Clientes c ON i.IdCliente = c.Id
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC
@@ -526,7 +528,7 @@ WHERE ui.IdUsuario = ?
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC
@@ -629,6 +631,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -650,7 +653,7 @@ AND i.Estatus = 1
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC
@@ -704,6 +707,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -724,7 +728,7 @@ AND c.Estatus = 1
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
@@ -810,7 +814,7 @@ WHERE ui.IdUsuario = ?
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
@@ -875,6 +879,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -895,7 +900,7 @@ AND i.IdCliente IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente q
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
@@ -939,6 +944,7 @@ SELECT
   v.Modelo AS modeloVehiculo,
   v.Placa AS placaVehiculo,
   v.NumeroEconomico AS numeroEconomicoVehiculo,
+  v.CantidadPuertas AS cantidadPuertas,
 
   -- Cliente
   i.IdCliente AS idCliente,
@@ -958,7 +964,7 @@ WHERE i.Id = ?
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
@@ -1039,7 +1045,7 @@ WHERE ui.IdUsuario = ?
 
 GROUP BY i.Id, i.FechaCreacion, i.FechaActualizacion, i.Estatus,
          i.IdValidador, d.NumeroSerie, d.Marca, d.Modelo,
-         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico,
+         i.IdVehiculo, v.Marca, v.Modelo, v.Placa, v.NumeroEconomico, v.CantidadPuertas,
          i.IdCliente, c.Nombre, c.ApellidoPaterno, c.ApellidoMaterno, c.Estatus
 
 ORDER BY i.Id DESC;
@@ -1069,6 +1075,7 @@ ORDER BY i.Id DESC;
         marcaContador: item.marcaContadores ? item.marcaContadores.split(', ')[0] : null,
         modeloContador: item.modeloContadores ? item.modeloContadores.split(', ')[0] : null,
         idVehiculo: Number(item.idVehiculo),
+        cantidadPuertas: item.cantidadPuertas ? Number(item.cantidadPuertas) : null,
         idCliente: Number(item.idCliente),
       }));
 

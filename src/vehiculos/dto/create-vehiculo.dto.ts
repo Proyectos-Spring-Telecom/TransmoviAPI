@@ -184,23 +184,4 @@ export class CreateVehiculoDto {
   @IsNumber()
   @IsPositive()
   capacidadLitros?: number;
-
-  // ⚠️ Propiedades ignoradas (no se usan en vehículos, son para licencias)
-  @ApiProperty({
-    description: 'Fecha de expedición (IGNORADA - no se guarda)',
-    example: '2024-01-15',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  fechaExpedicion?: string;
-
-  @ApiProperty({
-    description: 'Fecha de expiración (IGNORADA - no se guarda)',
-    example: '2028-01-15',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  fechaExpiracion?: string;
 }

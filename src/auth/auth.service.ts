@@ -93,10 +93,16 @@ export class AuthService {
       let monederos: any = null;
       let idClienteMonedero: number | null = null;
       let numeroSerieMonedero: string;
-      const clienteDefault = 1; // Cliente por defecto para usuarios sin monedero previo
 
       // Si no se proporciona numeroSerieMonedero, generar uno aleatorio único y crear el monedero
       if (!createAltaPasajaroDto.numeroSerieMonedero) {
+        // Validar que idCliente sea obligatorio cuando no se envía numeroSerieMonedero
+        if (!createAltaPasajaroDto.idCliente) {
+          throw new BadRequestException(
+            'El idCliente es obligatorio cuando no se proporciona un monedero',
+          );
+        }
+
         // Generar número de serie aleatorio único
         numeroSerieMonedero = await this.generarNumeroSerieUnico();
         
@@ -110,7 +116,7 @@ export class AuthService {
           saldo: 0,
           fechaActivacion: fechaDesfasada,
           estatus: EstatusEnum.INACTIVO, // Se activará cuando se asigne al pasajero
-          idCliente: clienteDefault,
+          idCliente: createAltaPasajaroDto.idCliente, // Usar idCliente del DTO
           idTipoPasajero: 1, // Tipo de pasajero por defecto
           esVirtual: 1, // Monedero virtual creado automáticamente
         });
@@ -133,13 +139,13 @@ export class AuthService {
           'Monederos',
           `Se creó un monedero automático con número de serie: ${numeroSerieMonedero} durante el registro de pasajero.`,
           'CREATE',
-          { numeroSerie: numeroSerieMonedero, idCliente: clienteDefault },
+          { numeroSerie: numeroSerieMonedero, idCliente: createAltaPasajaroDto.idCliente },
           1, // Usuario sistema por defecto
           EnumModulos.MONEDEROS,
           EstatusEnumBitcora.SUCCESS,
         );
       } else {
-        // Si se proporciona, buscar el monedero existente
+        // Si se proporciona numeroSerieMonedero, buscar el monedero existente y obtener su idCliente
         numeroSerieMonedero = createAltaPasajaroDto.numeroSerieMonedero;
         monederos = await this.monederoService.findOneMonederoBySerie(
           createAltaPasajaroDto.numeroSerieMonedero,
@@ -163,6 +169,7 @@ export class AuthService {
           }
         }
 
+        // Obtener el idCliente del monedero previamente registrado
         idClienteMonedero = monederos.data.idCliente;
       }
 
@@ -201,7 +208,7 @@ export class AuthService {
       const userSave = await this.usuariosRepository.save(newUser); //creamos el usuario
 
       //Le añadimos los permisos correspondientes
-      const permisosIds = [122,92];
+      const permisosIds = [92];
       if (permisosIds.length > 0) {
         const usuariosPermisos = permisosIds.map((permisoId) =>
           this.permisosRepository.create({

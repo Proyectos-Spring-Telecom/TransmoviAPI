@@ -421,6 +421,38 @@ ORDER BY Id ASC
   }
 
   // ========================================
+  // 🔹 OBTENER TODOS LOS CLIENTES ACTIVOS (PÚBLICO - SIN AUTENTICACIÓN)
+  // ========================================
+  async getClientesPublicos(): Promise<ApiResponseCommon> {
+    try {
+      const clientes = await this.clienteRepository.find({
+        where: { estatus: EstatusEnum.ACTIVO },
+        select: ['id', 'nombre'],
+        order: { id: 'ASC' },
+      });
+
+      // 🔥 Forzamos ids a number y solo devolvemos id y nombre
+      const data = clientes.map((item) => ({
+        id: Number(item.id),
+        nombre: item.nombre,
+      }));
+
+      const result: ApiResponseCommon = {
+        data: data,
+      };
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new InternalServerErrorException({
+        message: 'Ocurrió un error al obtener el listado de clientes.',
+        error: error.message,
+      });
+    }
+  }
+
+  // ========================================
   // 🔹 OBTENER UN CLIENTE
   // ========================================
   async getOneCliente(id: number) {
