@@ -64,6 +64,9 @@ export class Vehiculos {
   @Column("int", { name: "PasajerosParados", nullable: true, unsigned: true })
   pasajerosParados: number;
 
+  @Column("int", { name: "CantidadPuertas", nullable: true })
+  cantidadPuertas: number | null;
+
   @Column("datetime", {
     name: "FechaCreacion",
     default: () => "CURRENT_TIMESTAMP",

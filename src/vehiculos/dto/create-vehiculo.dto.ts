@@ -128,6 +128,17 @@ export class CreateVehiculoDto {
   @IsNumber()
   pasajerosParados?: number;
 
+  @ApiProperty({
+    description: 'Cantidad de puertas del vehículo',
+    example: 4,
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(2)
+  @Max(6)
+  cantidadPuertas?: number;
+
   @IsOptional()
   @IsInt()
   @IsIn([0, 1], { message: 'Solo se permite 0 o 1' })
