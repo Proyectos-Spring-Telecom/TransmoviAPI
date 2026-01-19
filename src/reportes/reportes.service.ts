@@ -106,7 +106,7 @@ SELECT
     END AS ticketPromedio,
     CASE 
         WHEN COUNT(DISTINCT td.Id) > 0
-        THEN (COUNT(DISTINCT CASE WHEN td.ControlTransaccion = 1 THEN td.Id END) * 100.0) / COUNT(DISTINCT td.Id)
+        THEN (COUNT(DISTINCT CASE WHEN td.IdControlTransaccion = 1 THEN td.Id END) * 100.0) / COUNT(DISTINCT td.Id)
         ELSE 0
     END AS porcentajeElectronico,
     COALESCE(SUM(vc.Diferencia), 0) AS ascensos,
@@ -510,6 +510,7 @@ ORDER BY datos.ingresos DESC, datos.numeroEconomico ASC;
       const fechaFin = filtros.fechaFin ? filtros.fechaFin.split('T')[0] : null;
 
       // Consulta principal: empezar desde transacciones y agrupar por instalación/dispositivo
+      // IMPORTANTE: La relación con BlueVoxs se gestiona mediante la tabla intermedia InstalacionesBlueVoxs
       const query = `
 SELECT
     datos.idInstalacion,
@@ -528,7 +529,15 @@ FROM (
     SELECT
         ins.Id AS idInstalacion,
         disp.NumeroSerie AS serieDispositivo,
-        bv.NumeroSerie AS serieBlueVox,
+        COALESCE(
+            (SELECT GROUP_CONCAT(bv.NumeroSerie SEPARATOR ', ')
+             FROM InstalacionesBlueVoxs ibv
+             INNER JOIN BlueVoxs bv ON ibv.IdBlueVox = bv.Id
+             WHERE ibv.IdInstalacion = ins.Id
+               AND ibv.Estatus = 1
+               AND bv.IdCliente = ins.IdCliente),
+            NULL
+        ) AS serieBlueVox,
         veh.NumeroEconomico AS numeroEconomico,
         veh.Placa AS placa,
         CONCAT(veh.NumeroEconomico, ' - ', veh.Placa) AS vehiculo,
@@ -543,14 +552,13 @@ FROM (
     LEFT JOIN Turnos t ON v.IdTurno = t.Id
     LEFT JOIN Instalaciones ins ON t.IdInstalacion = ins.Id
     LEFT JOIN Dispositivos disp ON ins.IdDispositivo = disp.Id
-    LEFT JOIN BlueVoxs bv ON ins.IdBlueVox = bv.Id
     LEFT JOIN Vehiculos veh ON ins.IdVehiculo = veh.Id
     WHERE c.Id IN (${placeholders})
     ${fechaInicio ? `AND DATE(td.FHRegistro) >= ?` : ''}
     ${fechaFin ? `AND DATE(td.FHRegistro) <= ?` : ''}
     ${filtros.idDispositivo ? 'AND disp.Id = ?' : ''}
     ${filtros.idInstalacion ? 'AND ins.Id = ?' : ''}
-    GROUP BY ins.Id, disp.NumeroSerie, bv.NumeroSerie, veh.NumeroEconomico, veh.Placa, disp.EstadoActual
+    GROUP BY ins.Id, disp.NumeroSerie, veh.NumeroEconomico, veh.Placa, disp.EstadoActual
 ) AS datos
 LEFT JOIN (
     SELECT 
