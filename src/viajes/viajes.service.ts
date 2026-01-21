@@ -412,8 +412,10 @@ WHERE v.Id = ${idViaje}
 
                 //Obtenemos los ultimos puntos del derrotero
                 const ultimoPunto1 = recorridoInterpolar.length - 1;
-                const { latitudFinal1, longitudFinal1 } = recorridoInterpolar[ultimoPunto1];
-
+                const { lat: latitudFinal1Raw, lng: longitudFinal1Raw } = recorridoInterpolar[ultimoPunto1];
+                // Formatear a decimal(10,7) - 7 decimales
+                const latitudFinal1 = parseFloat(Number(latitudFinal1Raw).toFixed(7));
+                const longitudFinal1 = parseFloat(Number(longitudFinal1Raw).toFixed(7));
 
                 await this.transaccionesService.createTransaccionDebitoByViajes(
                   montoCalculado,
@@ -485,7 +487,10 @@ WHERE v.Id = ${idViaje}
 
                 //Obtenemos los ultimos puntos del derrotero
                 const ultimoPunto = recorridoInterpolar.length - 1;
-                const { latitudFinal, longitudFinal } = recorridoInterpolar[ultimoPunto];
+                const { lat: latitudFinal, lng:longitudFinal } = recorridoInterpolar[ultimoPunto];
+                // Formatear a decimal(10,7) - 7 decimales
+                const latitudFinalRaw = parseFloat(Number(latitudFinal).toFixed(7));
+                const longitudFinalRaw = parseFloat(Number(longitudFinal).toFixed(7));
 
 
                 await this.transaccionesService.createTransaccionDebitoByViajes(
@@ -494,8 +499,8 @@ WHERE v.Id = ${idViaje}
                   longitudInicial,
                   i.fechaHoraInicio || new Date(),
                   distancia,
-                  latitudFinal,
-                  longitudFinal,
+                  latitudFinalRaw,
+                  longitudFinalRaw,
                   i.numeroSerieDispositivo,
                   idViaje,
                   i.numeroSerieMonedero,
