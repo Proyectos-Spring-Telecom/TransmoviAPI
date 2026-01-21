@@ -3237,6 +3237,9 @@ WHERE tr.IdUsuario = ?   -- 👈 filtro por usuario
     }
   }
 
+  // ========================================
+  // 🔹 Transacciones Debito Para Cierre de Viajes
+  // ========================================
 
   async createTransaccionDebitoByViajes(
     montoCalculado: number,
@@ -3248,8 +3251,9 @@ WHERE tr.IdUsuario = ?   -- 👈 filtro por usuario
     longitudFinal: number,
     numeroSerieDispositivo: string,
     idViaje: number,
-    idUser: number,
     numeroSerieMonedero: string,
+    idUser: number,
+    idTransaccion: number,
     idCardMonedero?: string,
   ): Promise<ApiCrudResponse> {
     let estado: EstadoTransaccion = EstadoTransaccion.INICIADA;
@@ -3374,7 +3378,7 @@ WHERE
             idUsuario: idUsuario
           }
         );
-        await this.transaccionesdebitoRepository.save(newTransaccion);
+        await this.transaccionesdebitoRepository.update(idTransaccion, newTransaccion);
         //se guarda en el historico
         await this.historicoTransaccionesDebitoRepository.save(newTransaccion);
 
@@ -3394,7 +3398,7 @@ WHERE
           status: 'error',
           message: 'Transacción creada correctamente',
           data: {
-            id: Number(newTransaccion.id),
+            id: Number(idTransaccion),
             nombre: `${monedero.numeroSerie}`,
           },
         };
@@ -3436,7 +3440,7 @@ WHERE
         bodyTransaccionDebito,
       );
       const transaccionSave =
-        await this.transaccionesdebitoRepository.save(newTransaccion);
+        await this.transaccionesdebitoRepository.update(idTransaccion, newTransaccion);
         await this.historicoTransaccionesDebitoRepository.save(newTransaccion);
 
       //Se guardara la transaccion en el historico de transacciones solamente cuando controltransaccion sea pagado
@@ -3459,7 +3463,7 @@ WHERE
         status: 'success',
         message: 'Transacción creada correctamente',
         data: {
-          id: Number(transaccionSave.id),
+          id: Number(idTransaccion),
           nombre: `${monedero.numeroSerie}`,
         },
       };
@@ -3469,11 +3473,11 @@ WHERE
       if (error instanceof HttpException) {
         throw error;
       }
-      console.log({ 'TransaccionesDebito': error })
+      console.log({ 'Create TransaccionesDebito By Viajes': error })
       if (error instanceof HttpException) throw error;
 
       throw new InternalServerErrorException(
-        `Error al generar la transacción de débito`,
+        `Error al cerrar la transacción abiertas de débito de un viaje`,
       );
     }
   }
