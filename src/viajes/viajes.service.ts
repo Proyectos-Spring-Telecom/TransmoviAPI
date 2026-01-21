@@ -491,7 +491,7 @@ WHERE v.Id = ${idViaje}
                 // Formatear a decimal(10,7) - 7 decimales
                 const latitudFinalRaw = parseFloat(Number(latitudFinal).toFixed(7));
                 const longitudFinalRaw = parseFloat(Number(longitudFinal).toFixed(7));
-
+                //console.log(latitudFinalRaw,longitudFinalRaw,'///*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*/*',latitudFinal, longitudFinal);
 
                 await this.transaccionesService.createTransaccionDebitoByViajes(
                   montoCalculado,
