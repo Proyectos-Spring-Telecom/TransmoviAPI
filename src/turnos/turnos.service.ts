@@ -47,18 +47,18 @@ export class TurnosService {
       //Creamos el turno
 
       const { fechaDesfasada, fechaActual } = await horaDesfasada();
-      const { numeroSerieDispositivo, ...body } = createTurnoDto
+      const { numeroSerieDispositivo, ...body } = createTurnoDto;
 
       const query = `
       SELECT
 	i.Id 
 FROM Dispositivos d
 LEFT JOIN Instalaciones i ON i.IdDispositivo = d.Id
-WHERE d.NumeroSerie = '${numeroSerieDispositivo}'
+WHERE d.NumeroSerie = ?
 AND i.Estatus = 1
-      `
+      `;
 
-      const instalacion = await this.turnosRepository.query(query);
+      const instalacion = await this.turnosRepository.query(query, [numeroSerieDispositivo]);
       if (instalacion.length === 0) {
         throw new NotFoundException('No se ha encontrado la instalación asignada al dispositivo.');
       }
@@ -168,7 +168,7 @@ SELECT
   d.Marca AS marcaDispositivo,
   d.Modelo AS modeloDispositivo,
 
-  -- BlueVox
+  -- BlueVox (primer BlueVox activo asociado a la instalación)
   b.Id AS idBlueVox,
   b.NumeroSerie AS numeroSerieBlueVox,
   b.Marca AS marcaBlueVox,
@@ -198,9 +198,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -219,12 +227,7 @@ ORDER BY t.Id DESC
   SELECT COUNT(*) AS total
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
 INNER JOIN Clientes c ON t.IdCliente = c.Id
-INNER JOIN Operadores o ON t.IdOperador = o.Id
-INNER JOIN Usuarios u ON o.IdUsuario = u.Id
 
 WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
   
@@ -299,9 +302,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -320,12 +331,7 @@ ORDER BY t.Id DESC
   SELECT COUNT(*) AS total
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
 INNER JOIN Clientes c ON t.IdCliente = c.Id
-INNER JOIN Operadores o ON t.IdOperador = o.Id
-INNER JOIN Usuarios u ON o.IdUsuario = u.Id
   `,
           );
           break;
@@ -408,7 +414,15 @@ INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Turnos t ON t.IdInstalacion = i.Id
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 LEFT JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-LEFT JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo, b.IdCliente
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id AND first_bv.IdCliente = i.IdCliente
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
 LEFT JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 LEFT JOIN Operadores o ON t.IdOperador = o.Id
 LEFT JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -433,7 +447,15 @@ FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Turnos t ON t.IdInstalacion = i.Id AND t.IdCliente = i.IdCliente
 INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
@@ -537,9 +559,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -612,9 +642,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -695,7 +733,15 @@ FROM UsuariosInstalaciones ui
 INNER JOIN Instalaciones i ON ui.IdInstalacion = i.Id
 INNER JOIN Turnos t ON t.IdInstalacion = i.Id AND t.IdCliente = i.IdCliente
 INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
 INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON i.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
@@ -794,9 +840,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -868,9 +922,17 @@ SELECT
 
 FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
-INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id
-INNER JOIN BlueVoxs b ON i.IdBlueVox = b.Id
-INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id
+INNER JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
+INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 INNER JOIN Operadores o ON t.IdOperador = o.Id
 INNER JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -951,7 +1013,15 @@ FROM Turnos t
 INNER JOIN Instalaciones i ON t.IdInstalacion = i.Id
 INNER JOIN Clientes c ON t.IdCliente = c.Id
 LEFT JOIN Dispositivos d ON i.IdDispositivo = d.Id AND i.IdCliente = d.IdCliente
-LEFT JOIN BlueVoxs b ON i.IdBlueVox = b.Id AND i.IdCliente = b.IdCliente
+LEFT JOIN (
+  SELECT ibv.IdInstalacion, b.Id, b.NumeroSerie, b.Marca, b.Modelo, b.IdCliente
+  FROM InstalacionesBlueVoxs ibv
+  INNER JOIN BlueVoxs b ON ibv.IdBlueVox = b.Id
+  WHERE ibv.Estatus = 1
+  ORDER BY ibv.Id
+  LIMIT 1
+) AS first_bv ON first_bv.IdInstalacion = i.Id AND first_bv.IdCliente = i.IdCliente
+LEFT JOIN BlueVoxs b ON first_bv.Id = b.Id
 LEFT JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
 LEFT JOIN Operadores o ON t.IdOperador = o.Id
 LEFT JOIN Usuarios u ON o.IdUsuario = u.Id
@@ -1073,18 +1143,18 @@ ORDER BY t.Inicio DESC;
       if (!idOperador) {
         throw new UnauthorizedException(`El usuario no está autorizado para actualizar un turno.`)
       }
-      const { numeroSerieDispositivo } = updateTurnoDto
+      const { numeroSerieDispositivo } = updateTurnoDto;
 
       const query = `
       SELECT
 	i.Id 
 FROM Dispositivos d
 LEFT JOIN Instalaciones i ON i.IdDispositivo = d.Id
-WHERE d.NumeroSerie = '${numeroSerieDispositivo}'
+WHERE d.NumeroSerie = ?
 AND i.Estatus = 1
-      `
+      `;
 
-      const instalacion = await this.turnosRepository.query(query);
+      const instalacion = await this.turnosRepository.query(query, [numeroSerieDispositivo]);
       if (instalacion.length === 0) {
         throw new NotFoundException('No se ha encontrado la instalación asignada al dispositivo.');
       }
