@@ -96,261 +96,255 @@ export class ConteopasajerosService {
     }
   }
 
-  //funcion para obtener los clientes hijos
-  private async clienteHijos(cliente: number) {
-    const clientesFiltrado = await this.clienteRepository.query(
-      `CALL spGetClientes(?);`,
-      [cliente],
-    );
+ //funcion para obtener los clientes hijos
+private async clienteHijos(cliente: number) {
+  const clientesFiltrado = await this.clienteRepository.query(
+    `CALL spGetClientes(?);`,
+    [cliente],
+  );
 
-    const idsFiltrados = clientesFiltrado[0]; // El primer índice contiene los resultados
-    const ids = idsFiltrados
-      .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
-      .filter(Boolean);
-    if (ids.length === 0) {
-      return { data: [] }; // No hay clientes que consultar
+  const idsFiltrados = clientesFiltrado[0];
+  const ids = idsFiltrados
+    .map((clientesFiltrado: any) => Number(clientesFiltrado.Id))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    return { data: [] };
+  }
+
+  const placeholders = ids.map(() => '?').join(', ');
+  return { ids, placeholders };
+}
+
+private async consultarConteoPasajerosPaginado(
+  cliente: number,
+  limit: number,
+  offset: number,
+) {
+  const { ids, placeholders } = await this.clienteHijos(cliente);
+  const query = `
+SELECT
+    cp.Id AS id,
+    cp.Entradas AS entradas,
+    cp.Salidas AS salidas,
+    cp.Diferencia AS diferencia,
+    cp.FechaHora AS fechaHora,
+    cp.FHRegistro AS fhRegistro,
+    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
+    bv.Marca AS marcaBlueVox,
+    bv.Modelo AS modeloBlueVox,
+    v.Placa AS placaVehiculo,
+    c.Id AS idCliente,
+    CONCAT(
+        c.Nombre,
+        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
+        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
+    ) AS NombreCompletoCliente
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+WHERE c.Id IN (${placeholders})
+ORDER BY cp.Id DESC
+LIMIT ? OFFSET ?;
+  `;
+  return this.conteopasajeroRepository.query(query, [...ids, limit, offset]);
+}
+
+private async consultarTotalConteoPasajerosPaginados(cliente: number) {
+  const { ids, placeholders } = await this.clienteHijos(cliente);
+  const query = `
+SELECT COUNT(*) AS total
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+WHERE c.Id IN (${placeholders})
+  `;
+  return await this.conteopasajeroRepository.query(query, [...ids]);
+}
+
+private async consultarConteoPasajerosPaginadoCL(
+  cliente: number,
+  limit: number,
+  offset: number,
+) {
+  const query = `
+SELECT
+    cp.Id AS id,
+    cp.Entradas AS entradas,
+    cp.Salidas AS salidas,
+    cp.Diferencia AS diferencia,
+    cp.FechaHora AS fechaHora,
+    cp.FHRegistro AS fhRegistro,
+    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
+    bv.Marca AS marcaBlueVox,
+    bv.Modelo AS modeloBlueVox,
+    v.Placa AS placaVehiculo,
+    c.Id AS idCliente,
+    CONCAT(
+        c.Nombre,
+        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
+        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
+    ) AS NombreCompletoCliente
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+WHERE c.Id = ?
+ORDER BY cp.Id DESC
+LIMIT ? OFFSET ?;
+  `;
+  return this.conteopasajeroRepository.query(query, [cliente, limit, offset]);
+}
+
+private async consultarTotalConteoPasajerosPaginadosCl(cliente: number) {
+  const query = `
+SELECT COUNT(*) AS total
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+WHERE c.Id = ?
+  `;
+  return await this.conteopasajeroRepository.query(query, [cliente]);
+}
+
+async findAll(
+  idUser: number,
+  cliente: number,
+  rol: number,
+  page: number,
+  limit: number
+): Promise<ApiResponseCommon> {
+  try {
+    let conteoPasajeros;
+    const offset = (page - 1) * limit;
+    let totalResult;
+    switch (rol) {
+      case 1:
+        conteoPasajeros = await this.conteopasajeroRepository.query(
+          `
+SELECT
+    cp.Id AS id,
+    cp.Entradas AS entradas,
+    cp.Salidas AS salidas,
+    cp.Diferencia AS diferencia,
+    cp.FechaHora AS fechaHora,
+    cp.FHRegistro AS fhRegistro,
+    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
+    bv.Marca AS marcaBlueVox,
+    bv.Modelo AS modeloBlueVox,
+    v.Placa AS placaVehiculo,
+    c.Id AS idCliente,
+    CONCAT(
+        c.Nombre,
+        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
+        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
+    ) AS NombreCompletoCliente
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+ORDER BY cp.Id DESC
+LIMIT ? OFFSET ?;
+          `,
+          [limit, offset],
+        );
+
+        totalResult = await this.conteopasajeroRepository.query(
+          `
+SELECT COUNT(*) AS total
+FROM ConteoPasajeros cp
+INNER JOIN BlueVoxs bv
+    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
+LEFT JOIN Instalaciones i 
+    ON i.IdBlueVox = bv.Id
+LEFT JOIN Vehiculos v 
+    ON i.IdVehiculo = v.Id
+INNER JOIN Clientes c
+    ON bv.IdCliente = c.Id
+          `,
+        );
+        break;
+
+      case 2:
+        conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
+        totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
+        break;
+
+      case 3:
+        conteoPasajeros = await this.consultarConteoPasajerosPaginadoCL(cliente, limit, offset);
+        totalResult = await this.consultarTotalConteoPasajerosPaginadosCl(cliente);
+        break;
+
+      case 8:
+        conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
+        totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
+        break;
+
+      case 10:
+        conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
+        totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
+        break;
+
+      default:
+        conteoPasajeros = await this.consultarConteoPasajerosPaginadoCL(cliente, limit, offset);
+        totalResult = await this.consultarTotalConteoPasajerosPaginadosCl(cliente);
+        break;
     }
 
-    // 3. Construir el query dinámico con los IDs
-    const placeholders = ids.map(() => '?').join(', ');
-    return { ids, placeholders };
-  }
+    const total = Number(totalResult[0]?.total || 0);
 
-  private async consultarConteoPasajerosPaginado(
-    cliente: number,
-    limit: number,
-    offset: number,
-  ) {
-    const { ids, placeholders } = await this.clienteHijos(cliente);
-    const query = `
-SELECT
-    cp.Id AS id,
-    cp.Entradas AS entradas,
-    cp.Salidas AS salidas,
-    cp.Diferencia AS diferencia,
-    cp.FechaHora AS fechaHora,
-    cp.FHRegistro AS fhRegistro,
-    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
-    bv.Marca AS marcaBlueVox,
-    bv.Modelo AS modeloBlueVox,
-    c.Id AS idCliente,
-    CONCAT(
-        c.Nombre,
-        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
-        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
-    ) AS NombreCompletoCliente
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
+    const data = conteoPasajeros.map((item) => ({
+      ...item,
+      id: Number(item.id),
+      idCliente: Number(item.idCliente),
+    }));
 
-WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-
-ORDER BY cp.Id DESC
-LIMIT ? OFFSET ?;
-    `;
-    return this.conteopasajeroRepository.query(query, [
-      ...ids,
-      limit,
-      offset,
-    ]);
-  }
-
-  private async consultarTotalConteoPasajerosPaginados(cliente: number) {
-    const { ids, placeholders } = await this.clienteHijos(cliente);
-    const query = `  
-    SELECT COUNT(*) AS total
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
-
-WHERE c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-`;
-    return await this.conteopasajeroRepository.query(query, [...ids]);
-  }
-
-  private async consultarConteoPasajerosPaginadoCL(
-    cliente: number,
-    limit: number,
-    offset: number,
-  ) {
-    const query = `
-SELECT
-    cp.Id AS id,
-    cp.Entradas AS entradas,
-    cp.Salidas AS salidas,
-    cp.Diferencia AS diferencia,
-    cp.FechaHora AS fechaHora,
-    cp.FHRegistro AS fhRegistro,
-    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
-    bv.Marca AS marcaBlueVox,
-    bv.Modelo AS modeloBlueVox,
-    c.Id AS idCliente,
-    CONCAT(
-        c.Nombre,
-        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
-        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
-    ) AS NombreCompletoCliente
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
-
-WHERE c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-
-ORDER BY cp.Id DESC
-LIMIT ? OFFSET ?;
-    `;
-    return this.conteopasajeroRepository.query(query, [
-      cliente,
-      limit,
-      offset,
-    ]);
-  }
-
-  private async consultarTotalConteoPasajerosPaginadosCl(cliente: number) {
-    const query = `  
-    SELECT COUNT(*) AS total
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
-
-WHERE c.Id = ?   -- 🔹 aquí colocas el ID del cliente que quieres consultar
-`;
-    return await this.conteopasajeroRepository.query(query, [cliente]);
-  }
-
-  async findAll(
-    idUser: number,
-    cliente: number,
-    rol: number,
-    page: number,
-    limit: number
-  ): Promise<ApiResponseCommon> {
-    try {
-      let conteoPasajeros;
-      const offset = (page - 1) * limit;
-      let totalResult;
-      switch (rol) {
-        case 1:
-          conteoPasajeros = await this.conteopasajeroRepository.query(
-            `
-SELECT
-    cp.Id AS id,
-    cp.Entradas AS entradas,
-    cp.Salidas AS salidas,
-    cp.Diferencia AS diferencia,
-    cp.FechaHora AS fechaHora,
-    cp.FHRegistro AS fhRegistro,
-    cp.NumeroSerieBlueVox AS numeroSerieBlueVox,
-    bv.Marca AS marcaBlueVox,
-    bv.Modelo AS modeloBlueVox,
-    c.Id AS idCliente,
-    CONCAT(
-        c.Nombre,
-        IFNULL(CONCAT(' ', c.ApellidoPaterno), ''),
-        IFNULL(CONCAT(' ', c.ApellidoMaterno), '')
-    ) AS NombreCompletoCliente
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
-
-ORDER BY cp.Id DESC
-LIMIT ? OFFSET ?;
-        `,
-            [limit, offset],
-          );
-
-          // Query para total (sin paginación)
-          totalResult = await this.conteopasajeroRepository.query(
-            `
-  SELECT COUNT(*) AS total
-FROM ConteoPasajeros cp
-INNER JOIN BlueVoxs bv
-    ON cp.NumeroSerieBlueVox = bv.NumeroSerie
-INNER JOIN Clientes c
-    ON bv.IdCliente = c.Id
-
-  `,
-          );
-          break;
-
-        case 2:
-          // Consulta de datos paginados Usuario Administrador
-          conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
-
-          // Query para total (sin paginación)
-          totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
-          break;
-
-        case 3:
-          // Consulta de datos paginados Usuario Operador
-          conteoPasajeros = await this.consultarConteoPasajerosPaginadoCL(cliente, limit, offset);
-
-          // Query para total (sin paginación)
-          totalResult = await this.consultarTotalConteoPasajerosPaginadosCl(cliente);
-          break;
-
-        case 8:
-          // Consulta de datos paginados Usuario Reportes
-          conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
-
-          // Query para total (sin paginación)
-          totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
-          break;
-
-        case 10:
-          // Consulta de datos paginados Usuario Capturista
-          conteoPasajeros = await this.consultarConteoPasajerosPaginado(cliente, limit, offset);
-
-          // Query para total (sin paginación)
-          totalResult = await this.consultarTotalConteoPasajerosPaginados(cliente);
-          break;
-
-        default:
-          // Consulta de datos paginados Usuario Operador
-          conteoPasajeros = await this.consultarConteoPasajerosPaginadoCL(cliente, limit, offset);
-
-          // Query para total (sin paginación)
-          totalResult = await this.consultarTotalConteoPasajerosPaginadosCl(cliente);
-          break;
-      }
-
-      const total = Number(totalResult[0]?.total || 0);
-
-      const data = conteoPasajeros.map((item) => ({
-        ...item,
-        id: Number(item.id),
-        idCliente: Number(item.idCliente),
-      }));
-
-      const result: ApiResponseCommon = {
-        data: data,
-        paginated: {
-          total,
-          page,
-          lastPage: Math.ceil(total / limit),
-        },
-      };
-      return result;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new InternalServerErrorException({
-        message: 'Error al obtener conteo pasajeros',
-        error: error.message,
-      });
+    const result: ApiResponseCommon = {
+      data: data,
+      paginated: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+      },
+    };
+    return result;
+  } catch (error) {
+    if (error instanceof HttpException) {
+      throw error;
     }
+    throw new InternalServerErrorException({
+      message: 'Error al obtener conteo pasajeros',
+      error: error.message,
+    });
   }
+}
 
   private async consultarConteoPasajerosPaginadoRango(
     fechaInicio: string,
