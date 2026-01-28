@@ -49,6 +49,7 @@ export class SocketIOAdapter implements WebSocketAdapter {
     // Crear UNA ÚNICA instancia del servidor Socket.IO adjunto al servidor HTTP de NestJS
     SocketIOAdapter.ioServer = new Server(httpServer, {
       ...options,
+      path: '/apidev/socket.io', // Path para que funcione con el prefijo /apidev
       cors: options?.cors || {
         origin: '*',
         methods: ['GET', 'POST'],
