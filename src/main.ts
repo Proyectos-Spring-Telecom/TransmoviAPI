@@ -13,29 +13,12 @@ async function bootstrap() {
 
   app.useGlobalFilters(new HttpStringResponseFilter());
 
-  // Configurar CORS
-  // Excluir SOLO los upgrade requests de WebSocket (Socket.IO maneja su propio CORS para estos)
-  // Las peticiones HTTP normales (incluidas las de /monitoreo controller) necesitan CORS
-  const httpAdapter = app.getHttpAdapter();
-  const instance = httpAdapter.getInstance();
-  
-  instance.use((req: any, res: any, next: any) => {
-    // Solo excluir upgrade requests de WebSocket y rutas internas de Socket.IO
-    const isWebSocketUpgrade = req.headers.upgrade === 'websocket';
-    const isSocketIOInternal = req.url && req.url.startsWith('/socket.io');
-    
-    // Para todas las demás rutas (incluido /monitoreo HTTP), aplicar CORS
-    if (!isWebSocketUpgrade && !isSocketIOInternal) {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
-      res.header('Access-Control-Allow-Credentials', 'true');
-      
-      if (req.method === 'OPTIONS') {
-        return res.sendStatus(204);
-      }
-    }
-    next();
+  // Configurar CORS global
+  app.enableCors({
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: 'Content-Type, Authorization, Accept',
   });
 
   const config = new DocumentBuilder()
