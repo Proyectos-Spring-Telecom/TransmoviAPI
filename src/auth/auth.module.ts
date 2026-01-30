@@ -16,6 +16,8 @@ import { PasajerosModule } from 'src/pasajeros/pasajeros.module';
 import { NetpayModule } from 'src/netpay/netpay.module';
 import { Pasajeros } from 'src/entities/Pasajeros';
 import { Monederos } from 'src/entities/Monederos';
+import { Turnos } from 'src/entities/Turnos';
+import { Viajes } from 'src/entities/Viajes';
 
 @Module({
   imports: [
@@ -33,7 +35,7 @@ import { Monederos } from 'src/entities/Monederos';
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN') },
       }),
     }),
-    TypeOrmModule.forFeature([Usuarios, UsuariosPermisos, CodigoAutenticacion, Pasajeros, Monederos]),
+    TypeOrmModule.forFeature([Usuarios, UsuariosPermisos, CodigoAutenticacion, Pasajeros, Monederos, Turnos, Viajes]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

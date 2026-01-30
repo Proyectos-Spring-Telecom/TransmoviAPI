@@ -30,6 +30,8 @@ import { Licencias } from 'src/entities/Licencias';
 import { NetpayService } from 'src/netpay/netpay.service';
 import { Pasajeros } from 'src/entities/Pasajeros';
 import { Monederos } from 'src/entities/Monederos';
+import { Turnos } from 'src/entities/Turnos';
+import { Viajes } from 'src/entities/Viajes';
 
 @Injectable()
 export class AuthService {
@@ -44,6 +46,10 @@ export class AuthService {
     private readonly pasajeroRepository: Repository<Pasajeros>,
     @InjectRepository(Monederos)
     private readonly monederosRepository: Repository<Monederos>,
+    @InjectRepository(Turnos)
+    private readonly turnosRepository: Repository<Turnos>,
+    @InjectRepository(Viajes)
+    private readonly viajesRepository: Repository<Viajes>,
     private readonly jwtService: JwtService,
     private readonly emailService: MailService,
     private readonly bitacoraLogger: BitacoraLoggerService,
@@ -578,6 +584,43 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
         rol: user.idRol,
         idOperador: operador[0].idOperador
       };
+
+      // Si el rol es 3 (operador), buscar turno y viaje activos
+      let idTurno: number | null = null;
+      let idViaje: number | null = null;
+
+      if (Number(user.idRol) === 3 && operador[0].idOperador) {
+        // Buscar turno activo (estatus = 1) para este operador
+        const turnoActivo = await this.turnosRepository.findOne({
+          where: {
+            idOperador: operador[0].idOperador,
+            estatus: 1,
+          },
+          order: {
+            inicio: 'DESC', // Más reciente primero
+          },
+        });
+
+        if (turnoActivo) {
+          idTurno = turnoActivo.id;
+
+          // Buscar viaje activo (estatus = 1) para este turno
+          const viajeActivo = await this.viajesRepository.findOne({
+            where: {
+              idTurno: turnoActivo.id,
+              estatus: 1,
+            },
+            order: {
+              inicio: 'DESC', // Más reciente primero
+            },
+          });
+
+          if (viajeActivo) {
+            idViaje = viajeActivo.id;
+          }
+        }
+      }
+
       return {
         message: `login exitoso`,
         id: Number(operador[0].IdUsuario),
@@ -606,6 +649,8 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
         rol: user.idRol2,
         token: this.jwtService.sign(payload),
         permisos: permisos,
+        idTurno: idTurno,
+        idViaje: idViaje,
       };
     } catch (error) {
       if (error instanceof HttpException) {
@@ -741,6 +786,43 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
           rol: user.idRol,
           idOperador: operador[0].idOperador
         };
+
+        // Si el rol es 3 (operador), buscar turno y viaje activos
+        let idTurno: number | null = null;
+        let idViaje: number | null = null;
+
+        if (Number(user.idRol) === 3 && operador[0].idOperador) {
+          // Buscar turno activo (estatus = 1) para este operador
+          const turnoActivo = await this.turnosRepository.findOne({
+            where: {
+              idOperador: operador[0].idOperador,
+              estatus: 1,
+            },
+            order: {
+              inicio: 'DESC', // Más reciente primero
+            },
+          });
+
+          if (turnoActivo) {
+            idTurno = turnoActivo.id;
+
+            // Buscar viaje activo (estatus = 1) para este turno
+            const viajeActivo = await this.viajesRepository.findOne({
+              where: {
+                idTurno: turnoActivo.id,
+                estatus: 1,
+              },
+              order: {
+                inicio: 'DESC', // Más reciente primero
+              },
+            });
+
+            if (viajeActivo) {
+              idViaje = viajeActivo.id;
+            }
+          }
+        }
+
         return {
           message: `login exitoso`,
           id: Number(operador[0].IdUsuario),
@@ -768,6 +850,8 @@ LEFT JOIN LicenciasJSON lj ON lj.IdUsuario = du.IdUsuario;
           rol: user.idRol2,
           token: this.jwtService.sign(payload),
           permisos: permisos,
+          idTurno: idTurno,
+          idViaje: idViaje,
         };
       }
       // Obtener logotipo del cliente o del padre si es null
