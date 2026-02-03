@@ -619,6 +619,7 @@ ORDER BY ru.Id DESC
           break;
 
         default:
+          console.log('default');
           // Consulta de datos paginados Usuario
           rutas = await this.usuarioszonasRepository.query(
             `
@@ -657,8 +658,7 @@ INNER JOIN Rutas ru ON ru.IdZona = r.Id              -- Ruta
 LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id        -- Zona final (puede ser null)
 INNER JOIN Clientes c ON r.IdCliente = c.Id            -- Cliente
 
-WHERE ur.IdUsuario = ?
-  AND ur.Estatus = 1
+WHERE  ur.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
   AND c.Estatus = 1

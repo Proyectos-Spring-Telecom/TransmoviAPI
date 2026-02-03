@@ -730,13 +730,13 @@ LEFT JOIN Zonas rf ON ru.IdZonaFin = rf.Id
 INNER JOIN Clientes c ON r.IdCliente = c.Id
 INNER JOIN UsuariosZonas ur ON ur.IdZona = r.Id
 
-WHERE ur.IdUsuario = ?
-  AND ur.Estatus = 1
+WHERE 
+ ur.Estatus = 1
   AND r.Estatus = 1
   AND ru.Estatus = 1
   AND d.Estatus = 1
   AND c.Estatus = 1
-   AND c.Id IN (${placeholders})   -- 🔹 aquí colocas el ID del cliente que quieres consultar
+   
 
 ORDER BY d.Id DESC;
       `,
