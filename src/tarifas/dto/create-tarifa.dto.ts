@@ -57,6 +57,16 @@ export class CreateTarifaDto {
   costoPorEstacion?: number;
 
   @ApiProperty({
+    example: 3,
+    description: 'Cantidad de estaciones base',
+    required: false,
+  })
+  @IsOptional()
+  @IsInt({ message: 'La cantidad de estaciones base debe ser un número entero' })
+  @Min(0, { message: 'La cantidad de estaciones base no puede ser negativa' })
+  cantidadEstacionesBase?: number;
+
+  @ApiProperty({
     description: 'ID del tipo de tarifa. Debe ser un ID válido del catálogo de tipos de tarifa (obtener desde /cat-tipo-tarifa)',
     required: true,
   })
