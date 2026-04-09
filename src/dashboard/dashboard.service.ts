@@ -1270,9 +1270,13 @@ ORDER BY periodo, ruta;
             validacionesExitosas: 0,
             validacionesFallidas: 0,
             graficaAscensosVsBoletos: [],
+            alertas: [],
           };
         }
       }
+
+      // Alertas de monitoreo (ÚltimaPosicion: inactividad ≥12 h, exceso de velocidad >90)
+      const alertas = await this.getDashboardAlertas(clienteFilter, clienteParams);
 
       // 1. Costo del ticket promedio (de TransaccionesDebito)
       const ticketPromedioData = await this.getTicketPromedio(clienteFilter, clienteFilter2, clienteParams, fechaInicio, fechaFin, filtroNum);
@@ -1328,6 +1332,7 @@ ORDER BY periodo, ruta;
         validacionesExitosas: validaciones.exitosas,
         validacionesFallidas: validaciones.fallidas,
         graficaAscensosVsBoletos,
+        alertas,
       };
 
       // Agregar ingresoTotalAyer solo si el filtro es "hoy" (1)
@@ -1346,6 +1351,106 @@ ORDER BY periodo, ruta;
         error: error.message,
       });
     }
+  }
+
+  /**
+   * Alertas de monitoreo: última fila por validador en Posiciones (MAX(Id) por NumeroSerieValidador).
+   * Vehículo vía instalación (join interno, no se expone objeto instalación en la respuesta).
+   * INACTIVIDAD: FechaHora con antigüedad ≥ 12 horas.
+   * EXCESO_VELOCIDAD: Velocidad > 90 (km/h).
+   */
+  private async getDashboardAlertas(clienteFilter: string, clienteParams: any[]) {
+    const ultimaPosicionSubquery = `
+      INNER JOIN (
+        SELECT NumeroSerieValidador AS ns, MAX(Id) AS maxId
+        FROM Posiciones
+        GROUP BY NumeroSerieValidador
+      ) ult ON p.Id = ult.maxId
+    `;
+
+    const baseFrom = `
+      FROM Posiciones p
+      ${ultimaPosicionSubquery}
+      INNER JOIN Validadores d ON p.NumeroSerieValidador = d.NumeroSerie
+      INNER JOIN Instalaciones i ON d.Id = i.IdValidador AND d.IdCliente = i.IdCliente
+      INNER JOIN Vehiculos v ON i.IdVehiculo = v.Id AND i.IdCliente = v.IdCliente
+      INNER JOIN Clientes c ON i.IdCliente = c.Id
+      WHERE i.Estatus = 1 AND d.Estatus = 1 AND v.Estatus = 1 AND c.Estatus = 1
+      ${clienteFilter}
+    `;
+
+    const cols = `
+        p.NumeroSerieValidador AS numeroSerieValidador,
+        p.FechaHora AS fechaHoraUltimaPosicion,
+        p.Velocidad AS velocidadReportada,
+        p.Latitud AS latitud,
+        p.Longitud AS longitud,
+        p.Id AS idPosicion,
+        v.Id AS idVehiculo,
+        v.Placa AS placaVehiculo,
+        v.Marca AS marcaVehiculo,
+        v.Modelo AS modeloVehiculo,
+        v.NumeroEconomico AS numeroEconomicoVehiculo,
+        v.Foto AS fotoVehiculo
+    `;
+
+    const sqlInactividad = `
+      SELECT
+        'INACTIVIDAD' AS tipoAlerta,
+        CONCAT(
+          'Inactividad: la última posición tiene más de 12 horas (',
+          DATE_FORMAT(p.FechaHora, '%Y-%m-%d %H:%i:%s'),
+          ').'
+        ) AS descripcion,
+        ${cols}
+      ${baseFrom}
+        AND p.FechaHora <= DATE_SUB(NOW(), INTERVAL 12 HOUR)
+    `;
+
+    const sqlVelocidad = `
+      SELECT
+        'EXCESO_VELOCIDAD' AS tipoAlerta,
+        CONCAT(
+          'Exceso de velocidad: ',
+          ROUND(CAST(p.Velocidad AS DECIMAL(10,2)), 1),
+          ' km/h (supera 90 km/h).'
+        ) AS descripcion,
+        ${cols}
+      ${baseFrom}
+        AND p.Velocidad IS NOT NULL AND CAST(p.Velocidad AS DECIMAL(10,2)) > 90
+    `;
+
+    const [rowsInactividad, rowsVelocidad] = await Promise.all([
+      this.clienteRepository.query(sqlInactividad, clienteParams),
+      this.clienteRepository.query(sqlVelocidad, clienteParams),
+    ]);
+
+    const rows = [...rowsInactividad, ...rowsVelocidad].sort((a: any, b: any) => {
+      const t = String(a.tipoAlerta).localeCompare(String(b.tipoAlerta));
+      if (t !== 0) return t;
+      return String(a.numeroSerieValidador ?? '').localeCompare(
+        String(b.numeroSerieValidador ?? ''),
+      );
+    });
+
+    return rows.map((row: any) => ({
+      tipoAlerta: row.tipoAlerta,
+      descripcion: row.descripcion,
+      numeroSerieValidador: row.numeroSerieValidador,
+      idPosicion: row.idPosicion != null ? Number(row.idPosicion) : null,
+      fechaHoraUltimaPosicion: row.fechaHoraUltimaPosicion,
+      velocidadReportada: row.velocidadReportada != null ? Number(row.velocidadReportada) : null,
+      latitud: row.latitud != null ? Number(row.latitud) : null,
+      longitud: row.longitud != null ? Number(row.longitud) : null,
+      vehiculo: {
+        idVehiculo: Number(row.idVehiculo),
+        placa: row.placaVehiculo,
+        marca: row.marcaVehiculo,
+        modelo: row.modeloVehiculo,
+        numeroEconomico: row.numeroEconomicoVehiculo,
+        foto: row.fotoVehiculo,
+      },
+    }));
   }
 
   /** Zona horaria usada para "hoy" y "ayer" en el dashboard. */
