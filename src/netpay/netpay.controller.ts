@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -22,6 +23,7 @@ import { Confirm3DSDto } from './dto/confirm-3ds.dto';
 import { CancelRefundDto } from './dto/cancel-refund.dto';
 import { ProcessPaymentWithTokenDto } from './dto/process-payment-with-token.dto';
 import { JwtAuthGuard } from 'src/guard/jwt-auth.guard';
+import { NormalizeCreateCustomerBodyInterceptor } from './interceptors/normalize-create-customer-body.interceptor';
 
 @ApiTags('Netpay - Integración Backend')
 @ApiBearerAuth('bearer-token')
@@ -67,6 +69,7 @@ export class NetpayController {
   }
 
   @Post('customers')
+  @UseInterceptors(NormalizeCreateCustomerBodyInterceptor)
   @ApiOperation({
     summary: 'Crea un cliente en Netpay',
     description: 'Crea un perfil de cliente en Netpay. Útil para guardar tarjetas y procesar pagos recurrentes.',

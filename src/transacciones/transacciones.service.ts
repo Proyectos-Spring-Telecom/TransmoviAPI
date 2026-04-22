@@ -973,8 +973,28 @@ export class TransaccionesService {
             const tarifaBase = Number(transaccionAbierta.monto) || 0;
             let montoCalculado = tarifaBase;
 
-            // Si es tarifa INCREMENTAL (tipoTarifa === 2) y hay configuración de costo adicional
-            if (tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa === 2) {
+              // Tarifa por estaciones (TipoTarifa=3): calcular por número de estaciones recorridas
+              if (tarifaInfoUpdate && Number(tarifaInfoUpdate.TipoTarifa) === EnumTipoTarifa.ESTACIONES) {
+                const estaciones = this.obtenerEstacionesDeVariante(varianteUpdate);
+                const idxInicio = this.encontrarIndiceEstacionMasCercana(
+                  estaciones,
+                  Number(transaccionAbierta.latitudInicial),
+                  Number(transaccionAbierta.longitudInicial),
+                );
+                const idxFin = this.encontrarIndiceEstacionMasCercana(
+                  estaciones,
+                  Number(latitudFinal),
+                  Number(longitudFinal),
+                );
+
+                const costoPorEstacion = tarifaInfoUpdate.CostoPorEstacion ? Number(tarifaInfoUpdate.CostoPorEstacion) : 0;
+                const cantidadBase = tarifaInfoUpdate.CantidadEstacionesBase ? Number(tarifaInfoUpdate.CantidadEstacionesBase) : 0;
+                const estacionesRecorridas = (idxInicio !== -1 && idxFin !== -1) ? Math.abs(idxFin - idxInicio) : 0;
+                const extras = Math.max(0, estacionesRecorridas - Math.max(0, cantidadBase));
+                montoCalculado = parseFloat((tarifaBase + (extras * Math.max(0, costoPorEstacion))).toFixed(2));
+              }
+              // Si es tarifa INCREMENTAL (tipoTarifa === 2) y hay configuración de costo adicional
+              else if (tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa === 2) {
               const costoAdicional = tarifaInfoUpdate.CostoAdicional ? Number(tarifaInfoUpdate.CostoAdicional) : 0;
               const distanciaBaseKm = tarifaInfoUpdate.DistanciaBaseKm ? Number(tarifaInfoUpdate.DistanciaBaseKm) : 0;
               const incrementoCadaMetros = tarifaInfoUpdate.IncrementoCadaMetros ? Number(tarifaInfoUpdate.IncrementoCadaMetros) : 0;
@@ -1003,10 +1023,13 @@ export class TransaccionesService {
             // Aplicar descuentos (igual que en el PATCH)
             let montoConDescuento = montoCalculado;
 
-            // PASO 1: Aplicar descuento por tipo de pasajero SOLO cuando tipoTarifa es ABIERTA (tipoTarifa === 2)
+              // PASO 1: Aplicar descuento por tipo de pasajero SOLO cuando la tarifa es ABIERTA o ESTACIONES
             const tipoTarifaUpdate = tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa ? Number(tarifaInfoUpdate.TipoTarifa) : null;
             
-            if (tipoTarifaUpdate === EnumTipoTarifa.ABIERTA && monedero.idTipoPasajero) {
+              if (
+                (tipoTarifaUpdate === EnumTipoTarifa.ABIERTA || tipoTarifaUpdate === EnumTipoTarifa.ESTACIONES) &&
+                monedero.idTipoPasajero
+              ) {
               const tipoPasajero = await this.CatTiposPasajerosRepository.findOne({
                 where: { id: monedero.idTipoPasajero },
                 relations: ['CatTipoDescuento'],
@@ -1199,6 +1222,8 @@ export class TransaccionesService {
           DistanciaBaseKm: tarifa?.distanciaBaseKm || null,
           IncrementoCadaMetros: tarifa?.incrementoCadaMetros || null,
           TipoTarifa: tarifa?.tipoTarifa || null,
+          CostoPorEstacion: tarifa?.costoPorEstacion || null,
+          CantidadEstacionesBase: tarifa?.cantidadEstacionesBase || null,
         }];
       } else {
         // Si no se proporciona idViaje, mantener la l?gica anterior con el query SQL
@@ -1217,7 +1242,9 @@ export class TransaccionesService {
             ta.CostoAdicional,
             ta.DistanciaBaseKm,
             ta.IncrementoCadaMetros,
-            ta.TipoTarifa
+            ta.TipoTarifa,
+            ta.CostoPorEstacion,
+            ta.CantidadEstacionesBase
           FROM DashCamDev.Instalaciones i
           JOIN DashCamDev.Validadores v ON i.IdValidador = v.Id
           JOIN DashCamDev.Turnos t ON t.IdInstalacion = i.Id
@@ -1256,6 +1283,8 @@ export class TransaccionesService {
       console.log(`[TRANSACCIONES] Tipo de tarifa: ${tipoTarifa} (${tipoTarifa === 1 ? 'FIJA' : tipoTarifa === 2 ? 'ABIERTA' : 'OTRO'})`);
       console.log(`[TRANSACCIONES] Tarifa base: $${tarifaBase.toFixed(2)}`);
       console.log('[TRANSACCIONES] ==========================================');
+
+      const esTarifaPorEstaciones = tipoTarifa === EnumTipoTarifa.ESTACIONES;
 
       // ===== NUEVA LÓGICA: Manejo de tarifas ABIERTAS con monedero físico (esQR = false) =====
       // Si la tarifa es ABIERTA y el pago es con monedero físico (esQR = false)
@@ -1375,8 +1404,28 @@ export class TransaccionesService {
                   const tarifaBaseUpdate = Number(transaccionAbiertaFisica.monto) || 0;
                   let montoCalculado = tarifaBaseUpdate;
 
+                  // Tarifa por estaciones (TipoTarifa=3): calcular por número de estaciones recorridas
+                  if (tarifaInfoUpdate && Number(tarifaInfoUpdate.TipoTarifa) === EnumTipoTarifa.ESTACIONES) {
+                    const estaciones = this.obtenerEstacionesDeVariante(varianteUpdate);
+                    const idxInicio = this.encontrarIndiceEstacionMasCercana(
+                      estaciones,
+                      Number(transaccionAbiertaFisica.latitudInicial),
+                      Number(transaccionAbiertaFisica.longitudInicial),
+                    );
+                    const idxFin = this.encontrarIndiceEstacionMasCercana(
+                      estaciones,
+                      Number(latitudFinal),
+                      Number(longitudFinal),
+                    );
+
+                    const costoPorEstacion = tarifaInfoUpdate.CostoPorEstacion ? Number(tarifaInfoUpdate.CostoPorEstacion) : 0;
+                    const cantidadBase = tarifaInfoUpdate.CantidadEstacionesBase ? Number(tarifaInfoUpdate.CantidadEstacionesBase) : 0;
+                    const estacionesRecorridas = (idxInicio !== -1 && idxFin !== -1) ? Math.abs(idxFin - idxInicio) : 0;
+                    const extras = Math.max(0, estacionesRecorridas - Math.max(0, cantidadBase));
+                    montoCalculado = parseFloat((tarifaBaseUpdate + (extras * Math.max(0, costoPorEstacion))).toFixed(2));
+                  }
                   // Si es tarifa INCREMENTAL (tipoTarifa === 2) y hay configuración de costo adicional
-                  if (tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa === 2) {
+                  else if (tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa === 2) {
                     const costoAdicional = tarifaInfoUpdate.CostoAdicional ? Number(tarifaInfoUpdate.CostoAdicional) : 0;
                     const distanciaBaseKm = tarifaInfoUpdate.DistanciaBaseKm ? Number(tarifaInfoUpdate.DistanciaBaseKm) : 0;
                     const incrementoCadaMetros = tarifaInfoUpdate.IncrementoCadaMetros ? Number(tarifaInfoUpdate.IncrementoCadaMetros) : 0;
@@ -1405,10 +1454,13 @@ export class TransaccionesService {
                   // Aplicar descuentos (igual que en el PATCH)
                   let montoConDescuento = montoCalculado;
 
-                  // PASO 1: Aplicar descuento por tipo de pasajero SOLO cuando tipoTarifa es ABIERTA (tipoTarifa === 2)
+                  // PASO 1: Aplicar descuento por tipo de pasajero SOLO cuando la tarifa es ABIERTA o ESTACIONES
                   const tipoTarifaUpdate = tarifaInfoUpdate && tarifaInfoUpdate.TipoTarifa ? Number(tarifaInfoUpdate.TipoTarifa) : null;
                   
-                  if (tipoTarifaUpdate === EnumTipoTarifa.ABIERTA && monedero.idTipoPasajero) {
+                  if (
+                    (tipoTarifaUpdate === EnumTipoTarifa.ABIERTA || tipoTarifaUpdate === EnumTipoTarifa.ESTACIONES) &&
+                    monedero.idTipoPasajero
+                  ) {
                     const tipoPasajero = await this.CatTiposPasajerosRepository.findOne({
                       where: { id: monedero.idTipoPasajero },
                       relations: ['CatTipoDescuento'],
@@ -1534,7 +1586,10 @@ export class TransaccionesService {
       let controlTransaccion: EnumControlTransacciones;
       if (tipoTarifa === EnumTipoTarifa.FIJA) {
         controlTransaccion = EnumControlTransacciones.PAGADO;
-      } else if (tipoTarifa === EnumTipoTarifa.ABIERTA) {
+      } else if (
+        tipoTarifa === EnumTipoTarifa.ABIERTA ||
+        tipoTarifa === EnumTipoTarifa.ESTACIONES
+      ) {
         controlTransaccion = EnumControlTransacciones.ABIERTA;
       } else {
         // Por defecto, si no se puede determinar, usar PAGADO
@@ -1552,7 +1607,7 @@ export class TransaccionesService {
       
       if (tipoTarifa === EnumTipoTarifa.FIJA) {
         montoCalculado = tarifaBase;
-      } else if (tipoTarifa === EnumTipoTarifa.ABIERTA) {
+      } else if (tipoTarifa === EnumTipoTarifa.ABIERTA || esTarifaPorEstaciones) {
         // Para tarifa abierta, usar TarifaBase (puede extenderse con l?gica adicional)
         montoCalculado = tarifaBase;
       }
@@ -1844,6 +1899,22 @@ export class TransaccionesService {
         createTransaccioneDebitoDto.longitud,
       );
 
+      // Cobro máximo para tarifa por estaciones (TipoTarifa=3)
+      // Máximo teórico: TarifaBase + (TotalEstaciones - CantidadEstacionesBase) * CostoPorEstacion
+      let cobroMaximoEstaciones: number | null = null;
+      if (esTarifaPorEstaciones) {
+        const costoPorEstacion = tarifaInfo.CostoPorEstacion ? Number(tarifaInfo.CostoPorEstacion) : 0;
+        const cantidadEstacionesBase = tarifaInfo.CantidadEstacionesBase ? Number(tarifaInfo.CantidadEstacionesBase) : 0;
+
+        // Para tipo 3, el recorridoDetallado se interpreta como lista de estaciones (puntos con nombre)
+        const estaciones = this.parsearRecorridoDetallado(variante?.recorridoDetallado ?? null)
+          ?.filter((p: any) => p && typeof p.nombre === 'string' && p.nombre.trim() !== '');
+        const totalEstaciones = Array.isArray(estaciones) ? estaciones.length : 0;
+
+        const extrasMax = Math.max(0, totalEstaciones - Math.max(0, cantidadEstacionesBase));
+        cobroMaximoEstaciones = parseFloat((tarifaBase + (extrasMax * Math.max(0, costoPorEstacion))).toFixed(2));
+      }
+
       // Calcular monto total a validar según el tipo de tarifa
       // Para tarifa FIJA: usar montoConDescuento
       // Para tarifa ABIERTA: usar cobroMaximo
@@ -1853,6 +1924,8 @@ export class TransaccionesService {
       } else if (tipoTarifa === EnumTipoTarifa.ABIERTA) {
         // Para tarifas ABIERTA, validar usando el monto máximo a cobrar
         montoTotalAValidar = (cobroMaximo || 0) * cantidadPasajes;
+      } else if (esTarifaPorEstaciones) {
+        montoTotalAValidar = ((cobroMaximoEstaciones || 0) * cantidadPasajes);
       } else {
         // Por defecto, usar montoConDescuento
         montoTotalAValidar = montoConDescuento * cantidadPasajes;
@@ -1869,6 +1942,9 @@ export class TransaccionesService {
         console.log(`[TRANSACCIONES] Monto total a validar: $${montoTotalAValidar.toFixed(2)}`);
       } else if (tipoTarifa === EnumTipoTarifa.ABIERTA) {
         console.log(`[TRANSACCIONES] Cobro máximo por pasaje: $${(cobroMaximo || 0).toFixed(2)}`);
+        console.log(`[TRANSACCIONES] Monto total a validar (cobro máximo × pasajes): $${montoTotalAValidar.toFixed(2)}`);
+      } else if (esTarifaPorEstaciones) {
+        console.log(`[TRANSACCIONES] Cobro máximo por pasaje (estaciones): $${(cobroMaximoEstaciones || 0).toFixed(2)}`);
         console.log(`[TRANSACCIONES] Monto total a validar (cobro máximo × pasajes): $${montoTotalAValidar.toFixed(2)}`);
       }
       console.log(`[TRANSACCIONES] Saldo después de validación: $${montoFinal.toFixed(2)}`);
@@ -2002,7 +2078,7 @@ export class TransaccionesService {
           numeroTransbordo,
           idViaje: idViaje,
           esQR: createTransaccioneDebitoDto.esQR ? 1 : 0,
-          cobroMaximo: cobroMaximo,
+          cobroMaximo: esTarifaPorEstaciones ? cobroMaximoEstaciones : cobroMaximo,
           descuentoTransbordo: costoTransbordo !== null && costoTransbordo !== undefined ? parseFloat(costoTransbordo.toFixed(2)) : null,
           tipoDescuentoTransbordo: tipoDescuentoTransbordo !== null && tipoDescuentoTransbordo !== undefined ? Number(tipoDescuentoTransbordo) : null,
           esMultiple: createTransaccioneDebitoDto.esMultiple ? 1 : 0,
@@ -2033,7 +2109,7 @@ export class TransaccionesService {
       );
 
       // 8?? Actualizar estatus del QR según las condiciones
-      // Si el pago es con QR y la tarifa es ABIERTA, NO cambiar el estatus del QR a 0, dejarlo en 1
+      // Si el pago es con QR y la tarifa es ABIERTA o ESTACIONES, NO cambiar el estatus del QR a 0, dejarlo en 1
       // Si no se cumplen esas condiciones y no se actualizó el QR anteriormente, cambiar el QR a estatus 0
       if (monedero.idPasajero && !qrActualizado) {
         const qrActivo = await this.qrCodesRepository.findOne({
@@ -2047,9 +2123,9 @@ export class TransaccionesService {
         });
 
         if (qrActivo) {
-          // Si el pago es con QR (esQR = true) y la tarifa es ABIERTA, mantener el QR en estatus 1
+          // Si el pago es con QR (esQR = true) y la tarifa es ABIERTA o ESTACIONES, mantener el QR en estatus 1
           const esPagoConQR = createTransaccioneDebitoDto.esQR === true;
-          const esTarifaAbierta = tipoTarifa === EnumTipoTarifa.ABIERTA;
+          const esTarifaAbierta = tipoTarifa === EnumTipoTarifa.ABIERTA || tipoTarifa === EnumTipoTarifa.ESTACIONES;
 
           if (esPagoConQR && esTarifaAbierta) {
             console.log(`[POST_DEBITO] Pago con QR y tarifa ABIERTA: QR ID ${qrActivo.id} se mantiene en estatus 1 (ACTIVO)`);
@@ -2125,6 +2201,40 @@ export class TransaccionesService {
     // 3. Construir el query din?mico con los IDs
     const placeholders = ids.map(() => '?').join(', ');
     return { ids, placeholders };
+  }
+
+  private obtenerEstacionesDeVariante(variante: Variantes | null): Array<{ lat: number; lng: number; nombre: string }> {
+    const recorrido = this.parsearRecorridoDetallado(variante?.recorridoDetallado ?? null);
+    if (!Array.isArray(recorrido)) return [];
+    return recorrido
+      .filter((p: any) =>
+        p &&
+        typeof p.lat === 'number' &&
+        typeof p.lng === 'number' &&
+        typeof p.nombre === 'string' &&
+        p.nombre.trim() !== '',
+      )
+      .map((p: any) => ({ lat: p.lat, lng: p.lng, nombre: String(p.nombre).trim() }));
+  }
+
+  private encontrarIndiceEstacionMasCercana(
+    estaciones: Array<{ lat: number; lng: number; nombre: string }>,
+    lat: number,
+    lng: number,
+  ): number {
+    if (!Array.isArray(estaciones) || estaciones.length === 0) return -1;
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    const target = { latitude: lat, longitude: lng };
+    for (let i = 0; i < estaciones.length; i++) {
+      const e = estaciones[i];
+      const dist = haversine(target, { latitude: e.lat, longitude: e.lng });
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
+      }
+    }
+    return bestIdx;
   }
 
   async paginado(

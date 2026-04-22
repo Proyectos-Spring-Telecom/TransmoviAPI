@@ -1,21 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, IsEmail, IsOptional, IsInt } from 'class-validator';
+import {
+  Allow,
+  IsNotEmpty,
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsInt,
+} from 'class-validator';
 
+/**
+ * Campos que el front a veces envía pero no aplican a crear customer en Netpay.
+ * Se permiten con @Allow() para no fallar con forbidNonWhitelisted; el servicio los ignora.
+ */
 export class CreateCustomerDto {
   @ApiProperty({
-    description: 'Nombre del cliente',
+    description:
+      'Nombre del cliente (Netpay). El body puede enviar `nombre`; un interceptor lo copia a firstName antes de validar.',
     example: 'Juan',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'firstName must be a string' })
+  @IsNotEmpty({ message: 'firstName should not be empty' })
   firstName: string;
 
   @ApiProperty({
-    description: 'Apellido del cliente',
+    description:
+      'Apellido(s) del cliente (Netpay). El body puede enviar `apellidoPaterno`/`apellidoMaterno`; un interceptor arma lastName antes de validar.',
     example: 'Pérez',
   })
-  @IsString()
-  @IsNotEmpty()
+  @IsString({ message: 'lastName must be a string' })
+  @IsNotEmpty({ message: 'lastName should not be empty' })
   lastName: string;
 
   @ApiProperty({
@@ -27,12 +40,55 @@ export class CreateCustomerDto {
   email: string;
 
   @ApiPropertyOptional({
-    description: 'Teléfono del cliente',
+    description:
+      'Teléfono del cliente. El body puede enviar `telefono`; un interceptor lo copia a phone antes de validar.',
     example: '+521234567890',
   })
   @IsString()
   @IsOptional()
   phone?: string;
+
+  /** Ignorados por createCustomer; permitidos para compatibilidad con payloads del front */
+  @Allow()
+  @IsOptional()
+  preAuth?: unknown;
+
+  @Allow()
+  @IsOptional()
+  cvv2?: unknown;
+
+  @Allow()
+  @IsOptional()
+  nombre?: unknown;
+
+  @Allow()
+  @IsOptional()
+  apellidoPaterno?: unknown;
+
+  @Allow()
+  @IsOptional()
+  apellidoMaterno?: unknown;
+
+  @Allow()
+  @IsOptional()
+  telefono?: unknown;
+
+  @Allow()
+  @IsOptional()
+  idDireccion?: unknown;
+
+  @Allow()
+  @IsOptional()
+  direccion?: unknown;
+
+  @ApiPropertyOptional({
+    description:
+      'Reference ID de la tarjeta en Netpay (opcional al asignar token tras crear el customer)',
+    example: '1222337263222',
+  })
+  @IsOptional()
+  @IsString()
+  referenceId?: string;
 
   @ApiPropertyOptional({
     description: 'Token de tarjeta a asignar al cliente (se asignará después de crear el cliente)',

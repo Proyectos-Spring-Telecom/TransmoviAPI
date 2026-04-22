@@ -16,6 +16,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentSavedCardDto } from './dto/payment-saved-card.dto';
 import { AssignCardDto } from './dto/assign-card.dto';
+import { DireccionTarjetaDto } from './dto/direccion-tarjeta.dto';
 import { Confirm3DSDto } from './dto/confirm-3ds.dto';
 import { CancelRefundDto } from './dto/cancel-refund.dto';
 import { ProcessPaymentWithTokenDto } from './dto/process-payment-with-token.dto';
@@ -32,7 +33,10 @@ import {
 
 @Injectable()
 export class NetpayService {
+  /** Origen del host (p. ej. https://gateway-154.netpaydev.com) para httpClient: /v1/..., health, etc. */
   private readonly baseUrl: string;
+  /** Base de gateway-ecommerce desde NETPAY_BASE_URL o default por ambiente */
+  private readonly netpayEcommerceBaseUrl: string;
   private readonly publicKey: string;
   private readonly privateKey: string;
   private readonly isProduction: boolean;
@@ -49,19 +53,26 @@ export class NetpayService {
     @InjectRepository(TokenDirecciones)
     private readonly tokenDireccionesRepository: Repository<TokenDirecciones>,
   ) {
-    this.isProduction = this.configService.get<string>('NETPAY_ENVIRONMENT') === 'production';
-    
-    // Permitir URL personalizada o usar defaults
-    const customUrl = this.configService.get<string>('NETPAY_BASE_URL');
-    if (customUrl) {
-      // Asegurar que la URL base no incluya rutas/endpoints
-      // Si el usuario incluyó un endpoint, lo removemos
-      this.baseUrl = customUrl.replace(/\/gateway-ecommerce.*$/, '').replace(/\/v\d+.*$/, '').replace(/\/$/, '');
-    } else {
-      // URLs por defecto según el curl de ejemplo de Netpay
-      this.baseUrl = this.isProduction
-        ? 'https://gateway.netpay.com.mx' // Producción
-        : 'https://gateway-154.netpaydev.com'; // Sandbox/Desarrollo
+    this.isProduction =
+      this.configService.get<string>('NETPAY_ENVIRONMENT') === 'production';
+
+    const defaultEcommerceBase = this.isProduction
+      ? 'https://gateway.netpay.com.mx/gateway-ecommerce'
+      : 'https://gateway-154.netpaydev.com/gateway-ecommerce';
+
+    const configuredBase = this.configService
+      .get<string>('NETPAY_BASE_URL')
+      ?.trim();
+    this.netpayEcommerceBaseUrl = (
+      configuredBase || defaultEcommerceBase
+    ).replace(/\/$/, '');
+
+    try {
+      this.baseUrl = new URL(this.netpayEcommerceBaseUrl).origin;
+    } catch {
+      this.baseUrl = this.netpayEcommerceBaseUrl
+        .replace(/\/gateway-ecommerce.*$/i, '')
+        .replace(/\/$/, '');
     }
     
     // Obtener y validar las API keys
@@ -438,8 +449,7 @@ export class NetpayService {
       }
 
       // URL completa para procesar pagos - usar endpoint v3.5/charges
-      const paymentUrl = `${this.baseUrl}/gateway-ecommerce/v3.5/charges`;
-
+      const paymentUrl = `${this.netpayEcommerceBaseUrl}/v3.5/charges`;
 
       // Usar axios directamente con la URL completa
       // Incluir User-Agent header como en el curl de ejemplo
@@ -497,89 +507,127 @@ export class NetpayService {
     createCustomerDto: CreateCustomerDto,
   ): Promise<NetpayCustomerResponse> {
     try {
-      // Generar identifier automáticamente si no se proporciona (mismo algoritmo que en pasajeros)
-      // Número aleatorio de 10 dígitos (entre 1000000000 y 9999999999)
-      const identifier = createCustomerDto.identifier ?? Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      const identifier =
+        createCustomerDto.identifier ??
+        Math.floor(1000000000 + Math.random() * 9000000000).toString();
+  
+      const trimStr = (v: unknown): string =>
+        v === undefined || v === null ? '' : String(v).trim();
 
-      // Según la documentación de Netpay v4, paymentSource es opcional
-      // Si hay token, debe ir dentro de paymentSource con el formato correcto
-      const payload: any = {
-        firstName: createCustomerDto.firstName,
-        lastName: createCustomerDto.lastName,
-        email: createCustomerDto.email,
-        identifier: identifier,
+      const optionalStr = (v: unknown): string | undefined => {
+        const s = trimStr(v);
+        return s === '' ? undefined : s;
       };
 
-      // Agregar phone si existe
-      if (createCustomerDto.phone) {
-        payload.phone = createCustomerDto.phone;
+      const optionalInt = (v: unknown): number | undefined => {
+        if (v === undefined || v === null || v === '') return undefined;
+        const n = Number(v);
+        if (!Number.isFinite(n)) return undefined;
+        return Math.trunc(n);
+      };
+
+      const optionalDireccion = (v: unknown): DireccionTarjetaDto | undefined => {
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+          return v as DireccionTarjetaDto;
+        }
+        return undefined;
+      };
+
+      const firstName =
+        trimStr(createCustomerDto.firstName) ||
+        trimStr(createCustomerDto.nombre);
+  
+      const lastName =
+        trimStr(createCustomerDto.lastName) ||
+        [
+          trimStr(createCustomerDto.apellidoPaterno),
+          trimStr(createCustomerDto.apellidoMaterno),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+  
+      const payload: any = {
+        firstName,
+        lastName,
+        email: createCustomerDto.email,
+        identifier,
+      };
+  
+      const phone =
+        trimStr(createCustomerDto.phone) || trimStr(createCustomerDto.telefono);
+  
+      if (phone) {
+        payload.phone = phone;
       }
-
-      // Según la documentación de Netpay v4, paymentSource es OPCIONAL
-      // El error "CardTokenAndClientId not found with token : 'null'" sugiere que
-      // cuando se envía paymentSource, Netpay espera un token válido
-      // Por lo tanto, NO enviar paymentSource si no hay token
-      // El cliente se puede crear sin paymentSource y asignar la tarjeta después con assignCardToCustomer
-
-      // URL completa para crear clientes - usar endpoint v4/clients
-      const clientsUrl = this.isProduction
-        ? 'https://gateway.netpay.com.mx/gateway-ecommerce/v4/clients'
-        : 'https://gateway-154.netpaydev.com/gateway-ecommerce/v4/clients';
-
-
-      // Usar axios directamente con la URL completa
+  
+      // IMPORTANTE:
+      // Crear cliente sin tarjeta en v4
+      const clientsUrl = `${this.netpayEcommerceBaseUrl}/v4/clients`;
+  
+      console.log('[NETPAY] createCustomer payload:', JSON.stringify(payload, null, 2));
+  
       const response = await axios.post<NetpayCustomerResponse>(
         clientsUrl,
         payload,
-        { 
+        {
           headers: this.getAuthHeaders(),
           timeout: 30000,
         },
       );
-
+  
       const customerResponse = response.data;
-
-      // Si se proporcionó idPasajero, actualizar el pasajero con el customerId
-      if (createCustomerDto.idPasajero && customerResponse?.id) {
+  
+      const customerId =
+        customerResponse?.id ||
+        customerResponse?.customerId ||
+        customerResponse?.clientId?.toString();
+  
+      if (createCustomerDto.idPasajero && customerId) {
         try {
-          const customerId = customerResponse.id || customerResponse.customerId;
-          
-          if (customerId) {
-            await this.pasajeroRepository.update(createCustomerDto.idPasajero, {
-              customerIdNetPay: customerId,
-            });
-          }
+          await this.pasajeroRepository.update(createCustomerDto.idPasajero, {
+            customerIdNetPay: String(customerId),
+          });
         } catch (updateError) {
-          // Si falla la actualización del pasajero, no fallar la creación del customer
-          // Solo registrar el error (puedes agregar logging aquí si es necesario)
-          console.error('[NETPAY] Error al actualizar customerIdNetPay del pasajero:', updateError);
+          console.error(
+            '[NETPAY] Error al actualizar customerIdNetPay del pasajero:',
+            updateError,
+          );
         }
       }
-
-      // Si se proporcionó token, asignar la tarjeta al customer recién creado
-      if (createCustomerDto.token && customerResponse?.id) {
+  
+      // Luego asignar la tarjeta con el token ya generado en frontend
+      if (createCustomerDto.token && customerId) {
         try {
-          const customerId = customerResponse.id || customerResponse.clientId?.toString() || customerResponse.customerId;
-          
-          if (customerId) {
-            await this.assignCardToCustomer({
-              customerId: String(customerId),
-              token: createCustomerDto.token,
-              preAuth: false,
-            });
-          }
+          await this.assignCardToCustomer({
+            customerId: String(customerId),
+            token: createCustomerDto.token,
+            preAuth: false,
+            cvv2: optionalStr(createCustomerDto.cvv2),
+            referenceId: createCustomerDto.referenceId,
+            idDireccion: optionalInt(createCustomerDto.idDireccion),
+            nombre: optionalStr(createCustomerDto.nombre) ?? firstName,
+            apellidoPaterno: optionalStr(createCustomerDto.apellidoPaterno),
+            apellidoMaterno: optionalStr(createCustomerDto.apellidoMaterno),
+            email: createCustomerDto.email,
+            telefono: optionalStr(createCustomerDto.telefono) ?? optionalStr(phone),
+            direccion: optionalDireccion(createCustomerDto.direccion),
+          });
         } catch (assignError) {
-          // Si falla la asignación de la tarjeta, no fallar la creación del customer
-          // Solo registrar el error
-          console.error('[NETPAY] Error al asignar tarjeta al customer:', assignError);
+          console.error(
+            '[NETPAY] Error al asignar tarjeta al customer:',
+            assignError,
+          );
         }
       }
-
+  
       return customerResponse;
     } catch (error) {
+      console.log('ERROR:', error);
       this.handleError(error, 'createCustomer');
     }
   }
+
 
   /**
    * Asigna una tarjeta a un cliente existente
@@ -595,58 +643,65 @@ export class NetpayService {
     assignCardDto: AssignCardDto,
   ): Promise<NetpayCardResponse> {
     try {
-      // Netpay puede usar tanto el id (string) como el clientId (número)
-      // Intentar primero con el clientId como número, si no es válido, usar como string
       let clientIdParam: string | number = assignCardDto.customerId;
-      
-      // Si es un número válido, convertirlo a número
-      if (!isNaN(Number(assignCardDto.customerId)) && assignCardDto.customerId.trim() !== '') {
+  
+      if (
+        typeof assignCardDto.customerId === 'string' &&
+        assignCardDto.customerId.trim() !== '' &&
+        !isNaN(Number(assignCardDto.customerId))
+      ) {
         clientIdParam = Number(assignCardDto.customerId);
       }
-
-      // Construir el payload según la documentación de Netpay
+  
       const payload: any = {
         token: assignCardDto.token,
-        preAuth: assignCardDto.preAuth !== undefined ? String(assignCardDto.preAuth) : 'false',
+        preAuth: assignCardDto.preAuth ?? false,
       };
-
-      // Agregar cvv2 solo si está presente
+  
       if (assignCardDto.cvv2) {
         payload.cvv2 = assignCardDto.cvv2;
       }
-
+  
       let idDireccionFinal: number | null = null;
-
-      // Si viene idDireccion, solo verificar que existe (NO crear nada)
+  
+      // Si viene idDireccion, solo validar que exista
       if (assignCardDto.idDireccion) {
-        // Verificar que la dirección existe
         const direccionExistente = await this.direccionesTarjetaRepository.findOne({
           where: { id: assignCardDto.idDireccion },
         });
-
+  
         if (!direccionExistente) {
           throw new BadRequestException(
             `No se encontró la dirección con ID ${assignCardDto.idDireccion}`,
           );
         }
-
+  
         idDireccionFinal = assignCardDto.idDireccion;
-      } 
-      // Si NO viene idDireccion pero hay datos personales Y dirección, crear los registros
-      else if (assignCardDto.direccion && (assignCardDto.nombre || assignCardDto.apellidoPaterno || assignCardDto.apellidoMaterno)) {
-        // Crear nuevo DatosTarjeta con los datos personales
+      }
+      // Si no viene idDireccion pero sí vienen datos y dirección, crear registros
+      else if (
+        assignCardDto.direccion &&
+        (
+          assignCardDto.nombre ||
+          assignCardDto.apellidoPaterno ||
+          assignCardDto.apellidoMaterno ||
+          assignCardDto.email ||
+          assignCardDto.telefono
+        )
+      ) {
         const datosTarjetaData = this.datosTarjetaRepository.create({
           nombre: assignCardDto.nombre || null,
           apellidoPaterno: assignCardDto.apellidoPaterno || null,
           apellidoMaterno: assignCardDto.apellidoMaterno || null,
           email: assignCardDto.email || null,
           telefono: assignCardDto.telefono || null,
-          customerIdNetPay: assignCardDto.customerId,
+          customerIdNetPay: String(assignCardDto.customerId),
           estatus: 1,
         });
-        const datosTarjetaGuardado = await this.datosTarjetaRepository.save(datosTarjetaData);
-
-        // Crear nueva dirección vinculada al DatosTarjeta recién creado
+  
+        const datosTarjetaGuardado =
+          await this.datosTarjetaRepository.save(datosTarjetaData);
+  
         const nuevaDireccion = this.direccionesTarjetaRepository.create({
           ciudad: assignCardDto.direccion.ciudad || null,
           pais: assignCardDto.direccion.pais || 'MX',
@@ -658,17 +713,24 @@ export class NetpayService {
           idDatosTarjeta: datosTarjetaGuardado.id,
           estatus: 1,
         });
-        const direccionGuardada = await this.direccionesTarjetaRepository.save(nuevaDireccion);
+  
+        const direccionGuardada =
+          await this.direccionesTarjetaRepository.save(nuevaDireccion);
+  
         idDireccionFinal = direccionGuardada.id;
       }
-
-      // URL completa para asignar tarjeta - usar endpoint v3/clients/{clientId}/token
-      // El endpoint acepta tanto número como string según el tipo de ID
-      const assignCardUrl = this.isProduction
-        ? `https://gateway.netpay.com.mx/gateway-ecommerce/v3/clients/${clientIdParam}/token`
-        : `https://gateway-154.netpaydev.com/gateway-ecommerce/v3/clients/${clientIdParam}/token`;
-
-      // Usar axios directamente con la URL completa
+  
+      const assignCardUrl = `${this.netpayEcommerceBaseUrl}/v3/clients/${clientIdParam}/token`;
+  
+      console.log(
+        '[NETPAY] assignCardToCustomer url:',
+        assignCardUrl,
+      );
+      console.log(
+        '[NETPAY] assignCardToCustomer payload:',
+        JSON.stringify(payload, null, 2),
+      );
+  
       const response = await axios.put<NetpayCardResponse>(
         assignCardUrl,
         payload,
@@ -677,27 +739,26 @@ export class NetpayService {
           timeout: 30000,
         },
       );
-
-      // Después de una respuesta exitosa, crear relación en TokenDirecciones
+  
       if (response.data && idDireccionFinal) {
-        // Obtener referenceId del DTO o de la respuesta de Netpay
-        // La respuesta de Netpay puede incluir referenceId aunque no esté tipado
-        const referenceId = assignCardDto.referenceId || (response.data as any).referenceId || null;
-        
+        const referenceId =
+          assignCardDto.referenceId || (response.data as any)?.referenceId || null;
+  
         const tokenDireccion = this.tokenDireccionesRepository.create({
           idDireccion: idDireccionFinal,
           tokenCard: assignCardDto.token,
-          referenceId: referenceId,
+          referenceId,
         });
+  
         await this.tokenDireccionesRepository.save(tokenDireccion);
       }
-
+  
       return response.data;
     } catch (error) {
+      console.log('ERROR assignCardToCustomer:', error);
       this.handleError(error, 'assignCardToCustomer');
     }
   }
-
   /**
    * Obtiene los datos de tarjeta y direcciones asociadas por CustomerIdNetPay
    * @param customerIdNetPay ID del cliente en Netpay
@@ -811,9 +872,7 @@ export class NetpayService {
       
       // URL completa para obtener cliente - usar endpoint v3/clients
       // El endpoint acepta tanto número como string según el tipo de ID
-      const clientUrl = this.isProduction
-        ? `https://gateway.netpay.com.mx/gateway-ecommerce/v3/clients/${clientIdParam}`
-        : `https://gateway-154.netpaydev.com/gateway-ecommerce/v3/clients/${clientIdParam}`;
+      const clientUrl = `${this.netpayEcommerceBaseUrl}/v3/clients/${clientIdParam}`;
 
 
       // Usar axios directamente con la URL completa
@@ -925,9 +984,7 @@ export class NetpayService {
       const encodedTokenCard = encodeURIComponent(tokenCard);
 
       // URL completa para eliminar tarjeta - usar endpoint v3/clients/{clientId}/token/{tokenCard}
-      const deleteUrl = this.isProduction
-        ? `https://gateway.netpay.com.mx/gateway-ecommerce/v3/clients/${encodedCustomerId}/token/${encodedTokenCard}`
-        : `https://gateway-154.netpaydev.com/gateway-ecommerce/v3/clients/${encodedCustomerId}/token/${encodedTokenCard}`;
+      const deleteUrl = `${this.netpayEcommerceBaseUrl}/v3/clients/${encodedCustomerId}/token/${encodedTokenCard}`;
 
       // Usar axios directamente con la URL completa
       await axios.delete(
@@ -1117,7 +1174,7 @@ export class NetpayService {
       delete finalPayload.cardId;
 
       // URL completa para procesar pagos - usar endpoint v3.5/charges
-      const paymentUrl = `${this.baseUrl}/gateway-ecommerce/v3.5/charges`;
+      const paymentUrl = `${this.netpayEcommerceBaseUrl}/v3.5/charges`;
       console.log(paymentUrl);
       // Obtener headers de autenticación
       const headers = this.getAuthHeaders(true); // Incluir User-Agent para v3.5/charges
@@ -1152,7 +1209,7 @@ export class NetpayService {
     try {
       // URL completa para confirmar transacción 3DS
       // Formato: /v3.5/charges/{transaccionTokenId}/confirm?processorTransactionId={processorTransactionId}
-      const confirmUrl = `${this.baseUrl}/gateway-ecommerce/v3.5/charges/${confirm3DSDto.transaccionTokenId}/confirm?processorTransactionId=${confirm3DSDto.processorTransactionId}`;
+      const confirmUrl = `${this.netpayEcommerceBaseUrl}/v3.5/charges/${confirm3DSDto.transaccionTokenId}/confirm?processorTransactionId=${confirm3DSDto.processorTransactionId}`;
 
 
       // Usar axios directamente con la URL completa
@@ -1182,7 +1239,7 @@ export class NetpayService {
   ): Promise<NetpayTransactionDetailResponse> {
     try {
       // URL completa para consultar transacción - usar endpoint v3/transactions/{transactionTokenId}
-      const transactionUrl = `${this.baseUrl}/gateway-ecommerce/v3/transactions/${transactionTokenId}`;
+      const transactionUrl = `${this.netpayEcommerceBaseUrl}/v3/transactions/${transactionTokenId}`;
 
 
       // Usar axios directamente con la URL completa

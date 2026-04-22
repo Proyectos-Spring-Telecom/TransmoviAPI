@@ -117,6 +117,7 @@ export enum EnumControlTransacciones {
 export enum EnumTipoTarifa {
   FIJA = 1,
   ABIERTA = 2,
+  ESTACIONES = 3,
 }
 
 export enum EnumTipoDescuentoTransbordo {
