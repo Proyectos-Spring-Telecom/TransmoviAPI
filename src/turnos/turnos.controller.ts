@@ -24,6 +24,9 @@ import {
   ApiBody,
   ApiParam,
 } from '@nestjs/swagger';
+import {
+  openApiTurnoListadoItem,
+} from 'src/common/openapi-instalaciones-monitoreo.schemas';
 
 @ApiTags('Turnos')
 @ApiBearerAuth('bearer-token')
@@ -81,7 +84,7 @@ export class TurnosController {
   @ApiOperation({
     summary: 'Listar turnos',
     description:
-      'Obtiene el listado de turnos. El acceso depende del rol del usuario.',
+      'Listado sin paginación. Cada turno incluye datos de instalación en **`dispositivos[]`** y **`blueVoxs[]`** (JSON agregado en SQL), con **`principal`** (`1` o `null`) en cada dispositivo. No hay un único `idDispositivo` en la raíz del objeto.',
   })
   @ApiResponse({
     status: 200,
@@ -91,16 +94,7 @@ export class TurnosController {
       properties: {
         data: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              idOperador: { type: 'number' },
-              idVehiculo: { type: 'number' },
-              fechaInicio: { type: 'string' },
-              fechaFin: { type: 'string' },
-            },
-          },
+          items: openApiTurnoListadoItem,
         },
       },
     },
@@ -117,7 +111,7 @@ export class TurnosController {
   @ApiOperation({
     summary: 'Listar turnos paginados',
     description:
-      'Obtiene el catálogo paginado de turnos. El acceso depende del rol del usuario.',
+      'Misma forma de cada elemento que en `GET /turnos/list`: arreglos `dispositivos` y `blueVoxs` con `principal` por dispositivo, más metadatos de turno, instalación, vehículo, cliente y operador.',
   })
   @ApiParam({ name: 'page', description: 'Número de página (desde 1)' })
   @ApiParam({ name: 'limit', description: 'Registros por página' })
@@ -129,18 +123,7 @@ export class TurnosController {
       properties: {
         data: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              idOperador: { type: 'number' },
-              idVehiculo: { type: 'number' },
-              idDispositivo: { type: 'number' },
-              fechaInicio: { type: 'string' },
-              fechaFin: { type: 'string' },
-              estatus: { type: 'number' },
-            },
-          },
+          items: openApiTurnoListadoItem,
         },
         paginated: {
           type: 'object',
@@ -174,7 +157,8 @@ export class TurnosController {
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener turno por ID',
-    description: 'Obtiene el detalle de un turno por su ID.',
+    description:
+      'Devuelve `{ data }` con un objeto de detalle con la misma convención que el listado: **`dispositivos[]`**, **`blueVoxs[]`**, `principal` en cada dispositivo.',
   })
   @ApiParam({ name: 'id', description: 'ID del turno' })
   @ApiResponse({
@@ -183,19 +167,7 @@ export class TurnosController {
     schema: {
       type: 'object',
       properties: {
-        data: {
-          type: 'object',
-          properties: {
-            id: { type: 'number' },
-            idOperador: { type: 'number' },
-            idVehiculo: { type: 'number' },
-            idDispositivo: { type: 'number' },
-            idRuta: { type: 'number' },
-            fechaInicio: { type: 'string' },
-            fechaFin: { type: 'string' },
-            estatus: { type: 'number' },
-          },
-        },
+        data: openApiTurnoListadoItem,
       },
     },
   })

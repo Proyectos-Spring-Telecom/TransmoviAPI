@@ -11,7 +11,7 @@ import {
 export class CreateInstalacionesDto {
   @ApiProperty({
     description:
-      'IDs de Dispositivos asociados a la instalación. Deben pertenecer al mismo cliente y estar disponibles.',
+      'IDs de Dispositivos asociados a la instalación (≥1). Deben pertenecer al mismo cliente y estar disponibles. En respuestas GET cada dispositivo se devuelve dentro de `dispositivos[]` con `idDispositivo`, `numeroSerieDispositivo`, `marcaDispositivo`, `modeloDispositivo` y `principal` (1 | null).',
     example: [101, 102],
   })
   @IsNotEmpty()
