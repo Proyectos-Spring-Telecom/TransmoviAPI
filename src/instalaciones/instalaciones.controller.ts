@@ -25,6 +25,7 @@ import {
   ApiTags,
   ApiBody,
 } from '@nestjs/swagger';
+import { openApiInstalacionListadoItem } from 'src/common/openapi-instalaciones-monitoreo.schemas';
 
 @ApiTags('Instalaciones')
 @ApiBearerAuth('bearer-token')
@@ -37,12 +38,12 @@ export class InstalacionesController {
   @ApiOperation({
     summary: 'Crear instalación',
     description:
-      'Asocia dispositivos, vehículo y BlueVoxs en una instalación. Requiere al menos 1 BlueVox en idsBlueVoxs.',
+      'Crea la instalación y los vínculos en `InstalacionesDispositivos` / `InstalacionesBlueVoxs`. Requiere al menos un ID en `idsDispositivos` y al menos uno en `idsBlueVoxs`. Opcional: **`idDispositivoPrincipal`** — debe existir dentro de `idsDispositivos`; marca exactamente un dispositivo con `Principal = 1` en BD y el resto con `Principal = null` (nunca 0). Si no se envía, todos los dispositivos quedan sin principal. Se registra histórico con snapshot de dispositivos (incluye `Principal` por elemento).',
   })
   @ApiBody({
     type: CreateInstalacionesDto,
     description:
-      'idsDispositivos (array), idVehiculo, idsBlueVoxs (array, al menos 1), idCliente',
+      'Cuerpo validado por `CreateInstalacionesDto`: idsDispositivos, idVehiculo, idCliente, idsBlueVoxs, opcional idDispositivoPrincipal y estatus.',
   })
   @ApiResponse({
     status: 201,
@@ -78,7 +79,11 @@ export class InstalacionesController {
   }
 
   @Get(':page/:limit')
-  @ApiOperation({ summary: 'Obtener instalaciones paginadas' })
+  @ApiOperation({
+    summary: 'Obtener instalaciones paginadas',
+    description:
+      'Lista instalaciones según rol/jerarquía. Cada elemento incluye **`dispositivos`**: arreglo de dispositivos activos con `idDispositivo`, `numeroSerieDispositivo`, `marcaDispositivo`, `modeloDispositivo`, **`principal`** (`1` | `null`). Incluye **`blueVoxs`** en el mismo patrón que instalaciones.',
+  })
   @ApiParam({ name: 'page', description: 'Número de página (desde 1)' })
   @ApiParam({ name: 'limit', description: 'Registros por página' })
   @ApiResponse({
@@ -87,7 +92,7 @@ export class InstalacionesController {
     schema: {
       type: 'object',
       properties: {
-        data: { type: 'array', items: { type: 'object' } },
+        data: { type: 'array', items: openApiInstalacionListadoItem },
         paginated: {
           type: 'object',
           properties: {
@@ -121,14 +126,16 @@ export class InstalacionesController {
   @ApiOperation({
     summary: 'Listar instalaciones',
     description:
-      'Obtiene el listado de instalaciones sin paginación. El acceso depende del rol.',
+      'Listado sin paginación; misma forma de cada ítem que en GET paginado: `dispositivos[]` con `principal` por fila, `blueVoxs[]`, vehículo y cliente.',
   })
   @ApiResponse({
     status: 200,
     description: 'Lista de instalaciones',
     schema: {
       type: 'object',
-      properties: { data: { type: 'array', items: { type: 'object' } } },
+      properties: {
+        data: { type: 'array', items: openApiInstalacionListadoItem },
+      },
     },
   })
   @ApiResponse({ status: 401, description: 'No autorizado' })
@@ -142,7 +149,8 @@ export class InstalacionesController {
   @Get(':id')
   @ApiOperation({
     summary: 'Obtener instalación por ID',
-    description: 'Obtiene el detalle de una instalación por su ID.',
+    description:
+      'Devuelve `{ data }` donde `data` es un arreglo (habitualmente un elemento) con la misma estructura que el listado: `dispositivos[]` (con `principal`), `blueVoxs[]`, datos de vehículo y cliente.',
   })
   @ApiParam({ name: 'id', description: 'ID de la instalación' })
   @ApiResponse({
@@ -150,7 +158,9 @@ export class InstalacionesController {
     description: 'Detalle de la instalación',
     schema: {
       type: 'object',
-      properties: { data: { type: 'array', items: { type: 'object' } } },
+      properties: {
+        data: { type: 'array', items: openApiInstalacionListadoItem },
+      },
     },
   })
   @ApiResponse({ status: 404, description: 'Instalación no encontrada' })
@@ -235,7 +245,12 @@ export class InstalacionesController {
   @ApiOperation({
     summary: 'Actualizar una instalación',
     description:
-      'Actualiza los componentes de una instalación (Dispositivo, Vehículo, BlueVoxs). Soporta actualización de múltiples BlueVoxs mediante matriz de decisiones (similar a usuarios-permisos). Los BlueVoxs se gestionan mediante la tabla intermedia InstalacionesBlueVoxs.',
+      'Actualiza vehículo/cliente opcional, lista `idsDispositivos` (matriz en servidor), `idsBlueVoxs`, `dispositivosAnteriores`, `blueVoxsAnteriores` y comentarios. **Dispositivo principal:** si el body incluye **`idDispositivoPrincipal`**, debe corresponder a un dispositivo asociado **activo** (Estatus=1 en `InstalacionesDispositivos`) después de aplicar `idsDispositivos`; se reconcilia el único `Principal=1` en BD. Si **no** se envía `idDispositivoPrincipal`, el principal actual no se modifica. El histórico guarda snapshot con `Principal` por dispositivo.',
+  })
+  @ApiBody({
+    type: UpdateInstalacioneDto,
+    description:
+      'Campos opcionales según `UpdateInstalacioneDto`; ver propiedades documentadas en el modelo (idsDispositivos, idDispositivoPrincipal, idsBlueVoxs, etc.).',
   })
   @ApiParam({
     name: 'id',

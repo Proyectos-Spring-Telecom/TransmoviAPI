@@ -21,6 +21,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { UpdateViajeDto } from './dto/update-viaje.dto';
+import { openApiViajeListadoItem } from 'src/common/openapi-instalaciones-monitoreo.schemas';
 
 @ApiTags('Viajes')
 @ApiBearerAuth('bearer-token')
@@ -158,7 +159,7 @@ export class ViajesController {
   @ApiOperation({
     summary: 'Obtener listado completo de viajes',
     description:
-      'Obtiene un listado completo de viajes según el rol del usuario: SuperAdministrador (todos), Administrador/Reportes/Capturista (hijos del cliente), Cliente (solo su cliente). Los viajes incluyen información detallada de turno, instalación, dispositivo, BlueVox, vehículo, operador y derrotero.',
+      'Viajes según rol. Cada registro incluye **`dispositivos[]`** y **`blueVoxs[]`** de la instalación del turno (agregación SQL + parse en API). Cada dispositivo trae **`principal`**: `1` si es el principal de la instalación, `null` si no. No se exponen columnas planas `idDispositivo` / `numeroSerieDispositivo` en la raíz.',
   })
   @ApiResponse({
     status: 200,
@@ -168,18 +169,7 @@ export class ViajesController {
       properties: {
         data: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number', example: 1 },
-              inicio: { type: 'string', format: 'date-time' },
-              fin: { type: 'string', format: 'date-time', nullable: true },
-              estatus: { type: 'number', example: 1 },
-              idCliente: { type: 'number', example: 5 },
-              idTurno: { type: 'number', example: 10 },
-              idDerrotero: { type: 'number', example: 20 },
-            },
-          },
+          items: openApiViajeListadoItem,
         },
       },
     },
@@ -199,7 +189,7 @@ export class ViajesController {
   @ApiOperation({
     summary: 'Obtener viajes paginados',
     description:
-      'Obtiene un listado paginado de viajes según el rol del usuario. Incluye información de paginación (total, página actual, última página). Los viajes incluyen información detallada de turno, instalación, dispositivo, BlueVox, vehículo, operador y derrotero.',
+      'Igual que el listado completo pero con `paginated`. Cada elemento de `data` incluye `dispositivos[]` (con `principal`) y `blueVoxs[]`.',
   })
   @ApiParam({
     name: 'page',
@@ -221,15 +211,7 @@ export class ViajesController {
       properties: {
         data: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number', example: 1 },
-              inicio: { type: 'string', format: 'date-time' },
-              fin: { type: 'string', format: 'date-time', nullable: true },
-              estatus: { type: 'number', example: 1 },
-            },
-          },
+          items: openApiViajeListadoItem,
         },
         paginated: {
           type: 'object',
@@ -261,7 +243,7 @@ export class ViajesController {
   @ApiOperation({
     summary: 'Obtener viaje por ID',
     description:
-      'Obtiene la información detallada de un viaje específico por su ID. Incluye turno, instalación, dispositivo, vehículo, operador y derrotero.',
+      'Un viaje con `dispositivos[]`, `blueVoxs[]` y `principal` por dispositivo; mismo contrato de nombres que en listados.',
   })
   @ApiParam({
     name: 'id',
@@ -274,18 +256,7 @@ export class ViajesController {
     schema: {
       type: 'object',
       properties: {
-        data: {
-          type: 'object',
-          properties: {
-            id: { type: 'number', example: 1 },
-            inicio: { type: 'string', format: 'date-time' },
-            fin: { type: 'string', format: 'date-time', nullable: true },
-            estatus: { type: 'number', example: 1 },
-            idCliente: { type: 'number', example: 5 },
-            idTurno: { type: 'number', example: 10 },
-            idDerrotero: { type: 'number', example: 20 },
-          },
-        },
+        data: openApiViajeListadoItem,
       },
     },
   })

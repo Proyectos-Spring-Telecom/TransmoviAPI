@@ -66,7 +66,10 @@ async function bootstrap() {
     .addTag('Dispositivos', 'Gestión de dispositivos')
     .addTag('Histórico instalaciones', 'Histórico de instalaciones')
     .addTag('Incidentes', 'Registro y gestión de incidentes')
-    .addTag('Instalaciones', 'Gestión de instalaciones')
+    .addTag(
+      'Instalaciones',
+      'Instalaciones: vehículo + N dispositivos + N BlueVoxs. Los GET devuelven `dispositivos[]` (cada elemento con `principal`: 1 o null) y `blueVoxs[]`. POST acepta `idDispositivoPrincipal` opcional (debe estar en `idsDispositivos`). PUT acepta `idsDispositivos`, `idDispositivoPrincipal` opcional, matriz de BlueVoxs y listas `dispositivosAnteriores` / `blueVoxsAnteriores` cuando aplique. Detalle de cuerpos y respuestas en cada endpoint.',
+    )
     .addTag('Licencias', 'Gestión de licencias')
     .addTag(
       'Mantenimiento combustible',
@@ -79,7 +82,10 @@ async function bootstrap() {
     .addTag('Mantenimiento vehicular', 'Gestión de mantenimiento vehicular')
     .addTag('Modulos', 'Gestión de módulos del sistema')
     .addTag('Monederos', 'Gestión de monederos electrónicos')
-    .addTag('Monitoreo', 'Monitoreo en tiempo real')
+    .addTag(
+      'Monitoreo',
+      'Mapa y recorrido GPS. Listado: por instalación solo posición del dispositivo **principal** (`Principal = 1`); sin principal o sin `UltimaPosicion`, la fila sigue apareciendo con campos de posición en null. Recorrido histórico: el `NumeroSerieDispositivo` del body debe ser el del dispositivo principal o el resultado será vacío.',
+    )
     .addTag('Operadores', 'Gestión de operadores')
     .addTag('Pasajeros', 'Gestión de pasajeros')
     .addTag('Permisos', 'Gestión de permisos')
@@ -92,13 +98,19 @@ async function bootstrap() {
     .addTag('Talleres', 'Gestión de talleres')
     .addTag('Tarifas', 'Gestión de tarifas')
     .addTag('Transacciones', 'Registro de transacciones')
-    .addTag('Turnos', 'Gestión de turnos')
+    .addTag(
+      'Turnos',
+      'Turnos de operador ligados a instalación. En GET (listado y detalle) la instalación se expone como `dispositivos[]` y `blueVoxs[]` con la misma forma que instalaciones, incluyendo `principal` por dispositivo.',
+    )
     .addTag('Usuarios', 'Gestión de usuarios')
     .addTag('Usuarios instalaciones', 'Relación usuarios-instalaciones')
     .addTag('Usuarios regiones', 'Relación usuarios-regiones')
     .addTag('Vehiculos', 'Gestión de vehículos')
     .addTag('Verificaciones', 'Gestión de verificaciones vehiculares')
-    .addTag('Viajes', 'Gestión de viajes')
+    .addTag(
+      'Viajes',
+      'Viajes asociados a turno/derrotero/operador. En GET (listado, paginado y uno) los datos de instalación van en `dispositivos[]` y `blueVoxs[]` (JSON agregado), con `principal` en cada dispositivo; no hay columnas planas `idDispositivo` en la raíz.',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

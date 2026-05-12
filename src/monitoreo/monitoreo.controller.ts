@@ -19,6 +19,10 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { RecorridoMonitoreoDto } from './dto/recorrido-monitoreo.dto';
+import {
+  openApiMonitoreoDerroteroItem,
+  openApiMonitoreoPosicionItem,
+} from 'src/common/openapi-instalaciones-monitoreo.schemas';
 
 @ApiTags('Monitoreo')
 @ApiBearerAuth('bearer-token')
@@ -29,28 +33,28 @@ export class MonitoreoController {
 
   @Get('list/:cliente')
   @ApiOperation({
-    summary: 'Listar posiciones en monitoreo',
+    summary: 'Listado para mapa de monitoreo',
     description:
-      'Obtiene el listado de dispositivos/posiciones en tiempo real para el cliente especificado.',
+      'Respuesta: objeto con **`derroteros`** (rutas/regiones del cliente o jerarquía según rol) y **`posicion`** (una fila por instalación activa). Cada fila de `posicion` une solo el dispositivo **principal** (`InstalacionesDispositivos.Principal = 1`) con `UltimaPosicion`. Si no hay principal o no hay última posición, `id`, `latitud`, `longitud`, `idDispositivo`, etc. pueden ser **null** (la instalación igual aparece). Incluye `blueVoxs` por instalación. Orden: `ORDER BY up.Id DESC` (filas sin posición al final).',
   })
-  @ApiParam({ name: 'cliente', description: 'ID del cliente' })
+  @ApiParam({
+    name: 'cliente',
+    description: 'ID de cliente (tenant) para filtrar instalaciones/posiciones',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de posiciones/dispositivos en monitoreo',
+    description:
+      'Objeto `{ derroteros, posicion }` (no va envuelto en `data` a nivel raíz).',
     schema: {
       type: 'object',
       properties: {
-        data: {
+        derroteros: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'number' },
-              latitud: { type: 'number' },
-              longitud: { type: 'number' },
-              idDispositivo: { type: 'number' },
-            },
-          },
+          items: openApiMonitoreoDerroteroItem,
+        },
+        posicion: {
+          type: 'array',
+          items: openApiMonitoreoPosicionItem,
         },
       },
     },
@@ -67,30 +71,25 @@ export class MonitoreoController {
 
   @Post('recorrido')
   @ApiOperation({
-    summary: 'Obtener recorrido del día de un dispositivo',
+    summary: 'Recorrido histórico por número de serie',
     description:
-      'Obtiene las posiciones/recorrido del día de un dispositivo para el monitoreo.',
+      'Devuelve puntos de la tabla **Posiciones** en el rango de fechas. El join usa solo el dispositivo **principal** de cada instalación: el **`NumeroSerieDispositivo`** del body debe ser el del principal; si es el de un dispositivo secundario, la respuesta será **lista vacía** (sin error). Misma forma de enriquecimiento por fila que el listado (dispositivo, `blueVoxs`, vehículo, cliente).',
   })
   @ApiBody({
     type: RecorridoMonitoreoDto,
-    description: 'Filtros: idDispositivo, fecha (formato YYYY-MM-DD)',
+    description:
+      'Obligatorio: `idCliente`, `NumeroSerieDispositivo` (string del principal). Opcional: `fechaInicio` / `fechaFin` (ISO date); si ambas faltan, se usa el día actual desfasado en servidor.',
   })
   @ApiResponse({
     status: 201,
-    description: 'Recorrido con las posiciones del dispositivo',
+    description:
+      '`{ posicion }` donde `posicion` es un arreglo de puntos ordenados por `fechaHora` ascendente.',
     schema: {
       type: 'object',
       properties: {
-        data: {
+        posicion: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              latitud: { type: 'number' },
-              longitud: { type: 'number' },
-              fechaHora: { type: 'string' },
-            },
-          },
+          items: openApiMonitoreoPosicionItem,
         },
       },
     },

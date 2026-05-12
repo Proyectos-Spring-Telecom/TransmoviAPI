@@ -11,14 +11,16 @@ export class RecorridoMonitoreoDto {
   @IsInt()
   @IsNotEmpty({ message: 'El IdCliente es obligatorio' })
   @ApiProperty({
-    description: 'ID del cliente al que pertenece la región',
+    description:
+      'ID del cliente (tenant). Debe coincidir con el cliente del contexto; el recorrido solo incluye posiciones de instalaciones de ese cliente.',
     example: 5,
     required: true,
   })
   idCliente: number;
 
   @ApiProperty({
-    description: 'Es el numero de serie del dispositivo',
+    description:
+      'Número de serie del **dispositivo principal** de la instalación (`InstalacionesDispositivos.Principal = 1`). Si se envía el número de serie de un dispositivo que no es principal, la API responde con lista vacía.',
     example: 'DIS-001A',
     required: true,
   })
