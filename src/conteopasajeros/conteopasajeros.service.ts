@@ -126,7 +126,8 @@ LIMIT 1
       // 3) Obtener viaje activo del día actual para ese turno
       const viajeResult = await this.conteopasajeroRepository.query(
         `
-SELECT v.Id AS idViaje
+SELECT v.Id AS idViaje,
+v.Estatus AS estatusViaje
 FROM Viajes v
 WHERE v.IdTurno = ?
   AND v.Estatus = 1
@@ -143,8 +144,24 @@ LIMIT 1
         );
       }
 
+      console.log(viajeResult[0].idViaje);
+
+      const conteoExistente = await this.conteopasajeroRepository.findOne({
+        where: {
+          numeroSerieBlueVox: createConteopasajeroDto.numeroSerieBlueVox,
+          idViaje: Number(viajeResult[0].idViaje),
+          estatus: EstatusEnum.ACTIVO,
+        },
+      });
+
+      if (conteoExistente && viajeResult[0].estatusViaje === EstatusEnum.ACTIVO) {
+        throw new BadRequestException(
+          `El conteo de pasajeros con el número de serie ${createConteopasajeroDto.numeroSerieBlueVox} ya existe para el viaje: ${viajeResult[0].idViaje} o el viaje ha cerrado.`,
+        );
+      }
       // 4) Asignar idViaje resuelto al DTO antes de guardar
       createConteopasajeroDto.idViaje = Number(viajeResult[0].idViaje);
+      createConteopasajeroDto.estatus = EstatusEnum.ACTIVO;
 
       // 🔹 CREACIÓN DEL REGISTRO: Se crea una instancia de ConteoPasajeros con los datos del DTO
       const newConteoPasajero = await this.conteopasajeroRepository.create(

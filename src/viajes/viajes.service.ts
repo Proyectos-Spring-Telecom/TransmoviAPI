@@ -137,7 +137,7 @@ export class ViajesService {
       // 🔹 CREACIÓN DE REGISTROS DE CONTEO DE PASAJEROS
       // Se crea un registro de ConteoPasajeros por cada BlueVox asociado a la instalación
       // Cada registro se inicializa con valores por defecto (entradas=0, salidas=0, diferencia=0)
-      if (numerosSerieBlueVoxs.length > 0) {
+      /* if (numerosSerieBlueVoxs.length > 0) {
         const conteosPasajeros = numerosSerieBlueVoxs.map(
           (numeroSerie: string) => {
             return this.conteoPasajerosRepository.create({
@@ -154,7 +154,7 @@ export class ViajesService {
 
         // 🔹 GUARDADO EN LOTE: Se guardan todos los conteos de una vez para mayor eficiencia
         await this.conteoPasajerosRepository.save(conteosPasajeros);
-      }
+      } */
 
       // 🔹 REGISTRO EN BITÁCORA: Se registra la operación exitosa
       // Se guarda el DTO completo para auditoría
@@ -274,8 +274,8 @@ WHERE v.Id = ?
    * - El viaje debe pertenecer al mismo cliente y operador del usuario autenticado
    * - La fecha de fin se establece automáticamente con desfase de horario (-6 horas)
    * - El estatus se cambia automáticamente a INACTIVO (finalización del viaje)
-   * - Al finalizar el viaje, todos los registros de ConteoPasajeros asociados al viaje
-   *   también se actualizan a estatus INACTIVO para mantener consistencia
+   * - Al finalizar el viaje, todos los registros de ConteoPasajeros con ese IdViaje
+   *   pasan a Estatus 0 (inactivo), justo antes de registrar en bitácora
    *
    * @param idUser ID del usuario que realiza la operación (para bitácora)
    * @param cliente ID del cliente (obtenido del token, debe coincidir con el del viaje)
@@ -348,13 +348,10 @@ WHERE v.Id = ?
       // Los campos que no se envían en el DTO permanecen sin cambios
       await this.viajesRepository.update(id, updateViajeDto);
 
-      // 🔹 ACTUALIZACIÓN DE CONTEO DE PASAJEROS ASOCIADOS AL VIAJE
-      // Al finalizar un viaje (cambiar su estatus a INACTIVO), se actualizan todos los registros
-      // de ConteoPasajeros asociados a ese viaje para también marcarlos como INACTIVOS
-      // Esto mantiene la consistencia: si el viaje termina, los conteos también deben finalizar
+      // 🔹 ConteoPasajeros por IdViaje → Estatus 0 (justo antes de bitácora SUCCESS)
       await this.conteoPasajerosRepository.update(
-        { idViaje: id }, // Filtra todos los conteos asociados al viaje
-        { estatus: EstatusEnum.INACTIVO }, // Cambia su estatus a INACTIVO
+        { idViaje: id },
+        { estatus: 0 },
       );
 
       // 🔹 REGISTRO EN BITÁCORA: Se registra la operación exitosa

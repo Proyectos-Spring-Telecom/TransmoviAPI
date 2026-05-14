@@ -278,7 +278,7 @@ export class ConteopasajerosController {
   @ApiOperation({
     summary: 'Resumen ascensos vs boletos por viaje (paginado)',
     description:
-      'Por viaje en el rango: totalAscensos (SUM Entradas-Salidas en ConteoPasajeros), totalBoletos (COUNT HistoricoTransaccionesDebito tipo débito), vehiculo (JSON camelCase), blueVoxs (array JSON con conteos en rango por serie). Roles: 1 global; 2/8/10 jerarquía; 3 y default un cliente.',
+      'Por viaje: totalAscensos y totalBoletos sobre todo el histórico del viaje; blueVoxs con conteos anidados sin recorte por fecha. El rango fechaInicio–fechaFin solo filtra qué viajes entran (actividad de conteo o débito en ese intervalo). vehiculo en JSON camelCase. Roles: 1 sin filtro cliente; 2/8/10 jerarquía spGetClientes; 3 y default cliente del token. Ver docs/CONTRATO.md.',
   })
   @ApiParam({ name: 'fechaInicio', description: 'Fecha inicio (YYYY-MM-DD)' })
   @ApiParam({ name: 'fechaFin', description: 'Fecha fin (YYYY-MM-DD)' })

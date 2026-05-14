@@ -25,6 +25,8 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+Documentación de contexto y contratos HTTP del producto: [docs/README.md](./docs/README.md).
+
 ## Project setup
 
 ```bash

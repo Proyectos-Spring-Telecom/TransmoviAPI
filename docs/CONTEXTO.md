@@ -1,261 +1,56 @@
-# Contexto del Proyecto – TransmoviAPI
+# Contexto del proyecto — TransmoviAPI
 
-## 1. Visión general
+## Qué es
 
-**TransmoviAPI** es una API REST desarrollada con **NestJS 11** para el sistema de gestión de transporte público **Transmovi**. Permite la administración integral de operaciones de transporte: flota vehicular, monederos electrónicos, transacciones de recarga y débito, monitoreo en tiempo real, conteo de pasajeros y reportes de recaudación.
+API backend **NestJS 11** (`transmoviapi` v2.0.0) para operaciones Transmovi: conteo de pasajeros, viajes, transacciones, dashboard, mantenimiento, etc. Persistencia con **TypeORM** contra **MySQL** (consultas SQL en crudo donde el dominio lo exige).
 
-- **Versión:** 2.0.0  
-- **Base URL local:** `http://localhost:3010`  
-- **Documentación Swagger:** `/docs`  
-- **Motor de base de datos:** MySQL  
+## Stack relevante
 
----
+- **Runtime:** Node.js, TypeScript.
+- **Framework:** NestJS (módulos, guards, Swagger).
+- **Auth:** JWT (`JwtAuthGuard`); el payload incluye al menos `userId`, `cliente`, `rol`.
+- **Respuestas listas paginadas:** interfaz `ApiResponseCommon` (`data` + `paginated` opcional).
 
-## 2. Dominio de negocio
+## Organización del código
 
-### 2.1 Actores principales
+- Cada dominio vive bajo `src/<modulo>/` con `*.module.ts`, `*.controller.ts`, `*.service.ts` y DTOs en `dto/`.
+- Entidades TypeORM en `src/entities/`.
+- Enumeraciones y tipos compartidos en `src/common/`.
 
-| Actor         | Descripción                                                                 |
-|---------------|-----------------------------------------------------------------------------|
-| **SuperAdministrador** | Acceso total al sistema, todos los clientes y datos.                    |
-| **Administrador**      | Gestión de su cliente y entidades asociadas.                             |
-| **Operador**           | Conducción de vehículos, apertura/cierre de turnos y viajes.             |
-| **Pasajero**           | Uso de monedero electrónico para pagar viajes.                           |
-| **Capturista/Reportes**| Consulta y generación de reportes, sin cambios críticos.                 |
+## Módulo Conteo pasajeros (`conteopasajeros`)
 
-### 2.2 Modelo de datos conceptual
+### Resumen ascensos vs boletos por viaje
 
-```
-Clientes (multi-tenant)
-  ├── Vehículos
-  ├── Dispositivos (GPS)
-  ├── BlueVox (conteo pasajeros)
-  ├── Regiones
-  ├── Rutas
-  ├── Operadores
-  └── Usuarios
+Implementado en `ConteopasajerosService.findResumenAscensosVsBoletosPorViaje` y expuesto en `GET /conteopasajeros/resumen-por-viaje/:fechaInicio/:fechaFin`.
 
-Instalaciones = Vehículo + Dispositivo + BlueVox (unidad operativa)
+**Objetivo de negocio:** por cada **Viaje**, comparar ascensos derivados de **ConteoPasajeros** con “boletos” como **COUNT** de filas en **HistoricoTransaccionesDebito** con `IdTipoTransaccion = DEBITO`, ligadas al viaje (`IdViajes`).
 
-Flujo operativo:
-  Turno (operador + vehículo) → Viajes → Transacciones (débito) / Conteo (BlueVox)
-  Monedero → Recarga → Transacciones (débito por validación)
-```
+**Filtro de fechas (solo inclusión en la lista):**
 
-### 2.3 Procesos principales
+- Un viaje **entra** en el resultado paginado si existe actividad en el rango:
+  - algún `ConteoPasajeros.FechaHora`, o
+  - algún `HistoricoTransaccionesDebito.FechaHoraFinal` (débito),
+  - dentro de `[fechaInicio 00:00:00, fechaFin 23:59:59]`.
+- **No** se filtra por `v.Inicio` / `v.Fin` del viaje para decidir inclusión.
 
-1. **Autenticación:** Usuario/operador/pasajero con JWT o PIN.  
-2. **Recarga:** Pasajero recarga monedero (efectivo/tarjeta).  
-3. **Validación:** Pasajero valida en dispositivo; se debita tarifa del monedero.  
-4. **Turnos:** Operador abre/cierra turno, asocia vehículo y dispositivo. Al cerrar un turno, se cierran automáticamente todos los viajes abiertos asociados (y sus transacciones/conteos).  
-5. **Viajes:** Apertura/cierre de viaje por derrotero.  
-6. **Conteo:** BlueVox registra pasajeros por viaje.  
-7. **Monitoreo:** Posiciones GPS en tiempo real para flota.  
-8. **Reportes:** Recaudación por ruta, operador, vehículo, dispositivo.  
+**Totales y detalle (sin recorte por fecha):**
 
----
+- `totalAscensos`: `SUM(Entradas - Salidas)` de **todo** el histórico de conteo del viaje (subconsulta por `IdViaje`), con reglas de cliente según rol.
+- `totalBoletos`: `COUNT(*)` de débitos del viaje **sin** acotar por fecha en la subconsulta.
+- `blueVoxs[].conteos`: detalle de conteos por serie para ese viaje, **sin** `BETWEEN` de fechas en la subconsulta anidada.
 
-## 3. Arquitectura técnica
+**Modelo SQL:** joins `Viajes` → `Turnos` → `Instalaciones` → `Vehiculos` → `InstalacionesBlueVoxs` (activos) → `BlueVoxs`; agregación `JSON_ARRAYAGG` + `GROUP BY` completo (`v.*` y columnas de vehículo necesarias para `ONLY_FULL_GROUP_BY`). Las variaciones por rol se arman con un objeto `pieces` (subconsultas y `WHERE`) y un único template de `sqlData` / `sqlCount`.
 
-### 3.1 Stack tecnológico
+**Roles (cliente / jerarquía):**
 
-| Capa        | Tecnología                 | Uso                                      |
-|-------------|----------------------------|------------------------------------------|
-| Framework   | NestJS 11                  | API REST modular                         |
-| ORM         | TypeORM 0.3                | Acceso a base de datos                   |
-| BD          | MySQL                      | Persistencia                             |
-| Autenticación | JWT + Passport           | Tokens y estrategias                     |
-| Validación  | class-validator, Joi       | DTOs y configuración                     |
-| Documentación | Swagger / OpenAPI        | Interfaz en `/docs`                      |
-| Storage     | AWS S3                     | Archivos (imágenes, PDF)                 |
-| Email       | Nodemailer                 | Confirmación y recuperación de acceso    |
-| Cron        | @nestjs/schedule           | Cierre de transacciones y turnos         |
+| Rol | Comportamiento |
+|-----|----------------|
+| 1 | Sin filtro de cliente en ascensos/boletos/conteos/listado (salvo EXISTS de actividad en rango). |
+| 2, 8, 10 | Jerarquía vía `clienteHijos` / `spGetClientes`: lista de IDs; filtros en `BlueVoxs`, `Dispositivos`, `Viajes` y EXISTS acordes. |
+| 3 y demás | Cliente fijo del token (`cliente`). |
 
-### 3.2 Estructura de directorios
+**Nota de inclusión:** al exigir `INNER JOIN` a instalación + BlueVox del turno, un viaje sin BlueVox vinculado en esa instalación **no** aparece aunque tenga conteos o débitos en rango.
 
-```
-src/
-├── auth/                    # Autenticación, login, JWT
-├── bitacora/                # Registro de acciones
-├── bluevox/                 # Dispositivos de conteo
-├── clientes/                # Gestión de clientes
-├── conteopasajeros/         # Conteo de pasajeros
-├── dashboard/               # KPIs
-├── derroteros/              # Derroteros por ruta
-├── dispositivos/            # Dispositivos GPS
-├── entities/                # Entidades TypeORM (52 archivos)
-├── guard/                   # JwtAuthGuard, etc.
-├── historicoinstalaciones/  # Histórico de instalaciones
-├── instalaciones/           # Vehículo + Dispositivo + BlueVox
-├── incidentes/              # Incidentes
-├── licencias/               # Licencias de operadores
-├── mantenimiento-*          # Mantenimiento vehicular, combustible, kilometraje
-├── modulos/                 # Módulos del sistema
-├── monederos/               # Monederos electrónicos
-├── monitoreo/               # Monitoreo en tiempo real
-├── operadores/              # Operadores
-├── pasajeros/               # Pasajeros
-├── permisos/                # Permisos por módulo
-├── posiciones/              # Posiciones GPS
-├── regiones/                # Regiones geográficas
-├── reportes/                # Reportes de recaudación
-├── roles/                   # Roles
-├── rutas/                   # Rutas de transporte
-├── s3/                      # Carga de archivos
-├── talleres/                # Talleres
-├── tarifas/                 # Tarifas
-├── transacciones/           # Recargas y débitos
-├── turnos/                  # Turnos de operadores
-├── usuarios/                # Usuarios
-├── usuariosinstalaciones/   # Usuario–Instalación
-├── usuariosregiones/        # Usuario–Región
-├── vehiculos/               # Vehículos
-├── verificaciones/          # Verificaciones vehiculares
-├── viajes/                  # Viajes
-├── cattipo* / cat-*         # Catálogos
-├── app.module.ts
-└── main.ts
-```
+## Mantenimiento de esta documentación
 
-### 3.3 Patrones aplicados
-
-- **Módulos NestJS** por dominio.  
-- **Guard JWT** en casi todos los endpoints.  
-- **ValidationPipe global** con `whitelist`, `forbidNonWhitelisted`, `transform`.  
-- **Filtro global** para respuestas HTTP.  
-- **CORS** configurado (en producción conviene restringir orígenes).  
-
----
-
-## 4. Autenticación y seguridad
-
-### 4.1 Tipos de acceso
-
-| Tipo        | Endpoint                          | Método                |
-|------------|-----------------------------------|------------------------|
-| Usuario    | `POST /login`                     | userName, password     |
-| Operador   | `POST /login/operador/login`      | userName, pinHash, deviceId |
-| Pasajero   | `POST /login/pasajero/registro`   | Registro + confirmación |
-| Recuperación | `POST /login/usuario/recuperar/acceso` | Correo               |
-| Cambio pass | `POST /login/cambiar/accesso`     | Bearer + nueva contraseña |
-
-### 4.2 Payload JWT
-
-```json
-{
-  "userId": number,
-  "email": string,
-  "cliente": number,
-  "rol": number,
-  "idOperador": number | null
-}
-```
-
-### 4.3 Permisos
-
-- Permisos por módulo (`Permisos` → `Modulos`).  
-- Roles con conjuntos de permisos (`Roles` → `UsuariosPermisos`).  
-- Acceso por cliente (multi-tenant).  
-
----
-
-## 5. Integraciones externas
-
-| Servicio      | Uso                              |
-|---------------|-----------------------------------|
-| **AWS S3**    | Subida de archivos (clientes, operadores, etc.) |
-| **Nodemailer**| Correos de confirmación y recuperación |
-| **Haversine** | Cálculo de distancias para tarifas |
-
----
-
-## 6. Tareas programadas (Cron)
-
-| Hora  | Tarea                                                                 |
-|-------|-----------------------------------------------------------------------|
-| 01:30 | Cierre de transacciones, viajes y turnos abiertos                     |
-| 02:30 | Migración de transacciones a histórico y limpieza de tablas activas   |
-
----
-
-## 7. Variables de entorno requeridas
-
-| Variable              | Descripción        |
-|-----------------------|--------------------|
-| DB_HOST               | Host MySQL         |
-| DB_PORT               | Puerto MySQL       |
-| DB_USER               | Usuario MySQL      |
-| DB_PASSWORD           | Contraseña MySQL   |
-| DB_DATABASE           | Base de datos      |
-| JWT_SECRET            | Secreto JWT        |
-| JWT_EXPIRES_IN        | Expiración JWT     |
-| JWT_CONFIRMACION      | Expiración tokens de correo |
-| AWS_REGION            | Región AWS         |
-| AWS_ACCESS_KEY_ID     | Access Key AWS     |
-| AWS_SECRET_ACCESS_KEY | Secret Key AWS     |
-| AWS_S3_BUCKET         | Bucket S3          |
-| UPLOAD_MAX_SIZE       | Tamaño máximo de archivo |
-| PORT                  | Puerto API (default: 3010) |
-
----
-
-## 8. Flujo de datos críticos
-
-### 8.1 Transacción de débito (validación)
-
-1. Dispositivo/envía: `idMonedero`, `idDispositivo`, `idDerrotero`, coordenadas.  
-2. API valida saldo, tarifa y ubicación.  
-3. Se crea o cierra `TransaccionDebito`.  
-4. Se actualiza saldo del monedero.  
-
-### 8.2 Recarga
-
-1. Cliente envía: `idMonedero`, `monto`, `idMetodoPago`.  
-2. API crea `TransaccionRecarga`.  
-3. Se actualiza saldo del monedero.  
-
-### 8.3 Monitoreo
-
-1. `GET /monitoreo/list/:cliente` → última posición por dispositivo.  
-2. `POST /monitoreo/recorrido` → posiciones por dispositivo y fecha.  
-
-### 8.4 Cierre de turno
-
-1. Operador envía `PATCH /turnos/:id` con `numeroSerieDispositivo` para cerrar turno.  
-2. API valida instalación, turno y permisos.  
-3. **Si existen viajes abiertos** (estatus ACTIVO) del turno → se cierran uno a uno (transacciones abiertas, conteos, fin, estatus INACTIVO).  
-4. Se cierra el turno (fin, estatus INACTIVO).  
-
----
-
-## 9. Entidades principales
-
-| Entidad                    | Relación principal                             |
-|----------------------------|-----------------------------------------------|
-| Usuarios                   | Clientes, Roles, Operadores                    |
-| Clientes                   | Jerarquía (idPadre), Vehículos, Regiones       |
-| Operadores                 | Usuarios, Licencias                            |
-| Vehiculos                  | Clientes                                       |
-| Instalaciones              | Vehículo + Dispositivo + BlueVox + Cliente     |
-| Monederos                  | Pasajeros, CatTiposPasajeros, Clientes         |
-| TransaccionesRecarga/Debito| Monederos, Dispositivos, Derroteros            |
-| Viajes                     | Turnos, Derroteros, Operadores                 |
-| Turnos                     | Operadores, Vehículos, Dispositivos, Rutas. Al cerrar, cierra viajes abiertos automáticamente |
-| ConteoPasajeros            | BlueVox, Viajes                                |
-| Posiciones                 | Dispositivos                                   |
-
----
-
-## 10. Módulos eliminados
-
-Los módulos **viajesconteos** y **viajestransacciones** fueron eliminados. No existen endpoints API para estas entidades. Las tablas/entidades pueden seguir en BD para compatibilidad.
-
----
-
-## 11. Consideraciones para desarrollo
-
-- Usar **Swagger** (`/docs`) como referencia de contratos.  
-- Respetar **nombres de variables** y DTOs existentes.  
-- La mayoría de endpoints requieren **Bearer JWT**.  
-- Las respuestas suelen seguir: `{ status, message, data }` o `{ data, paginated }`.  
-- `synchronize: false` en TypeORM: no modificar esquema sin migraciones.  
+Cuando cambien reglas de negocio del resumen por viaje, el orden de parámetros SQL o el shape de respuesta, actualizar **este archivo** y **CONTRATO.md** en el mismo cambio.
