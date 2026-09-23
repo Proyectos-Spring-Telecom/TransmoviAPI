@@ -112,3 +112,13 @@ export enum EnumControlTarifaIncremental {
   INICIAL = 1,
   FINAL = 2,
 }
+
+export enum EnumTipoPago {
+  SPEI = 'SPEI',
+  TARJETA = 'TARJETA',
+}
+
+export enum EnumEstatusPago {
+  NO_ACREDITADO = 0,
+  ACREDITADO = 1,
+}

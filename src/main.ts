@@ -87,6 +87,10 @@ async function bootstrap() {
       'Mapa y recorrido GPS. Listado: por instalación solo posición del dispositivo **principal** (`Principal = 1`); sin principal o sin `UltimaPosicion`, la fila sigue apareciendo con campos de posición en null. Recorrido histórico: el `NumeroSerieDispositivo` del body debe ser el del dispositivo principal o el resultado será vacío.',
     )
     .addTag('Operadores', 'Gestión de operadores')
+    .addTag(
+      'Pagos',
+      'Pagos SPEI, checkout con tarjeta y webhook de acreditación de saldo',
+    )
     .addTag('Pasajeros', 'Gestión de pasajeros')
     .addTag('Permisos', 'Gestión de permisos')
     .addTag('Posiciones', 'Registro de posiciones GPS')
