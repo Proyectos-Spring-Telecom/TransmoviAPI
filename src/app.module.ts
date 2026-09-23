@@ -55,6 +55,7 @@ import { ReportesModule } from './reportes/reportes.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { IncidentesModule } from './incidentes/incidentes.module';
 import { CatMetodoPagoModule } from './cat-metodo-pago/cat-metodo-pago.module';
+import { PagosModule } from './pagos/pagos.module';
 import Joi from 'joi';
 
 @Module({
@@ -129,6 +130,8 @@ import Joi from 'joi';
           .integer()
           .min(1000)
           .default(60_000),
+        URL_PAGOS: Joi.string().uri().required(),
+        URL_PAGOS_TARJETA: Joi.string().uri().required(),
       }),
     }),
 
@@ -270,6 +273,8 @@ import Joi from 'joi';
     IncidentesModule,
 
     CatMetodoPagoModule,
+
+    PagosModule,
   ],
   controllers: [AppController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
