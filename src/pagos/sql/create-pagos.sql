@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS Pagos (
+  Id BIGINT NOT NULL AUTO_INCREMENT,
+  Monedero VARCHAR(100) NOT NULL,
+  Monto DECIMAL(10,2) NOT NULL,
+  TipoPago VARCHAR(20) NULL,
+  ExternalReference VARCHAR(150) NULL,
+  EmailPayer VARCHAR(150) NULL,
+  Descripcion VARCHAR(255) NULL,
+  UrlCheckout VARCHAR(500) NULL,
+  OrderId VARCHAR(80) NULL,
+  PaymentId VARCHAR(80) NULL,
+  Status VARCHAR(50) NULL,
+  PaymentStatus VARCHAR(50) NULL,
+  PaymentStatusDetail VARCHAR(80) NULL,
+  Estatus TINYINT NOT NULL DEFAULT 0,
+  FechaCreacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FechaActualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (Id),
+  KEY IX_Pagos_Monedero (Monedero),
+  KEY IX_Pagos_ExternalReference (ExternalReference),
+  UNIQUE KEY UQ_Pagos_PaymentId (PaymentId),
+  UNIQUE KEY UQ_Pagos_OrderId (OrderId)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
