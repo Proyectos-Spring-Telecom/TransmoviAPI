@@ -69,20 +69,20 @@ export class PagosService {
       });
 
       const idsExternos = this.extraerIdsPagoExterno(data);
-      const pago = await this.pagosRepository.save(
-        this.pagosRepository.create({
-          monedero: createPagoDto.monedero,
-          monto: createPagoDto.transaction_amount,
-          tipoPago: EnumTipoPago.SPEI,
-          externalReference,
-          emailPayer: userName,
-          descripcion,
-          orderId: idsExternos.orderId,
-          paymentId: idsExternos.paymentId,
-          status: idsExternos.status,
-          estatus: EnumEstatusPago.NO_ACREDITADO,
-        }),
-      );
+      const pago = await this.guardarPagoGenerado({
+        monedero: createPagoDto.monedero,
+        monto: createPagoDto.transaction_amount,
+        tipoPago: EnumTipoPago.SPEI,
+        externalReference,
+        emailPayer: userName,
+        descripcion,
+        orderId: idsExternos.orderId,
+        paymentId: idsExternos.paymentId,
+        status: idsExternos.status,
+        paymentStatus: idsExternos.status,
+        paymentStatusDetail: idsExternos.statusDetail,
+        estatus: EnumEstatusPago.NO_ACREDITADO,
+      });
 
       return {
         status: 'success',
@@ -91,28 +91,34 @@ export class PagosService {
         pago: this.mapearPago(pago),
       };
     } catch (error) {
-      console.log(error);
+      console.error('[crearPagoSpei]', error);
       if (error instanceof HttpException) {
         throw error;
       }
 
-      if (axios.isAxiosError(error) && error.response) {
-        const remote = error.response.data;
-        const message =
-          typeof remote === 'string'
-            ? remote
-            : remote?.message ??
-              remote?.error ??
-              'Error al procesar el pago en el servicio externo.';
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          const remote = error.response.data;
+          const message =
+            typeof remote === 'string'
+              ? remote
+              : remote?.message ??
+                remote?.error ??
+                'Error al procesar el pago en el servicio externo.';
 
-        throw new HttpException(
-          Array.isArray(message) ? message.join(', ') : message,
-          error.response.status,
+          throw new HttpException(
+            Array.isArray(message) ? message.join(', ') : message,
+            error.response.status,
+          );
+        }
+
+        throw new BadRequestException(
+          `No se pudo conectar con el servicio de pagos SPEI: ${error.message}`,
         );
       }
 
       throw new BadRequestException(
-        'Se produjo un error al solicitar el pago SPEI.',
+        `Se produjo un error al registrar el pago SPEI: ${error?.message ?? 'Error desconocido'}`,
       );
     }
   }
@@ -425,8 +431,71 @@ export class PagosService {
     );
   }
 
+  private async guardarPagoGenerado(datos: Partial<Pagos>): Promise<Pagos> {
+    const filtros: Array<Pick<Pagos, 'paymentId'> | Pick<Pagos, 'orderId'>> = [];
+    if (datos.paymentId) {
+      filtros.push({ paymentId: datos.paymentId });
+    }
+    if (datos.orderId) {
+      filtros.push({ orderId: datos.orderId });
+    }
+
+    const existente = filtros.length
+      ? await this.pagosRepository.findOne({ where: filtros })
+      : null;
+
+    if (existente) {
+      await this.pagosRepository.update(
+        { id: existente.id },
+        { ...datos, fechaActualizacion: new Date() },
+      );
+      const actualizado = await this.pagosRepository.findOne({
+        where: { id: existente.id },
+      });
+      if (!actualizado) {
+        throw new InternalServerErrorException(
+          'No fue posible actualizar el registro de pago.',
+        );
+      }
+      return actualizado;
+    }
+
+    try {
+      return await this.pagosRepository.save(
+        this.pagosRepository.create(datos),
+      );
+    } catch (error) {
+      if (!this.esDuplicado(error) || filtros.length === 0) {
+        throw error;
+      }
+
+      const duplicado = await this.pagosRepository.findOne({ where: filtros });
+      if (!duplicado) {
+        throw error;
+      }
+
+      await this.pagosRepository.update(
+        { id: duplicado.id },
+        { ...datos, fechaActualizacion: new Date() },
+      );
+      const actualizado = await this.pagosRepository.findOne({
+        where: { id: duplicado.id },
+      });
+      if (!actualizado) {
+        throw error;
+      }
+      return actualizado;
+    }
+  }
+
+  private esDuplicado(error: any): boolean {
+    const codigo = error?.code ?? error?.driverError?.code;
+    const mensaje = String(error?.message ?? error?.driverError?.message ?? '');
+    return codigo === 'ER_DUP_ENTRY' || /duplicate/i.test(mensaje);
+  }
+
   private extraerIdsPagoExterno(data: any) {
-    const orderId = data?.order_id ?? data?.orderId ?? data?.id ?? null;
+    const orderId = data?.order_id ?? data?.orderId ?? null;
     const paymentId =
       data?.payment_id ?? data?.paymentId ?? data?.payment?.id ?? null;
 
@@ -434,6 +503,8 @@ export class PagosService {
       orderId: orderId != null ? String(orderId) : null,
       paymentId: paymentId != null ? String(paymentId) : null,
       status: data?.status != null ? String(data.status) : null,
+      statusDetail:
+        data?.status_detail != null ? String(data.status_detail) : null,
     };
   }
 
