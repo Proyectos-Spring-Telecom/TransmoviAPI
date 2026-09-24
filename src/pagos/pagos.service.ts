@@ -19,7 +19,12 @@ import { Monederos } from 'src/entities/Monederos';
 import { Pagos } from 'src/entities/Pagos';
 import { TransaccionesRecarga } from 'src/entities/TransaccionesRecarga';
 import { horaDesfasada } from 'src/utils/correccion-hora';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  DataSource,
+  EntityManager,
+  FindOptionsWhere,
+  Repository,
+} from 'typeorm';
 import { AcreditarPagoDto } from './dto/acreditar-pago.dto';
 import { CreatePagoDto } from './dto/create-pago.dto';
 import { CreatePagoTarjetaDto } from './dto/create-pago-tarjeta.dto';
@@ -432,7 +437,7 @@ export class PagosService {
   }
 
   private async guardarPagoGenerado(datos: Partial<Pagos>): Promise<Pagos> {
-    const filtros: Array<Pick<Pagos, 'paymentId'> | Pick<Pagos, 'orderId'>> = [];
+    const filtros: FindOptionsWhere<Pagos>[] = [];
     if (datos.paymentId) {
       filtros.push({ paymentId: datos.paymentId });
     }
