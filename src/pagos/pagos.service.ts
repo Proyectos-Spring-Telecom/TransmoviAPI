@@ -178,14 +178,28 @@ export class PagosService {
 
     try {
       const pagoRepo = queryRunner.manager.getRepository(Pagos);
-      const pagoExistente = await this.buscarPagoRegistrado(
-        pagoRepo,
-        acreditarPagoDto,
+      const transaccionesRecargaRepo = queryRunner.manager.getRepository(
+        TransaccionesRecarga,
       );
+      const pagoExistente = await this.buscarPagoPorOrderId(
+        pagoRepo,
+        acreditarPagoDto.order_id,
+      );
+      if (!pagoExistente) {
+        throw new NotFoundException(
+          `No se encontró un pago con OrderId ${acreditarPagoDto.order_id}.`,
+        );
+      }
+      const recargaPrevia = await transaccionesRecargaRepo.findOne({
+        where: {
+          controlTransaccion: acreditarPagoDto.payment_id.slice(0, 30),
+        },
+      });
       const yaAcreditado =
-        pagoExistente?.estatus === EnumEstatusPago.ACREDITADO;
+        pagoExistente?.estatus === EnumEstatusPago.ACREDITADO ||
+        !!recargaPrevia;
 
-      const pago = await this.guardarPagoDesdeWebhook(
+      const pago = await this.actualizarPagoPorOrderId(
         pagoRepo,
         pagoExistente,
         acreditarPagoDto,
@@ -334,76 +348,24 @@ export class PagosService {
     };
   }
 
-  private async buscarPagoRegistrado(
+  private async buscarPagoPorOrderId(
     pagoRepo: Repository<Pagos>,
-    dto: AcreditarPagoDto,
+    orderId: string,
   ) {
-    if (dto.payment_id) {
-      const porPaymentId = await pagoRepo.findOne({
-        where: { paymentId: dto.payment_id },
-      });
-      if (porPaymentId) {
-        return porPaymentId;
-      }
-    }
-
-    if (dto.order_id) {
-      const porOrderId = await pagoRepo.findOne({
-        where: { orderId: dto.order_id },
-      });
-      if (porOrderId) {
-        return porOrderId;
-      }
-    }
-
-    if (dto.external_reference) {
-      const porReferencia = await pagoRepo.findOne({
-        where: { externalReference: dto.external_reference },
-      });
-      if (porReferencia) {
-        return porReferencia;
-      }
-    }
-
-    const pendientes = await pagoRepo.find({
-      where: {
-        monedero: dto.monedero,
-        estatus: EnumEstatusPago.NO_ACREDITADO,
-      },
-      order: { id: 'DESC' },
-      take: 20,
+    return pagoRepo.findOne({
+      where: { orderId },
     });
-
-    const porRefParcial = pendientes.find(
-      (pago) =>
-        !!dto.external_reference &&
-        !!pago.externalReference &&
-        (dto.external_reference.includes(pago.externalReference) ||
-          pago.externalReference.includes(dto.external_reference)),
-    );
-    if (porRefParcial) {
-      return porRefParcial;
-    }
-
-    return (
-      pendientes.find(
-        (pago) => Number(pago.monto) === Number(dto.total_amount),
-      ) ?? null
-    );
   }
 
-  private async guardarPagoDesdeWebhook(
+  private async actualizarPagoPorOrderId(
     pagoRepo: Repository<Pagos>,
-    pagoExistente: Pagos | null,
+    pagoExistente: Pagos,
     dto: AcreditarPagoDto,
     acreditado: boolean,
   ): Promise<Pagos> {
     const datosWebhook: Partial<Pagos> = {
       monedero: dto.monedero,
       monto: dto.total_amount,
-      externalReference:
-        dto.external_reference ?? pagoExistente?.externalReference ?? null,
-      orderId: dto.order_id,
       paymentId: dto.payment_id,
       status: dto.status,
       paymentStatus: dto.payment_status,
@@ -414,26 +376,20 @@ export class PagosService {
       fechaActualizacion: new Date(),
     };
 
-    if (pagoExistente) {
-      await pagoRepo.update({ id: pagoExistente.id }, datosWebhook);
-      const pagoActualizado = await pagoRepo.findOne({
-        where: { id: pagoExistente.id },
-      });
-      if (!pagoActualizado) {
-        throw new InternalServerErrorException(
-          'No fue posible actualizar el registro de pago.',
-        );
-      }
-      return pagoActualizado;
+    const result = await pagoRepo
+      .createQueryBuilder()
+      .update(Pagos)
+      .set(datosWebhook)
+      .where('OrderId = :orderId', { orderId: dto.order_id })
+      .execute();
+
+    if (!result.affected) {
+      throw new InternalServerErrorException(
+        `No fue posible actualizar el pago con OrderId ${dto.order_id}.`,
+      );
     }
 
-    return pagoRepo.save(
-      pagoRepo.create({
-        ...datosWebhook,
-        tipoPago: null,
-        descripcion: `Recarga de saldo: ${dto.total_amount}`,
-      }),
-    );
+    return Object.assign(pagoExistente, datosWebhook);
   }
 
   private async guardarPagoGenerado(datos: Partial<Pagos>): Promise<Pagos> {
