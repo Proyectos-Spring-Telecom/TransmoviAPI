@@ -96,8 +96,12 @@ export class PagosController {
   })
   @ApiResponse({ status: 400, description: 'Error de validación' })
   @ApiResponse({ status: 401, description: 'No autorizado' })
-  crearPagoTarjeta(@Body() createPagoTarjetaDto: CreatePagoTarjetaDto) {
-    return this.pagosService.crearPagoTarjeta(createPagoTarjetaDto);
+  crearPagoTarjeta(
+    @Body() createPagoTarjetaDto: CreatePagoTarjetaDto,
+    @Request() req,
+  ) {
+    const userName = req.user.email;
+    return this.pagosService.crearPagoTarjeta(createPagoTarjetaDto, userName);
   }
 
   @Post('acreditar')

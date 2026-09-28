@@ -78,7 +78,10 @@ export class PagosService {
         monedero: createPagoDto.monedero,
         monto: createPagoDto.transaction_amount,
         tipoPago: EnumTipoPago.SPEI,
-        externalReference,
+        externalReference:
+          data?.external_reference != null
+            ? String(data.external_reference)
+            : externalReference,
         emailPayer: userName,
         descripcion,
         orderId: idsExternos.orderId,
@@ -128,7 +131,16 @@ export class PagosService {
     }
   }
 
-  async crearPagoTarjeta(createPagoTarjetaDto: CreatePagoTarjetaDto) {
+  async crearPagoTarjeta(
+    createPagoTarjetaDto: CreatePagoTarjetaDto,
+    userName: string,
+  ) {
+    if (!userName) {
+      throw new BadRequestException(
+        'No fue posible obtener el usuario que solicita el pago.',
+      );
+    }
+
     const urlPagosTarjeta = this.configService.get<string>('URL_PAGOS_TARJETA');
     if (!urlPagosTarjeta) {
       throw new InternalServerErrorException(
@@ -137,19 +149,28 @@ export class PagosService {
     }
 
     const ref = this.generarExternalReference(createPagoTarjetaDto.monedero);
+    const descripcion = `Recarga de saldo: ${createPagoTarjetaDto.amount}`;
     const url = new URL(urlPagosTarjeta);
     url.searchParams.set('monedero', createPagoTarjetaDto.monedero);
     url.searchParams.set('amount', String(createPagoTarjetaDto.amount));
     url.searchParams.set('ref', ref);
 
+    // En tarjeta el OrderId/PaymentId llegan después, cuando el usuario paga
+    // en el checkout y el webhook acredita. Aquí se registra el pendiente.
     const pago = await this.pagosRepository.save(
       this.pagosRepository.create({
         monedero: createPagoTarjetaDto.monedero,
         monto: createPagoTarjetaDto.amount,
         tipoPago: EnumTipoPago.TARJETA,
         externalReference: ref,
-        descripcion: `Recarga de saldo: ${createPagoTarjetaDto.amount}`,
+        emailPayer: userName,
+        descripcion,
         urlCheckout: url.toString(),
+        orderId: null,
+        paymentId: null,
+        status: 'pending',
+        paymentStatus: 'pending',
+        paymentStatusDetail: 'waiting_payment',
         estatus: EnumEstatusPago.NO_ACREDITADO,
       }),
     );
@@ -181,13 +202,13 @@ export class PagosService {
       const transaccionesRecargaRepo = queryRunner.manager.getRepository(
         TransaccionesRecarga,
       );
-      const pagoExistente = await this.buscarPagoPorOrderId(
+      const pagoExistente = await this.buscarPagoParaWebhook(
         pagoRepo,
-        acreditarPagoDto.order_id,
+        acreditarPagoDto,
       );
       if (!pagoExistente) {
         throw new NotFoundException(
-          `No se encontró un pago con OrderId ${acreditarPagoDto.order_id}.`,
+          `No se encontró un pago pendiente para OrderId ${acreditarPagoDto.order_id} / monedero ${acreditarPagoDto.monedero}.`,
         );
       }
       const recargaPrevia = await transaccionesRecargaRepo.findOne({
@@ -196,10 +217,10 @@ export class PagosService {
         },
       });
       const yaAcreditado =
-        pagoExistente?.estatus === EnumEstatusPago.ACREDITADO ||
+        Number(pagoExistente.estatus) === EnumEstatusPago.ACREDITADO ||
         !!recargaPrevia;
 
-      const pago = await this.actualizarPagoPorOrderId(
+      const pago = await this.actualizarPagoDesdeWebhook(
         pagoRepo,
         pagoExistente,
         acreditarPagoDto,
@@ -348,25 +369,73 @@ export class PagosService {
     };
   }
 
-  private async buscarPagoPorOrderId(
+  private async buscarPagoParaWebhook(
     pagoRepo: Repository<Pagos>,
-    orderId: string,
+    dto: AcreditarPagoDto,
   ) {
-    return pagoRepo.findOne({
-      where: { orderId },
+    // 1) Si ya tiene OrderId (SPEI o reintento de webhook), actualizar esa fila.
+    if (dto.order_id) {
+      const porOrderId = await pagoRepo.findOne({
+        where: { orderId: dto.order_id },
+      });
+      if (porOrderId) {
+        return porOrderId;
+      }
+    }
+
+    // 2) Tarjeta nace sin OrderId: localizar el pendiente por monedero/ref/monto.
+    const pendientes = await pagoRepo.find({
+      where: {
+        monedero: dto.monedero,
+        estatus: EnumEstatusPago.NO_ACREDITADO,
+      },
+      order: { id: 'DESC' },
+      take: 30,
     });
+
+    if (dto.external_reference) {
+      const porRefExacta = pendientes.find(
+        (pago) => pago.externalReference === dto.external_reference,
+      );
+      if (porRefExacta) {
+        return porRefExacta;
+      }
+
+      const porRefParcial = pendientes.find(
+        (pago) =>
+          !!pago.externalReference &&
+          (dto.external_reference!.includes(pago.externalReference) ||
+            pago.externalReference.includes(dto.external_reference!)),
+      );
+      if (porRefParcial) {
+        return porRefParcial;
+      }
+    }
+
+    const porMonto = pendientes.find(
+      (pago) => Number(pago.monto) === Number(dto.total_amount),
+    );
+    if (porMonto) {
+      return porMonto;
+    }
+
+    return pendientes[0] ?? null;
   }
 
-  private async actualizarPagoPorOrderId(
+  private async actualizarPagoDesdeWebhook(
     pagoRepo: Repository<Pagos>,
     pagoExistente: Pagos,
     dto: AcreditarPagoDto,
     acreditado: boolean,
   ): Promise<Pagos> {
+    const id = Number(pagoExistente.id);
     const datosWebhook: Partial<Pagos> = {
       monedero: dto.monedero,
       monto: dto.total_amount,
+      orderId: dto.order_id,
       paymentId: dto.payment_id,
+      externalReference:
+        dto.external_reference ?? pagoExistente.externalReference ?? null,
       status: dto.status,
       paymentStatus: dto.payment_status,
       paymentStatusDetail: dto.payment_status_detail,
@@ -376,20 +445,21 @@ export class PagosService {
       fechaActualizacion: new Date(),
     };
 
+    // Actualiza por Id del registro original (tarjeta nace sin OrderId).
     const result = await pagoRepo
       .createQueryBuilder()
       .update(Pagos)
       .set(datosWebhook)
-      .where('OrderId = :orderId', { orderId: dto.order_id })
+      .where('Id = :id', { id })
       .execute();
 
     if (!result.affected) {
       throw new InternalServerErrorException(
-        `No fue posible actualizar el pago con OrderId ${dto.order_id}.`,
+        `No fue posible actualizar el pago Id ${id} (OrderId ${dto.order_id}).`,
       );
     }
 
-    return Object.assign(pagoExistente, datosWebhook);
+    return Object.assign(pagoExistente, datosWebhook, { id });
   }
 
   private async guardarPagoGenerado(datos: Partial<Pagos>): Promise<Pagos> {
