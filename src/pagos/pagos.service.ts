@@ -371,7 +371,7 @@ export class PagosService {
 
   private async buscarPagoParaWebhook(
     pagoRepo: Repository<Pagos>,
-    orderId: string,
+    dto: AcreditarPagoDto,
   ) {
     // 1) Si ya tiene OrderId (SPEI o reintento de webhook), actualizar esa fila.
     if (dto.order_id) {
